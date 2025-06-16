@@ -20,20 +20,24 @@ interface TableAllocationProps {
 }
 
 const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
-  // Initialize with a typical theatre table layout
+  // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
+    // Tables 1-3: 2 seats each
     { id: 1, seats: 2, isOccupied: false },
-    { id: 2, seats: 4, isOccupied: false },
-    { id: 3, seats: 6, isOccupied: false },
-    { id: 4, seats: 2, isOccupied: false },
+    { id: 2, seats: 2, isOccupied: false },
+    { id: 3, seats: 2, isOccupied: false },
+    // Tables 4-9: 4 seats each
+    { id: 4, seats: 4, isOccupied: false },
     { id: 5, seats: 4, isOccupied: false },
-    { id: 6, seats: 6, isOccupied: false },
-    { id: 7, seats: 2, isOccupied: false },
+    { id: 6, seats: 4, isOccupied: false },
+    { id: 7, seats: 4, isOccupied: false },
     { id: 8, seats: 4, isOccupied: false },
-    { id: 9, seats: 6, isOccupied: false },
+    { id: 9, seats: 4, isOccupied: false },
+    // Tables 10-13: 2 seats each
     { id: 10, seats: 2, isOccupied: false },
-    { id: 11, seats: 4, isOccupied: false },
-    { id: 12, seats: 6, isOccupied: false },
+    { id: 11, seats: 2, isOccupied: false },
+    { id: 12, seats: 2, isOccupied: false },
+    { id: 13, seats: 2, isOccupied: false },
   ]);
 
   const [selectedGuest, setSelectedGuest] = useState<{
