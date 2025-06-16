@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +21,7 @@ interface TableAllocationProps {
 const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
   // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
-    // Tables 1-3: 2 seats each
+    // Tables 1-3: 2 seats each (front row)
     { id: 1, seats: 2, isOccupied: false },
     { id: 2, seats: 2, isOccupied: false },
     { id: 3, seats: 2, isOccupied: false },
@@ -33,7 +32,7 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
     { id: 7, seats: 4, isOccupied: false },
     { id: 8, seats: 4, isOccupied: false },
     { id: 9, seats: 4, isOccupied: false },
-    // Tables 10-13: 2 seats each
+    // Tables 10-13: 2 seats each (back row)
     { id: 10, seats: 2, isOccupied: false },
     { id: 11, seats: 2, isOccupied: false },
     { id: 12, seats: 2, isOccupied: false },
@@ -83,12 +82,12 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
   const occupiedTables = tables.filter(t => t.isOccupied).length;
   const availableTables = tables.filter(t => !t.isOccupied).length;
 
-  // Define table rows for layout
+  // Define table rows for layout - front to back
   const tableRows = [
-    { label: 'Row 1', tableIds: [1, 2, 3] },
-    { label: 'Row 2', tableIds: [4, 5, 6] },
-    { label: 'Row 3', tableIds: [7, 8, 9] },
-    { label: 'Row 4', tableIds: [10, 11, 12, 13] }
+    { label: 'Front Row', tableIds: [1, 2, 3], distance: 'Closest to Stage' },
+    { label: 'Row 2', tableIds: [4, 5, 6], distance: '' },
+    { label: 'Row 3', tableIds: [7, 8, 9], distance: '' },
+    { label: 'Back Row', tableIds: [10, 11, 12, 13], distance: 'Furthest from Stage' }
   ];
 
   const getTableById = (id: number) => tables.find(table => table.id === id);
@@ -202,69 +201,110 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">🎭 Theatre Seating Layout</CardTitle>
+          <CardTitle className="text-xl">🎭 Dinner Theatre Layout</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {tableRows.map((row) => (
-              <div key={row.label} className="space-y-2">
-                <h3 className="text-lg font-semibold text-gray-700">{row.label}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {row.tableIds.map((tableId) => {
-                    const table = getTableById(tableId);
-                    if (!table) return null;
-                    
-                    return (
-                      <div
-                        key={table.id}
-                        className={`
-                          p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
-                          ${getTableColor(table)}
-                          ${selectedGuest ? 'hover:shadow-lg' : ''}
-                        `}
-                        onClick={() => {
-                          if (selectedGuest && !table.isOccupied) {
-                            assignTable(table.id);
-                          }
-                        }}
-                      >
-                        <div className="text-center">
-                          <div className="font-bold text-lg mb-1">Table {table.id}</div>
-                          <div className="text-sm text-gray-600 mb-2">{table.seats} seats</div>
-                          
-                          {table.isOccupied ? (
-                            <div className="space-y-1">
-                              <div className="font-medium text-sm">{table.guestName}</div>
-                              <div className="text-xs text-gray-600">{table.guestCount} guests</div>
-                              <div className="text-xs">
-                                <Badge variant="outline" className="text-xs">
-                                  {table.showTime}
-                                </Badge>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="mt-2 h-6 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  clearTable(table.id);
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="text-green-600 font-medium text-sm">
-                              Available
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          <div className="space-y-8">
+            {/* Stage */}
+            <div className="text-center">
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 px-8 rounded-lg shadow-lg mx-auto max-w-md">
+                <h2 className="text-2xl font-bold">🎭 STAGE 🎭</h2>
+                <p className="text-sm opacity-90">Performance Area</p>
               </div>
-            ))}
+            </div>
+
+            {/* Seating Area */}
+            <div className="space-y-6 bg-gray-50 p-6 rounded-lg">
+              {tableRows.map((row, rowIndex) => (
+                <div key={row.label} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-700">{row.label}</h3>
+                    {row.distance && (
+                      <span className="text-sm text-gray-500 italic">{row.distance}</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-center">
+                    <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${row.tableIds.length}, 1fr)` }}>
+                      {row.tableIds.map((tableId) => {
+                        const table = getTableById(tableId);
+                        if (!table) return null;
+                        
+                        return (
+                          <div key={table.id} className="flex flex-col items-center space-y-2">
+                            {/* Seating behind table (facing stage) */}
+                            <div className="flex space-x-1">
+                              {Array.from({ length: table.seats / 2 }).map((_, i) => (
+                                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
+                              ))}
+                            </div>
+                            
+                            {/* Table */}
+                            <div
+                              className={`
+                                p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
+                                ${getTableColor(table)}
+                                ${selectedGuest ? 'hover:shadow-lg' : ''}
+                              `}
+                              onClick={() => {
+                                if (selectedGuest && !table.isOccupied) {
+                                  assignTable(table.id);
+                                }
+                              }}
+                            >
+                              <div className="text-center">
+                                <div className="font-bold text-sm mb-1">T{table.id}</div>
+                                
+                                {table.isOccupied ? (
+                                  <div className="space-y-1">
+                                    <div className="font-medium text-xs">{table.guestName}</div>
+                                    <div className="text-xs text-gray-600">{table.guestCount}p</div>
+                                    <div className="text-xs">
+                                      <Badge variant="outline" className="text-xs py-0">
+                                        {table.showTime}
+                                      </Badge>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      className="mt-1 h-5 text-xs px-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        clearTable(table.id);
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="text-green-600 font-medium text-xs">
+                                    Free
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Seating in front of table (backs to stage) */}
+                            <div className="flex space-x-1">
+                              {Array.from({ length: table.seats / 2 }).map((_, i) => (
+                                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Legend for seating */}
+            <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
+              <p>• Gray circles represent seating positions</p>
+              <p>• Top seats face the stage, bottom seats have backs to stage</p>
+              <p>• Each table serves as dining surface for all seats</p>
+            </div>
           </div>
         </CardContent>
       </Card>
