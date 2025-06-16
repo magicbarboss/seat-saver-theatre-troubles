@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Users, CheckCircle, User, Clock, Layout } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -16,6 +16,13 @@ interface Guest {
 interface CheckInSystemProps {
   guests: Guest[];
   headers: string[];
+}
+
+interface BookingGroup {
+  mainBooking: Guest;
+  addOns: Guest[];
+  originalIndex: number;
+  addOnIndices: number[];
 }
 
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
@@ -74,6 +81,47 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return 'Unknown';
   };
 
+  // Check if an item is an add-on (doesn't contain show time info)
+  const isAddOn = (itemField: string) => {
+    if (!itemField) return false;
+    
+    // If it contains show time info, it's a main booking
+    const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
+    if (timeMatch) return false;
+    
+    // If it doesn't contain show time info, it's likely an add-on
+    return true;
+  };
+
+  // Group bookings by booking code to identify add-ons
+  const groupedBookings = useMemo(() => {
+    const groups = new Map<string, BookingGroup>();
+    
+    guests.forEach((guest, index) => {
+      const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
+      const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
+      
+      if (!bookingCode) return;
+      
+      if (!groups.has(bookingCode)) {
+        // First occurrence - this is the main booking
+        groups.set(bookingCode, {
+          mainBooking: guest,
+          addOns: [],
+          originalIndex: index,
+          addOnIndices: []
+        });
+      } else {
+        // Subsequent occurrence - this is an add-on
+        const group = groups.get(bookingCode)!;
+        group.addOns.push(guest);
+        group.addOnIndices.push(index);
+      }
+    });
+    
+    return Array.from(groups.values());
+  }, [guests, bookingCodeIndex, itemIndex]);
+
   // Get ticket types from columns I to V (indices 8 to 21)
   const getTicketTypes = (guest: Guest) => {
     const ticketTypes: string[] = [];
@@ -120,12 +168,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return extractShowTime(itemField);
   };
 
-  // Filter guests based on search and show time
-  const filteredGuests = useMemo(() => {
-    return guests.filter((guest, index) => {
-      const bookerField = bookerIndex >= 0 ? guest[bookerIndex] || '' : '';
+  // Filter bookings based on search and show time
+  const filteredBookings = useMemo(() => {
+    return groupedBookings.filter((booking) => {
+      const bookerField = bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '';
       const guestName = extractGuestName(bookerField);
-      const showTime = getShowTime(guest);
+      const showTime = getShowTime(booking.mainBooking);
       
       const matchesSearch = searchTerm === '' || 
         guestName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -134,21 +182,21 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       
       return matchesSearch && matchesShow;
     });
-  }, [guests, searchTerm, showFilter, bookerIndex, itemIndex]);
+  }, [groupedBookings, searchTerm, showFilter, bookerIndex, itemIndex]);
 
-  const handleCheckIn = (guestIndex: number) => {
+  const handleCheckIn = (mainIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
-    const guest = guests[guestIndex];
+    const guest = guests[mainIndex];
     const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
     
-    if (newCheckedIn.has(guestIndex)) {
-      newCheckedIn.delete(guestIndex);
+    if (newCheckedIn.has(mainIndex)) {
+      newCheckedIn.delete(mainIndex);
       toast({
         title: "✅ Checked Out",
         description: `${guestName} has been checked out.`,
       });
     } else {
-      newCheckedIn.add(guestIndex);
+      newCheckedIn.add(mainIndex);
       toast({
         title: "🎉 Checked In",
         description: `${guestName} has been checked in successfully!`,
@@ -180,19 +228,20 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Total Qty Index: {totalQtyIndex} ({totalQtyIndex >= 0 ? headers[totalQtyIndex] : 'Not found'})</p>
         <p className="text-xs">Item Index: {itemIndex} ({itemIndex >= 0 ? headers[itemIndex] : 'Not found'})</p>
         <p className="text-xs">Ticket columns (I-V): {headers.slice(8, 22).join(', ')}</p>
+        <p className="text-xs">Grouped bookings: {groupedBookings.length}</p>
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-gray-800">🎭 Theatre Check-In</h2>
-            <p className="text-gray-600 mt-1">Simple guest management</p>
+            <p className="text-gray-600 mt-1">Simple guest management with add-ons</p>
           </div>
           <div className="flex items-center space-x-6 text-lg">
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
               <Users className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-gray-700">{guests.length}</span>
-              <span className="text-gray-500">Total</span>
+              <span className="font-semibold text-gray-700">{groupedBookings.length}</span>
+              <span className="text-gray-500">Bookings</span>
             </div>
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -270,24 +319,24 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredGuests.map((guest, index) => {
-                  const originalIndex = guests.indexOf(guest);
-                  const isCheckedIn = checkedInGuests.has(originalIndex);
+                {filteredBookings.map((booking) => {
+                  const isCheckedIn = checkedInGuests.has(booking.originalIndex);
                   
-                  const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
-                  const booker = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
-                  const totalQty = totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1';
-                  const showTime = getShowTime(guest);
-                  const ticketTypes = getTicketTypes(guest);
-                  const note = noteIndex >= 0 ? guest[noteIndex] || '' : '';
+                  const bookingCode = bookingCodeIndex >= 0 ? booking.mainBooking[bookingCodeIndex] || '' : '';
+                  const booker = extractGuestName(bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '');
+                  const totalQty = totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1';
+                  const showTime = getShowTime(booking.mainBooking);
+                  const ticketTypes = getTicketTypes(booking.mainBooking);
+                  const note = noteIndex >= 0 ? booking.mainBooking[noteIndex] || '' : '';
                   
                   return (
-                    <TableRow key={originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
+                    <TableRow key={booking.originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
                       <TableCell>
                         <div className="font-mono text-sm text-gray-700">
                           {bookingCode}
@@ -322,13 +371,30 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="text-sm text-gray-700 max-w-xs">
+                          {booking.addOns.length > 0 ? (
+                            <div className="space-y-1">
+                              {booking.addOns.map((addOn, idx) => {
+                                const addOnItem = itemIndex >= 0 ? addOn[itemIndex] || '' : '';
+                                return (
+                                  <div key={idx} className="bg-orange-50 px-2 py-1 rounded text-xs flex items-center">
+                                    <Plus className="h-3 w-3 mr-1 text-orange-600" />
+                                    {addOnItem}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : 'No add-ons'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="text-sm text-gray-600 max-w-xs">
                           {note}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Button
-                          onClick={() => handleCheckIn(originalIndex)}
+                          onClick={() => handleCheckIn(booking.originalIndex)}
                           variant={isCheckedIn ? "destructive" : "default"}
                           size="sm"
                           className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
@@ -341,10 +407,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 })}
               </TableBody>
             </Table>
-            {filteredGuests.length === 0 && (
+            {filteredBookings.length === 0 && (
               <div className="text-center py-12">
                 <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <div className="text-lg text-gray-500 mb-2">No guests found</div>
+                <div className="text-lg text-gray-500 mb-2">No bookings found</div>
                 <div className="text-gray-400">Try adjusting your search or filter criteria</div>
               </div>
             )}
@@ -364,8 +430,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               </h3>
               <div className="space-y-3">
                 {['7:00pm', '9:00pm'].map(time => {
-                  const count = guests.filter(guest => getShowTime(guest) === time).length;
-                  const percentage = guests.length > 0 ? Math.round((count / guests.length) * 100) : 0;
+                  const count = groupedBookings.filter(booking => getShowTime(booking.mainBooking) === time).length;
+                  const percentage = groupedBookings.length > 0 ? Math.round((count / groupedBookings.length) * 100) : 0;
                   return (
                     <div key={time} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                       <span className="font-medium text-gray-700">{time} Show</span>
@@ -391,11 +457,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <span className="font-medium text-gray-700">Waiting</span>
-                  <span className="font-bold text-red-600 text-xl">{guests.length - checkedInGuests.size}</span>
+                  <span className="font-bold text-red-600 text-xl">{groupedBookings.length - checkedInGuests.size}</span>
                 </div>
                 <div className="text-center pt-4">
                   <div className="text-3xl font-bold text-gray-800">
-                    {guests.length > 0 ? Math.round((checkedInGuests.size / guests.length) * 100) : 0}%
+                    {groupedBookings.length > 0 ? Math.round((checkedInGuests.size / groupedBookings.length) * 100) : 0}%
                   </div>
                   <div className="text-gray-600">Completion Rate</div>
                 </div>
@@ -409,8 +475,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               </h3>
               <div className="text-center">
                 <div className="text-4xl font-bold text-purple-600 mb-2">
-                  {guests.reduce((total, guest) => {
-                    const qty = totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1';
+                  {groupedBookings.reduce((total, booking) => {
+                    const qty = totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1';
                     return total + parseInt(qty);
                   }, 0)}
                 </div>
