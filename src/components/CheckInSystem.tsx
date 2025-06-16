@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,18 +121,32 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return Array.from(groups.values());
   }, [guests, bookingCodeIndex, itemIndex]);
 
-  // Get ticket types from columns I to V (indices 8 to 21)
+  // Get ticket types from columns I to AG (indices 8 to 32) - handling duplicates
   const getTicketTypes = (guest: Guest) => {
     const ticketTypes: string[] = [];
+    const seenTickets = new Set<string>(); // Track seen ticket types to avoid duplicates
     
-    // Check columns I through V (indices 8-21)
-    for (let i = 8; i <= 21 && i < headers.length; i++) {
+    // Check columns I through AG (indices 8-32)
+    for (let i = 8; i <= 32 && i < headers.length; i++) {
       const value = guest[i];
       if (value && value.trim() !== '' && value !== '0') {
         const header = headers[i];
         // Only include if it looks like a ticket quantity
         if (!isNaN(parseInt(value))) {
-          ticketTypes.push(`${value}x ${header}`);
+          const ticketDisplay = `${value}x ${header}`;
+          // Only add if we haven't seen this exact ticket type before
+          if (!seenTickets.has(header)) {
+            ticketTypes.push(ticketDisplay);
+            seenTickets.add(header);
+          } else {
+            // If duplicate header, add the quantity to existing one
+            const existingIndex = ticketTypes.findIndex(ticket => ticket.includes(header));
+            if (existingIndex >= 0) {
+              const existingQty = parseInt(ticketTypes[existingIndex].split('x')[0]);
+              const newQty = existingQty + parseInt(value);
+              ticketTypes[existingIndex] = `${newQty}x ${header}`;
+            }
+          }
         }
       }
     }
@@ -227,8 +240,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Booker Index: {bookerIndex} ({bookerIndex >= 0 ? headers[bookerIndex] : 'Not found'})</p>
         <p className="text-xs">Total Qty Index: {totalQtyIndex} ({totalQtyIndex >= 0 ? headers[totalQtyIndex] : 'Not found'})</p>
         <p className="text-xs">Item Index: {itemIndex} ({itemIndex >= 0 ? headers[itemIndex] : 'Not found'})</p>
-        <p className="text-xs">Ticket columns (I-V): {headers.slice(8, 22).join(', ')}</p>
+        <p className="text-xs">Ticket columns (I-AG): {headers.slice(8, 33).join(', ')}</p>
         <p className="text-xs">Grouped bookings: {groupedBookings.length}</p>
+        <p className="text-xs">Duplicate headers found: {headers.filter((header, index) => headers.indexOf(header) !== index).join(', ')}</p>
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
