@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, Check, X, Plus, Minus, AlertTriangle } from 'lucide-react';
+import { Users, Check, X, Plus, Minus, AlertTriangle, Bell } from 'lucide-react';
 
 interface Table {
   id: number;
@@ -19,14 +19,17 @@ interface CheckedInGuest {
   count: number;
   showTime: string;
   originalIndex: number;
+  pagerNumber?: number;
+  hasBeenSeated?: boolean;
 }
 
 interface TableAllocationProps {
   onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
   checkedInGuests?: CheckedInGuest[];
+  onPagerRelease?: (pagerNumber: number) => void;
 }
 
-const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocationProps) => {
+const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }: TableAllocationProps) => {
   // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
     // Tables 1-3: 2 seats each (front row)
@@ -53,8 +56,13 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
     guest: CheckedInGuest;
     tables: Table[];
   } | null>(null);
+  const [showPagerReleaseDialog, setShowPagerReleaseDialog] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<{
+    guest: CheckedInGuest;
+    tables: Table[];
+  } | null>(null);
 
-  // Define adjacent table groups for splitting suggestions
+  // Updated adjacent table groups to include vertical adjacency
   const adjacentTableGroups = [
     [1, 2, 3], // Front row
     [4, 5, 6], // Row 2
@@ -63,6 +71,13 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
     [4, 5], [5, 6], // Adjacent pairs in row 2
     [7, 8], [8, 9], // Adjacent pairs in row 3
     [10, 11], [11, 12], [12, 13], // Adjacent pairs in back row
+    // Vertical adjacency
+    [1, 4], [2, 5], [3, 6], // Front to row 2
+    [4, 7], [5, 8], [6, 9], // Row 2 to row 3
+    [7, 10], [8, 11], [9, 12], // Row 3 to back row
+    // Extended vertical combinations
+    [1, 4, 7], [2, 5, 8], [3, 6, 9], // Front through row 3
+    [4, 7, 10], [5, 8, 11], [6, 9, 12], // Row 2 through back
   ];
 
   const getAdjacentTables = (tableId: number): number[] => {
@@ -124,6 +139,18 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
   };
 
   const assignGuestToTable = (guest: CheckedInGuest, tablesToUse: Table[]) => {
+    // Check if guest has a pager that needs to be released
+    if (guest.pagerNumber && !guest.hasBeenSeated) {
+      setPendingAssignment({ guest, tables: tablesToUse });
+      setShowPagerReleaseDialog(true);
+      return;
+    }
+
+    // Proceed with table assignment
+    completeTableAssignment(guest, tablesToUse);
+  };
+
+  const completeTableAssignment = (guest: CheckedInGuest, tablesToUse: Table[]) => {
     const updatedTables = tables.map(table => {
       if (tablesToUse.some(t => t.id === table.id)) {
         return {
@@ -147,6 +174,20 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
     setShowAssignmentDialog(false);
     setSelectedTable(null);
     setSplitSuggestion(null);
+    setShowPagerReleaseDialog(false);
+    setPendingAssignment(null);
+  };
+
+  const handlePagerRelease = () => {
+    if (pendingAssignment && pendingAssignment.guest.pagerNumber) {
+      // Release the pager
+      if (onPagerRelease) {
+        onPagerRelease(pendingAssignment.guest.pagerNumber);
+      }
+      
+      // Complete the table assignment
+      completeTableAssignment(pendingAssignment.guest, pendingAssignment.tables);
+    }
   };
 
   const suggestSplit = (guest: CheckedInGuest) => {
@@ -374,6 +415,9 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
     }
   };
 
+  // Filter out guests who have already been seated
+  const availableGuests = checkedInGuests.filter(guest => !guest.hasBeenSeated);
+
   return (
     <div className="space-y-6">
       {/* Table Assignment Dialog */}
@@ -389,11 +433,21 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
               <div>
                 <h4 className="font-medium mb-3">Guests that fit ({selectedTable.seats} seats available):</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {getSuitableGuests(selectedTable).map((guest, idx) => (
+                  {getSuitableGuests(selectedTable).filter(guest => availableGuests.includes(guest)).map((guest, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
                       <div>
                         <div className="font-medium">{guest.name}</div>
-                        <div className="text-sm text-gray-600">{guest.count} guests • {guest.showTime}</div>
+                        <div className="text-sm text-gray-600">
+                          {guest.count} guests • {guest.showTime}
+                          {guest.pagerNumber && (
+                            <span className="ml-2">
+                              <Badge variant="outline" className="bg-blue-50">
+                                <Bell className="h-3 w-3 mr-1" />
+                                Pager {guest.pagerNumber}
+                              </Badge>
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Button
                         onClick={() => assignGuestToTable(guest, [selectedTable])}
@@ -403,25 +457,35 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
                       </Button>
                     </div>
                   ))}
-                  {getSuitableGuests(selectedTable).length === 0 && (
-                    <p className="text-gray-500 text-center py-4">No checked-in guests fit this table size</p>
+                  {getSuitableGuests(selectedTable).filter(guest => availableGuests.includes(guest)).length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No available checked-in guests fit this table size</p>
                   )}
                 </div>
               </div>
 
               {/* Large parties that need splitting */}
-              {getLargeParties(selectedTable).length > 0 && (
+              {getLargeParties(selectedTable).filter(guest => availableGuests.includes(guest)).length > 0 && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center">
                     <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
                     Large parties (need multiple tables):
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {getLargeParties(selectedTable).map((guest, idx) => (
+                    {getLargeParties(selectedTable).filter(guest => availableGuests.includes(guest)).map((guest, idx) => (
                       <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-orange-50">
                         <div>
                           <div className="font-medium">{guest.name}</div>
-                          <div className="text-sm text-gray-600">{guest.count} guests • {guest.showTime}</div>
+                          <div className="text-sm text-gray-600">
+                            {guest.count} guests • {guest.showTime}
+                            {guest.pagerNumber && (
+                              <span className="ml-2">
+                                <Badge variant="outline" className="bg-blue-50">
+                                  <Bell className="h-3 w-3 mr-1" />
+                                  Pager {guest.pagerNumber}
+                                </Badge>
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <Button
                           variant="outline"
@@ -451,6 +515,14 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
             <div className="space-y-4">
               <p className="text-gray-700">
                 <strong>{splitSuggestion.guest.name}</strong> has {splitSuggestion.guest.count} guests.
+                {splitSuggestion.guest.pagerNumber && (
+                  <span className="ml-2">
+                    <Badge variant="outline" className="bg-blue-50">
+                      <Bell className="h-3 w-3 mr-1" />
+                      Pager {splitSuggestion.guest.pagerNumber}
+                    </Badge>
+                  </span>
+                )}
               </p>
               
               <div className="bg-blue-50 p-4 rounded-lg">
@@ -482,6 +554,68 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
                 <Button
                   variant="outline"
                   onClick={() => setSplitSuggestion(null)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Pager Release Dialog */}
+      <Dialog open={showPagerReleaseDialog} onOpenChange={setShowPagerReleaseDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <Bell className="h-5 w-5 mr-2 text-blue-600" />
+              Release Pager
+            </DialogTitle>
+          </DialogHeader>
+          
+          {pendingAssignment && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-gray-700 mb-2">
+                  <strong>{pendingAssignment.guest.name}</strong> is being seated at:
+                </p>
+                <div className="flex items-center space-x-2 mb-3">
+                  {pendingAssignment.tables.map((table, idx) => (
+                    <div key={table.id} className="flex items-center">
+                      <Badge variant="outline" className="bg-white">
+                        Table {table.id}
+                      </Badge>
+                      {idx < pendingAssignment.tables.length - 1 && (
+                        <span className="mx-2 text-gray-500">+</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {pendingAssignment.guest.pagerNumber && (
+                  <div className="flex items-center space-x-2">
+                    <Bell className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium">
+                      Please collect Pager {pendingAssignment.guest.pagerNumber} from the guests
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={handlePagerRelease}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Pager Collected - Complete Seating
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowPagerReleaseDialog(false);
+                    setPendingAssignment(null);
+                  }}
                   className="flex-1"
                 >
                   Cancel
@@ -613,8 +747,8 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocatio
             {/* Legend for seating */}
             <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
               <p>• Click any available table to assign checked-in guests</p>
-              <p>• Large parties will get suggestions for adjacent table splits</p>
-              <p>• Use +/- buttons to adjust seating for available tables</p>
+              <p>• Large parties will get suggestions for adjacent table splits (including T6+T9, T5+T8, etc.)</p>
+              <p>• Pagers will be automatically released when guests are seated</p>
             </div>
           </div>
         </CardContent>
