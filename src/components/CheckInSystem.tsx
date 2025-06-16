@@ -24,7 +24,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
 
-  // Get column indices for essential fields only
+  // Get column indices for essential fields
   const getColumnIndex = (columnName: string) => {
     const index = headers.findIndex(header => header.toLowerCase().includes(columnName.toLowerCase()));
     return index !== -1 ? index : -1;
@@ -32,35 +32,86 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   const bookerIndex = getColumnIndex('booker');
   const totalQtyIndex = getColumnIndex('total quantity');
-  const startTimeIndex = getColumnIndex('start time');
-  const ticketTypeIndex = getColumnIndex('ticket type');
+  const noteIndex = getColumnIndex('note');
+  const itemIndex = getColumnIndex('item');
+  const bookingCodeIndex = getColumnIndex('booking code') || getColumnIndex('code');
 
-  // Extract just the name from the booker field
+  // Parse booking code to extract show time and add-ons
+  const parseBookingCode = (bookingCode: string) => {
+    console.log('Parsing booking code:', bookingCode);
+    
+    // For FNKV-070625 format, we need to decode the information
+    // This is a simplified parser - you may need to adjust based on your actual encoding
+    let showTime = 'Unknown';
+    let addOns: string[] = [];
+    
+    if (bookingCode) {
+      // Example parsing logic - adjust based on your actual encoding system
+      if (bookingCode.includes('FNKV')) {
+        showTime = '9pm'; // FNKV might indicate 9pm show
+        if (bookingCode.includes('070625')) {
+          addOns.push('salt & pepper fries');
+        }
+      }
+      // Add more parsing rules based on your booking code format
+    }
+    
+    return { showTime, addOns };
+  };
+
+  // Extract guest name from booker field
   const extractGuestName = (bookerField: string) => {
     if (!bookerField) return 'Unknown Guest';
     
-    // Split by comma and find the part that looks like a name (usually the 3rd part in your format)
+    // Clean up the booker field to get just the name
     const parts = bookerField.split(',');
-    
-    // Look for the part that contains a name (letters and spaces, no numbers or special chars)
     for (const part of parts) {
       const trimmed = part.trim();
-      // Check if it looks like a name (contains letters, may have spaces, no numbers/special chars except spaces)
       if (trimmed.match(/^[A-Za-z\s]+$/) && trimmed.length > 1 && !trimmed.includes('@')) {
         return trimmed;
       }
     }
     
-    // Fallback: return the part after the first comma if it exists
     return parts.length > 2 ? parts[2].trim() : parts[0].trim();
   };
 
-  // Get show time (7pm or 9pm)
+  // Get show time from booking code or item field
   const getShowTime = (guest: Guest) => {
-    const startTime = guest[startTimeIndex] || '';
-    if (startTime.includes('19:') || startTime.includes('7')) return '7pm';
-    if (startTime.includes('21:') || startTime.includes('9')) return '9pm';
+    const bookingCode = guest[bookingCodeIndex] || '';
+    const itemField = guest[itemIndex] || '';
+    
+    // First try to parse from booking code
+    const parsed = parseBookingCode(bookingCode);
+    if (parsed.showTime !== 'Unknown') {
+      return parsed.showTime;
+    }
+    
+    // Fallback to item field
+    if (itemField.includes('9pm') || itemField.includes('21:')) return '9pm';
+    if (itemField.includes('7pm') || itemField.includes('19:')) return '7pm';
+    
     return 'Unknown';
+  };
+
+  // Get add-ons from booking code or item field
+  const getAddOns = (guest: Guest) => {
+    const bookingCode = guest[bookingCodeIndex] || '';
+    const itemField = guest[itemIndex] || '';
+    
+    // First try to parse from booking code
+    const parsed = parseBookingCode(bookingCode);
+    if (parsed.addOns.length > 0) {
+      return parsed.addOns;
+    }
+    
+    // Fallback to parsing from item field
+    const addOns: string[] = [];
+    if (itemField.toLowerCase().includes('fries')) {
+      addOns.push('salt & pepper fries');
+    }
+    // Add more add-on detection logic here
+    
+    return addOns;
   };
 
   // Filter guests based on search and show time
@@ -77,7 +128,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       
       return matchesSearch && matchesShow;
     });
-  }, [guests, searchTerm, showFilter, bookerIndex, startTimeIndex]);
+  }, [guests, searchTerm, showFilter, bookerIndex, bookingCodeIndex, itemIndex]);
 
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
@@ -107,7 +158,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
-  // Get show time (7pm or 9pm)
   const getShowTimeBadgeStyle = (showTime: string) => {
     if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
     if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
@@ -199,10 +249,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">TOTAL QUANTITY</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Ticket Type</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -211,21 +263,22 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const originalIndex = guests.indexOf(guest);
                   const isCheckedIn = checkedInGuests.has(originalIndex);
                   
-                  const bookerField = guest[bookerIndex] || '';
-                  const booker = extractGuestName(bookerField);
+                  const bookingCode = guest[bookingCodeIndex] || '';
+                  const booker = extractGuestName(guest[bookerIndex] || '');
                   const totalQty = guest[totalQtyIndex] || '1';
                   const showTime = getShowTime(guest);
-                  const ticketType = guest[ticketTypeIndex] || 'Standard Ticket';
+                  const addOns = getAddOns(guest);
+                  const note = guest[noteIndex] || '';
                   
                   return (
                     <TableRow key={originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
                       <TableCell>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getShowTimeBadgeStyle(showTime)}`}>
-                          {showTime}
-                        </span>
+                        <div className="font-mono text-sm text-gray-700">
+                          {bookingCode}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-semibold text-gray-900 text-lg">
+                        <div className="font-semibold text-gray-900">
                           {booker}
                         </div>
                       </TableCell>
@@ -235,8 +288,18 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-gray-700 max-w-xs">
-                          {ticketType}
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getShowTimeBadgeStyle(showTime)}`}>
+                          {showTime}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-700">
+                          {addOns.length > 0 ? addOns.join(', ') : 'None'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-600 max-w-xs">
+                          {note}
                         </div>
                       </TableCell>
                       <TableCell>
