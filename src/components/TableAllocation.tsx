@@ -1,19 +1,11 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, Check, X, Plus, Minus, AlertTriangle, Bell, MapPin } from 'lucide-react';
-
-interface Table {
-  id: number;
-  seats: number;
-  isOccupied: boolean;
-  guestName?: string;
-  guestCount?: number;
-  showTime?: string;
-  isAllocated?: boolean; // New: table is allocated but guest not seated yet
-}
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Users, MapPin, Utensils, Radio, CheckCircle } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface CheckedInGuest {
   name: string;
@@ -22,898 +14,456 @@ interface CheckedInGuest {
   originalIndex: number;
   pagerNumber?: number;
   hasBeenSeated?: boolean;
-  hasTableAllocated?: boolean; // New: guest has table allocated but not seated
+  hasTableAllocated?: boolean;
 }
 
 interface TableAllocationProps {
   onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
-  checkedInGuests?: CheckedInGuest[];
-  onPagerRelease?: (pagerNumber: number) => void;
-  onGuestSeated?: (guestIndex: number) => void;
-  onTableAllocated?: (guestIndex: number, tableIds: number[]) => void; // New callback
+  checkedInGuests: CheckedInGuest[];
+  onPagerRelease: (pagerNumber: number) => void;
+  onGuestSeated: (guestIndex: number) => void;
+  onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
 }
 
-const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, onGuestSeated, onTableAllocated }: TableAllocationProps) => {
-  // Initialize with your specific table layout
+interface Table {
+  id: number;
+  name: string;
+  capacity: number;
+  status: 'AVAILABLE' | 'ALLOCATED' | 'OCCUPIED';
+  allocatedTo?: string;
+  allocatedGuest?: CheckedInGuest;
+  splitWith?: number[];
+}
+
+const TableAllocation = ({ 
+  onTableAssign, 
+  checkedInGuests, 
+  onPagerRelease, 
+  onGuestSeated,
+  onTableAllocated 
+}: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
-    // Tables 1-3: 2 seats each (front row)
-    { id: 1, seats: 2, isOccupied: false },
-    { id: 2, seats: 2, isOccupied: false },
-    { id: 3, seats: 2, isOccupied: false },
-    // Tables 4-9: 4 seats each
-    { id: 4, seats: 4, isOccupied: false },
-    { id: 5, seats: 4, isOccupied: false },
-    { id: 6, seats: 4, isOccupied: false },
-    { id: 7, seats: 4, isOccupied: false },
-    { id: 8, seats: 4, isOccupied: false },
-    { id: 9, seats: 4, isOccupied: false },
-    // Tables 10-13: 2 seats each (back row)
-    { id: 10, seats: 2, isOccupied: false },
-    { id: 11, seats: 2, isOccupied: false },
-    { id: 12, seats: 2, isOccupied: false },
-    { id: 13, seats: 2, isOccupied: false },
+    { id: 1, name: 'T1', capacity: 2, status: 'AVAILABLE' },
+    { id: 2, name: 'T2', capacity: 2, status: 'AVAILABLE' },
+    { id: 3, name: 'T3', capacity: 4, status: 'AVAILABLE' },
+    { id: 4, name: 'T4', capacity: 4, status: 'AVAILABLE' },
+    { id: 5, name: 'T5', capacity: 4, status: 'AVAILABLE' },
+    { id: 6, name: 'T6', capacity: 4, status: 'AVAILABLE' },
+    { id: 7, name: 'T7', capacity: 2, status: 'AVAILABLE' },
+    { id: 8, name: 'T8', capacity: 2, status: 'AVAILABLE' },
+    { id: 9, name: 'T9', capacity: 4, status: 'AVAILABLE' },
+    { id: 10, name: 'T10', capacity: 4, status: 'AVAILABLE' },
+    { id: 11, name: 'T11', capacity: 4, status: 'AVAILABLE' },
+    { id: 12, name: 'T12', capacity: 4, status: 'AVAILABLE' },
+    { id: 13, name: 'T13', capacity: 6, status: 'AVAILABLE' },
+    { id: 14, name: 'T14', capacity: 6, status: 'AVAILABLE' },
+    { id: 15, name: 'T15', capacity: 6, status: 'AVAILABLE' },
+    { id: 16, name: 'T16', capacity: 6, status: 'AVAILABLE' },
   ]);
 
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
-  const [splitSuggestion, setSplitSuggestion] = useState<{
-    guest: CheckedInGuest;
-    tables: Table[];
-  } | null>(null);
-  const [showPagerReleaseDialog, setShowPagerReleaseDialog] = useState(false);
-  const [pendingAssignment, setPendingAssignment] = useState<{
-    guest: CheckedInGuest;
-    tables: Table[];
-  } | null>(null);
+  const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
 
-  // Updated adjacent table groups to include vertical adjacency
-  const adjacentTableGroups = [
-    [1, 2, 3], // Front row
-    [4, 5, 6], // Row 2
-    [7, 8, 9], // Row 3
-    [10, 11, 12, 13], // Back row
-    [4, 5], [5, 6], // Adjacent pairs in row 2
-    [7, 8], [8, 9], // Adjacent pairs in row 3
-    [10, 11], [11, 12], [12, 13], // Adjacent pairs in back row
-    // Vertical adjacency
-    [1, 4], [2, 5], [3, 6], // Front to row 2
-    [4, 7], [5, 8], [6, 9], // Row 2 to row 3
-    [7, 10], [8, 11], [9, 12], // Row 3 to back row
-    // Extended vertical combinations
-    [1, 4, 7], [2, 5, 8], [3, 6, 9], // Front through row 3
-    [4, 7, 10], [5, 8, 11], [6, 9, 12], // Row 2 through back
-  ];
-
-  const getAdjacentTables = (tableId: number): number[] => {
-    for (const group of adjacentTableGroups) {
-      if (group.includes(tableId)) {
-        return group.filter(id => id !== tableId);
+  // Load table state from localStorage on mount
+  useEffect(() => {
+    const savedTables = localStorage.getItem('table-allocation-state');
+    if (savedTables) {
+      try {
+        const parsedTables = JSON.parse(savedTables);
+        setTables(parsedTables);
+        console.log('Loaded table allocation state');
+      } catch (error) {
+        console.error('Failed to load table allocation state:', error);
       }
     }
-    return [];
-  };
+  }, []);
 
-  const getSuitableGuests = (table: Table) => {
-    return checkedInGuests.filter(guest => 
-      guest.count <= table.seats && 
-      !guest.hasBeenSeated && 
-      !guest.hasTableAllocated
-    );
-  };
+  // Save table state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('table-allocation-state', JSON.stringify(tables));
+  }, [tables]);
 
-  const getLargeParties = (table: Table) => {
-    return checkedInGuests.filter(guest => 
-      guest.count > table.seats && 
-      !guest.hasBeenSeated && 
-      !guest.hasTableAllocated
-    );
-  };
-
-  const findSplitOptions = (guest: CheckedInGuest, clickedTable: Table) => {
-    const adjacentTableIds = getAdjacentTables(clickedTable.id);
-    const availableAdjacent = tables.filter(t => 
-      adjacentTableIds.includes(t.id) && !t.isOccupied && !t.isAllocated
-    );
-
-    const splitOptions: Table[][] = [];
-    
-    // Try combinations of clicked table + adjacent tables
-    for (let i = 0; i < availableAdjacent.length; i++) {
-      const combo = [clickedTable, availableAdjacent[i]];
-      const totalSeats = combo.reduce((sum, t) => sum + t.seats, 0);
-      if (totalSeats >= guest.count) {
-        splitOptions.push(combo);
-      }
-    }
-
-    // Try combinations of 3 tables if needed
-    if (guest.count > clickedTable.seats + Math.max(...availableAdjacent.map(t => t.seats))) {
-      for (let i = 0; i < availableAdjacent.length; i++) {
-        for (let j = i + 1; j < availableAdjacent.length; j++) {
-          const combo = [clickedTable, availableAdjacent[i], availableAdjacent[j]];
-          const totalSeats = combo.reduce((sum, t) => sum + t.seats, 0);
-          if (totalSeats >= guest.count) {
-            splitOptions.push(combo);
+  // Update table statuses based on current guest states
+  useEffect(() => {
+    setTables(prevTables => 
+      prevTables.map(table => {
+        if (table.allocatedGuest) {
+          // Check if the allocated guest is now seated
+          const currentGuest = checkedInGuests.find(g => g.originalIndex === table.allocatedGuest?.originalIndex);
+          if (currentGuest?.hasBeenSeated) {
+            // Guest has been seated - mark table as occupied
+            return { ...table, status: 'OCCUPIED' as const };
+          } else if (!currentGuest) {
+            // Guest is no longer checked in - free the table
+            return { 
+              id: table.id, 
+              name: table.name, 
+              capacity: table.capacity, 
+              status: 'AVAILABLE' as const 
+            };
           }
         }
-      }
-    }
+        return table;
+      })
+    );
+  }, [checkedInGuests]);
 
-    return splitOptions;
+  // Get guests that can be assigned tables (checked in but not seated)
+  const availableForAllocation = checkedInGuests.filter(guest => 
+    !guest.hasBeenSeated && !guest.hasTableAllocated
+  );
+
+  const handleGuestSelect = (guest: CheckedInGuest) => {
+    setSelectedGuest(guest);
+    setShowAssignDialog(true);
   };
 
-  const handleTableClick = (table: Table) => {
-    if (table.isOccupied) return;
+  const canSplitTables = (tableIds: number[], guestCount: number) => {
+    const selectedTables = tables.filter(t => tableIds.includes(t.id));
+    const totalCapacity = selectedTables.reduce((sum, t) => sum + t.capacity, 0);
     
-    setSelectedTable(table);
-    setShowAssignmentDialog(true);
-    setSplitSuggestion(null);
+    // Check if tables are available and have enough total capacity
+    const allAvailable = selectedTables.every(t => t.status === 'AVAILABLE');
+    const hasCapacity = totalCapacity >= guestCount;
+    
+    // Check if tables can be split (vertically adjacent for T6&T9)
+    const canSplit = tableIds.length === 2 && (
+      (tableIds.includes(6) && tableIds.includes(9)) // T6 and T9 are vertically adjacent
+    );
+    
+    return allAvailable && hasCapacity && canSplit;
   };
 
-  // New: Allocate table (not seat yet)
-  const allocateTableToGuest = (guest: CheckedInGuest, tablesToUse: Table[]) => {
-    const updatedTables = tables.map(table => {
-      if (tablesToUse.some(t => t.id === table.id)) {
-        return {
-          ...table,
-          isAllocated: true,
-          guestName: guest.name,
-          guestCount: guest.count,
-          showTime: guest.showTime
-        };
-      }
-      return table;
-    });
+  const assignTable = (tableIds: number[]) => {
+    if (!selectedGuest) return;
 
-    setTables(updatedTables);
-    
-    // Mark guest as having table allocated
-    if (onTableAllocated) {
-      onTableAllocated(guest.originalIndex, tablesToUse.map(t => t.id));
-    }
-    
-    setShowAssignmentDialog(false);
-    setSelectedTable(null);
-    setSplitSuggestion(null);
-  };
+    const selectedTables = tables.filter(t => tableIds.includes(t.id));
+    const totalCapacity = selectedTables.reduce((sum, t) => sum + t.capacity, 0);
 
-  // New: Mark guest as seated (convert allocation to occupied)
-  const markGuestAsSeated = (tableId: number) => {
-    const updatedTables = tables.map(table => {
-      if (table.id === tableId && table.isAllocated) {
-        return {
-          ...table,
-          isAllocated: false,
-          isOccupied: true
-        };
-      }
-      return table;
-    });
-
-    setTables(updatedTables);
-    
-    // Find the guest and mark as seated
-    const table = tables.find(t => t.id === tableId);
-    if (table && table.guestName) {
-      const guest = checkedInGuests.find(g => g.name === table.guestName);
-      if (guest && onGuestSeated) {
-        onGuestSeated(guest.originalIndex);
-      }
-    }
-  };
-
-  const assignGuestToTable = (guest: CheckedInGuest, tablesToUse: Table[]) => {
-    // Check if guest has a pager that needs to be released
-    if (guest.pagerNumber && !guest.hasBeenSeated) {
-      setPendingAssignment({ guest, tables: tablesToUse });
-      setShowPagerReleaseDialog(true);
+    if (selectedGuest.count > totalCapacity) {
+      toast({
+        title: "❌ Insufficient Capacity",
+        description: `Table(s) can only seat ${totalCapacity} guests, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
+        variant: "destructive"
+      });
       return;
     }
 
-    // Proceed with table assignment
-    completeTableAssignment(guest, tablesToUse);
-  };
-
-  const completeTableAssignment = (guest: CheckedInGuest, tablesToUse: Table[]) => {
-    const updatedTables = tables.map(table => {
-      if (tablesToUse.some(t => t.id === table.id)) {
-        return {
-          ...table,
-          isOccupied: true,
-          guestName: guest.name,
-          guestCount: guest.count,
-          showTime: guest.showTime
-        };
-      }
-      return table;
-    });
-
-    setTables(updatedTables);
-    
-    // Mark guest as seated in the parent component
-    if (onGuestSeated) {
-      onGuestSeated(guest.originalIndex);
-    }
-    
-    // Call the callback for each table
-    tablesToUse.forEach(table => {
-      onTableAssign(table.id, guest.name, guest.count, guest.showTime);
-    });
-
-    setShowAssignmentDialog(false);
-    setSelectedTable(null);
-    setSplitSuggestion(null);
-    setShowPagerReleaseDialog(false);
-    setPendingAssignment(null);
-  };
-
-  const handlePagerRelease = () => {
-    if (pendingAssignment && pendingAssignment.guest.pagerNumber) {
-      // Release the pager
-      if (onPagerRelease) {
-        onPagerRelease(pendingAssignment.guest.pagerNumber);
-      }
-      
-      // Complete the table assignment
-      completeTableAssignment(pendingAssignment.guest, pendingAssignment.tables);
-    }
-  };
-
-  const suggestSplit = (guest: CheckedInGuest) => {
-    if (!selectedTable) return;
-    
-    const splitOptions = findSplitOptions(guest, selectedTable);
-    if (splitOptions.length > 0) {
-      setSplitSuggestion({
-        guest,
-        tables: splitOptions[0] // Use the first (best) option
+    // Check if all tables are available
+    const allAvailable = selectedTables.every(t => t.status === 'AVAILABLE');
+    if (!allAvailable) {
+      toast({
+        title: "❌ Table Unavailable",
+        description: "One or more selected tables are not available.",
+        variant: "destructive"
       });
+      return;
+    }
+
+    // Update table status to ALLOCATED
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (tableIds.includes(table.id)) {
+          return {
+            ...table,
+            status: 'ALLOCATED' as const,
+            allocatedTo: selectedGuest.name,
+            allocatedGuest: selectedGuest,
+            splitWith: tableIds.length > 1 ? tableIds.filter(id => id !== table.id) : undefined
+          };
+        }
+        return table;
+      })
+    );
+
+    // Call the parent callback to track allocation
+    onTableAllocated(selectedGuest.originalIndex, tableIds);
+
+    const tableNames = selectedTables.map(t => t.name).join(' & ');
+    onTableAssign(tableIds[0], selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+
+    toast({
+      title: "📍 Table Allocated",
+      description: `${selectedGuest.name} (${selectedGuest.count} guests) allocated to ${tableNames}. Page when ready!`,
+    });
+
+    setShowAssignDialog(false);
+    setSelectedGuest(null);
+  };
+
+  const markGuestSeated = (table: Table) => {
+    if (!table.allocatedGuest) return;
+
+    // Mark guest as seated
+    onGuestSeated(table.allocatedGuest.originalIndex);
+
+    // Update table status to OCCUPIED
+    setTables(prevTables =>
+      prevTables.map(t => {
+        if (t.id === table.id || (table.splitWith && table.splitWith.includes(t.id))) {
+          return { ...t, status: 'OCCUPIED' as const };
+        }
+        return t;
+      })
+    );
+
+    toast({
+      title: "✅ Guest Seated",
+      description: `${table.allocatedGuest.name} has been seated at ${table.name}${table.splitWith ? ` & T${table.splitWith.join(' & T')}` : ''}`,
+    });
+  };
+
+  const freeTable = (tableId: number) => {
+    const table = tables.find(t => t.id === tableId);
+    if (!table) return;
+
+    const tablesToFree = [tableId];
+    if (table.splitWith) {
+      tablesToFree.push(...table.splitWith);
+    }
+
+    setTables(prevTables =>
+      prevTables.map(t => {
+        if (tablesToFree.includes(t.id)) {
+          return {
+            id: t.id,
+            name: t.name,
+            capacity: t.capacity,
+            status: 'AVAILABLE' as const
+          };
+        }
+        return t;
+      })
+    );
+
+    toast({
+      title: "🔄 Table Freed",
+      description: `${table.name}${table.splitWith ? ` & T${table.splitWith.join(' & T')}` : ''} is now available`,
+    });
+  };
+
+  const getTableColor = (status: string) => {
+    switch (status) {
+      case 'AVAILABLE': return 'bg-green-100 border-green-300 hover:bg-green-150';
+      case 'ALLOCATED': return 'bg-blue-100 border-blue-300';
+      case 'OCCUPIED': return 'bg-red-100 border-red-300';
+      default: return 'bg-gray-100 border-gray-300';
     }
   };
 
-  const clearTable = (tableId: number) => {
-    setTables(prev => prev.map(table => 
-      table.id === tableId 
-        ? { 
-            ...table, 
-            isOccupied: false, 
-            isAllocated: false,
-            guestName: undefined, 
-            guestCount: undefined, 
-            showTime: undefined 
-          }
-        : table
-    ));
-  };
-
-  const adjustSeating = (tableId: number, increment: boolean) => {
-    setTables(prev => prev.map(table => {
-      if (table.id === tableId && !table.isOccupied && !table.isAllocated) {
-        const newSeats = increment ? table.seats + 1 : Math.max(1, table.seats - 1);
-        return { ...table, seats: Math.min(12, newSeats) }; // Max 12 seats per table
-      }
-      return table;
-    }));
-  };
-
-  const getTableColor = (table: Table) => {
-    if (table.isOccupied) {
-      return table.showTime === '7:00pm' || table.showTime === '7pm'
-        ? 'bg-orange-100 border-orange-300' 
-        : 'bg-purple-100 border-purple-300';
-    }
-    if (table.isAllocated) {
-      return 'bg-blue-100 border-blue-300'; // New color for allocated tables
-    }
-    return 'bg-green-100 border-green-300 hover:bg-green-200';
-  };
-
-  const occupiedTables = tables.filter(t => t.isOccupied).length;
-  const allocatedTables = tables.filter(t => t.isAllocated).length;
-  const availableTables = tables.filter(t => !t.isOccupied && !t.isAllocated).length;
-
-  // Define table rows for layout - front to back
-  const tableRows = [
-    { label: 'Front Row', tableIds: [1, 2, 3], distance: 'Closest to Stage' },
-    { label: 'Row 2', tableIds: [4, 5, 6], distance: '' },
-    { label: 'Row 3', tableIds: [7, 8, 9], distance: '' },
-    { label: 'Back Row', tableIds: [10, 11, 12, 13], distance: 'Furthest from Stage' }
-  ];
-
-  const getTableById = (id: number) => tables.find(table => table.id === id);
-
-  const renderSeatingAroundTable = (table: Table) => {
-    const is2SeatTable = [1, 2, 3, 10, 11, 12, 13].includes(table.id);
-    
-    if (is2SeatTable) {
-      // 2-seat tables: only seats at the back (facing stage)
-      return (
-        <div className="flex flex-col items-center space-y-2">
-          {/* Seating behind table (facing stage) */}
-          <div className="flex space-x-1">
-            {Array.from({ length: table.seats }).map((_, i) => (
-              <div key={i} className="w-4 h-4 bg-gray-400 rounded-full border border-gray-600"></div>
-            ))}
-          </div>
-          
-          {/* Table */}
-          <div
-            className={`
-              p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
-              ${getTableColor(table)}
-              ${(!table.isOccupied && !table.isAllocated) ? 'hover:shadow-lg' : ''}
-            `}
-            onClick={() => handleTableClick(table)}
-          >
-            <div className="text-center">
-              <div className="font-bold text-sm mb-1">T{table.id}</div>
-              
-              {table.isOccupied ? (
-                <div className="space-y-1">
-                  <div className="font-medium text-xs">{table.guestName}</div>
-                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
-                  <div className="text-xs">
-                    <Badge variant="outline" className="text-xs py-0">
-                      {table.showTime}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-green-600 font-bold">SEATED</div>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="mt-1 h-5 text-xs px-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearTable(table.id);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : table.isAllocated ? (
-                <div className="space-y-1">
-                  <div className="font-medium text-xs">{table.guestName}</div>
-                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
-                  <div className="text-xs">
-                    <Badge variant="outline" className="text-xs py-0">
-                      {table.showTime}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-blue-600 font-bold flex items-center justify-center">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    ALLOCATED
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="mt-1 h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markGuestAsSeated(table.id);
-                    }}
-                  >
-                    Mark Seated
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="mt-1 h-5 text-xs px-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearTable(table.id);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="text-green-600 font-medium text-xs">Free</div>
-                  <div className="text-xs text-gray-500">{table.seats} seats</div>
-                  <div className="flex justify-center space-x-1 mt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-5 w-5 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        adjustSeating(table.id, false);
-                      }}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-5 w-5 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        adjustSeating(table.id, true);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    } else {
-      // 4+ seat tables: seats on both sides
-      const seatsPerSide = Math.ceil(table.seats / 2);
-      const backSeats = seatsPerSide;
-      const frontSeats = table.seats - seatsPerSide;
-
-      return (
-        <div className="flex flex-col items-center space-y-2">
-          {/* Seating behind table (facing stage) */}
-          <div className="flex space-x-1">
-            {Array.from({ length: backSeats }).map((_, i) => (
-              <div key={i} className="w-4 h-4 bg-gray-400 rounded-full border border-gray-600"></div>
-            ))}
-          </div>
-          
-          {/* Table */}
-          <div
-            className={`
-              p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
-              ${getTableColor(table)}
-              ${(!table.isOccupied && !table.isAllocated) ? 'hover:shadow-lg' : ''}
-            `}
-            onClick={() => handleTableClick(table)}
-          >
-            <div className="text-center">
-              <div className="font-bold text-sm mb-1">T{table.id}</div>
-              
-              {table.isOccupied ? (
-                <div className="space-y-1">
-                  <div className="font-medium text-xs">{table.guestName}</div>
-                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
-                  <div className="text-xs">
-                    <Badge variant="outline" className="text-xs py-0">
-                      {table.showTime}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-green-600 font-bold">SEATED</div>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="mt-1 h-5 text-xs px-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearTable(table.id);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : table.isAllocated ? (
-                <div className="space-y-1">
-                  <div className="font-medium text-xs">{table.guestName}</div>
-                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
-                  <div className="text-xs">
-                    <Badge variant="outline" className="text-xs py-0">
-                      {table.showTime}
-                    </Badge>
-                  </div>
-                  <div className="text-xs text-blue-600 font-bold flex items-center justify-center">
-                    <MapPin className="h-3 w-3 mr-1" />
-                    ALLOCATED
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="mt-1 h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markGuestAsSeated(table.id);
-                    }}
-                  >
-                    Mark Seated
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="mt-1 h-5 text-xs px-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      clearTable(table.id);
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="text-green-600 font-medium text-xs">Free</div>
-                  <div className="text-xs text-gray-500">{table.seats} seats</div>
-                  <div className="flex justify-center space-x-1 mt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-5 w-5 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        adjustSeating(table.id, false);
-                      }}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-5 w-5 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        adjustSeating(table.id, true);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Seating in front of table (backs to stage) */}
-          {frontSeats > 0 && (
-            <div className="flex space-x-1">
-              {Array.from({ length: frontSeats }).map((_, i) => (
-                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'AVAILABLE': return <Badge className="bg-green-600">Available</Badge>;
+      case 'ALLOCATED': return <Badge className="bg-blue-600">Allocated</Badge>;
+      case 'OCCUPIED': return <Badge className="bg-red-600">Occupied</Badge>;
+      default: return <Badge variant="secondary">Unknown</Badge>;
     }
   };
-
-  // Filter out guests who have already been seated or have tables allocated
-  const availableGuests = checkedInGuests.filter(guest => !guest.hasBeenSeated && !guest.hasTableAllocated);
 
   return (
     <div className="space-y-6">
-      {/* Table Assignment Dialog */}
-      <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Allocate Table {selectedTable?.id}</DialogTitle>
-          </DialogHeader>
-          
-          {selectedTable && (
-            <div className="space-y-6">
-              {/* Suitable guests (fit in this table) */}
-              <div>
-                <h4 className="font-medium mb-3">Guests that fit ({selectedTable.seats} seats available):</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {getSuitableGuests(selectedTable).map((guest, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
-                      <div>
-                        <div className="font-medium">{guest.name}</div>
-                        <div className="text-sm text-gray-600">
-                          {guest.count} guests • {guest.showTime}
-                          {guest.pagerNumber && (
-                            <span className="ml-2">
-                              <Badge variant="outline" className="bg-blue-50">
-                                <Bell className="h-3 w-3 mr-1" />
-                                Pager {guest.pagerNumber}
-                              </Badge>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => allocateTableToGuest(guest, [selectedTable])}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Allocate Table
-                      </Button>
-                    </div>
-                  ))}
-                  {getSuitableGuests(selectedTable).length === 0 && (
-                    <p className="text-gray-500 text-center py-4">No available checked-in guests fit this table size</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Large parties that need splitting */}
-              {getLargeParties(selectedTable).length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-3 flex items-center">
-                    <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
-                    Large parties (need multiple tables):
-                  </h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {getLargeParties(selectedTable).map((guest, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-orange-50">
-                        <div>
-                          <div className="font-medium">{guest.name}</div>
-                          <div className="text-sm text-gray-600">
-                            {guest.count} guests • {guest.showTime}
-                            {guest.pagerNumber && (
-                              <span className="ml-2">
-                                <Badge variant="outline" className="bg-blue-50">
-                                  <Bell className="h-3 w-3 mr-1" />
-                                  Pager {guest.pagerNumber}
-                                </Badge>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          onClick={() => suggestSplit(guest)}
-                          className="border-orange-300"
-                        >
-                          Suggest Split
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Split Suggestion Dialog */}
-      <Dialog open={splitSuggestion !== null} onOpenChange={() => setSplitSuggestion(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Split Party Suggestion</DialogTitle>
-          </DialogHeader>
-          
-          {splitSuggestion && (
-            <div className="space-y-4">
-              <p className="text-gray-700">
-                <strong>{splitSuggestion.guest.name}</strong> has {splitSuggestion.guest.count} guests.
-                {splitSuggestion.guest.pagerNumber && (
-                  <span className="ml-2">
-                    <Badge variant="outline" className="bg-blue-50">
-                      <Bell className="h-3 w-3 mr-1" />
-                      Pager {splitSuggestion.guest.pagerNumber}
-                    </Badge>
-                  </span>
-                )}
-              </p>
-              
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Suggested table combination:</h4>
-                <div className="flex items-center space-x-2 mb-2">
-                  {splitSuggestion.tables.map((table, idx) => (
-                    <div key={table.id} className="flex items-center">
-                      <Badge variant="outline" className="bg-white">
-                        Table {table.id} ({table.seats} seats)
-                      </Badge>
-                      {idx < splitSuggestion.tables.length - 1 && (
-                        <span className="mx-2 text-gray-500">+</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-sm text-gray-600">
-                  Total seats: {splitSuggestion.tables.reduce((sum, t) => sum + t.seats, 0)}
-                </p>
-              </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  onClick={() => allocateTableToGuest(splitSuggestion.guest, splitSuggestion.tables)}
-                  className="flex-1"
-                >
-                  <MapPin className="h-4 w-4 mr-2" />
-                  Allocate These Tables
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setSplitSuggestion(null)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Pager Release Dialog */}
-      <Dialog open={showPagerReleaseDialog} onOpenChange={setShowPagerReleaseDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Bell className="h-5 w-5 mr-2 text-blue-600" />
-              Release Pager
-            </DialogTitle>
-          </DialogHeader>
-          
-          {pendingAssignment && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-gray-700 mb-2">
-                  <strong>{pendingAssignment.guest.name}</strong> is being seated at:
-                </p>
-                <div className="flex items-center space-x-2 mb-3">
-                  {pendingAssignment.tables.map((table, idx) => (
-                    <div key={table.id} className="flex items-center">
-                      <Badge variant="outline" className="bg-white">
-                        Table {table.id}
-                      </Badge>
-                      {idx < pendingAssignment.tables.length - 1 && (
-                        <span className="mx-2 text-gray-500">+</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {pendingAssignment.guest.pagerNumber && (
-                  <div className="flex items-center space-x-2">
-                    <Bell className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium">
-                      Please collect Pager {pendingAssignment.guest.pagerNumber} from the guests
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  onClick={handlePagerRelease}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  Pager Collected - Complete Seating
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowPagerReleaseDialog(false);
-                    setPendingAssignment(null);
-                  }}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center">
-              <Users className="h-5 w-5 mr-2 text-blue-600" />
-              Table Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Available:</span>
-                <Badge variant="outline" className="bg-green-50 text-green-700">
-                  {availableTables}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Allocated:</span>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  {allocatedTables}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Seated:</span>
-                <Badge variant="outline" className="bg-purple-50 text-purple-700">
-                  {occupiedTables}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total:</span>
-                <Badge variant="outline">{tables.length}</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Legend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-                <span className="text-sm">Available</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
-                <span className="text-sm">Allocated (not seated)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
-                <span className="text-sm">Seated - 7pm Show</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-purple-100 border border-purple-300 rounded"></div>
-                <span className="text-sm">Seated - 9pm Show</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Instructions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm text-gray-600">
-              <p>• Click any available table to allocate to checked-in guests</p>
-              <p>• Allocated tables show guest info and pager number</p>
-              <p>• Page guests manually when ready</p>
-              <p>• Click "Mark Seated" when guest arrives at table</p>
-              <p>• Return pager manually when guests are seated</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Guests waiting for table allocation */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">🎭 Dinner Theatre Layout</CardTitle>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Guests Awaiting Table Allocation ({availableForAllocation.length})</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-8">
-            {/* Stage */}
-            <div className="text-center">
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 px-8 rounded-lg shadow-lg mx-auto max-w-md">
-                <h2 className="text-2xl font-bold">🎭 STAGE 🎭</h2>
-                <p className="text-sm opacity-90">Performance Area</p>
-              </div>
-            </div>
-
-            {/* Seating Area */}
-            <div className="space-y-6 bg-gray-50 p-6 rounded-lg">
-              {tableRows.map((row, rowIndex) => (
-                <div key={row.label} className="space-y-3">
+          {availableForAllocation.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No guests waiting for table allocation</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {availableForAllocation.map((guest) => (
+                <div
+                  key={guest.originalIndex}
+                  className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors"
+                  onClick={() => handleGuestSelect(guest)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-semibold text-gray-900">{guest.name}</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {guest.showTime}
+                    </Badge>
+                  </div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-700">{row.label}</h3>
-                    {row.distance && (
-                      <span className="text-sm text-gray-500 italic">{row.distance}</span>
+                    <span className="text-sm text-gray-600">
+                      <Users className="h-4 w-4 inline mr-1" />
+                      {guest.count} guests
+                    </span>
+                    {guest.pagerNumber && (
+                      <Badge className="bg-purple-100 text-purple-800">
+                        Pager #{guest.pagerNumber}
+                      </Badge>
                     )}
                   </div>
-                  
-                  <div className="flex justify-center">
-                    <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${row.tableIds.length}, 1fr)` }}>
-                      {row.tableIds.map((tableId) => {
-                        const table = getTableById(tableId);
-                        if (!table) return null;
-                        
-                        return (
-                          <div key={table.id}>
-                            {renderSeatingAroundTable(table)}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <Button className="w-full mt-3" size="sm">
+                    Assign Table
+                  </Button>
                 </div>
               ))}
             </div>
-            
-            {/* Legend for seating */}
-            <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
-              <p>• Click any available table to allocate to checked-in guests</p>
-              <p>• Allocated tables (blue) are reserved but guests not seated yet</p>
-              <p>• Use "Mark Seated" button when guests arrive at their table</p>
-            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Table Layout */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Utensils className="h-5 w-5" />
+            <span>Table Layout</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 gap-4">
+            {tables.map((table) => (
+              <div
+                key={table.id}
+                className={`p-4 border-2 rounded-lg transition-all ${getTableColor(table.status)}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-bold text-lg">{table.name}</h3>
+                  {getStatusBadge(table.status)}
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-2">
+                  Capacity: {table.capacity} guests
+                </p>
+
+                {table.allocatedTo && (
+                  <div className="mb-3">
+                    <p className="font-medium text-sm text-gray-800">{table.allocatedTo}</p>
+                    {table.allocatedGuest && (
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className="text-xs text-gray-600">
+                          {table.allocatedGuest.count} guests
+                        </span>
+                        {table.allocatedGuest.pagerNumber && (
+                          <Badge className="bg-purple-100 text-purple-800 text-xs">
+                            #{table.allocatedGuest.pagerNumber}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    {table.splitWith && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Split with T{table.splitWith.join(' & T')}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {table.status === 'ALLOCATED' && table.allocatedGuest && (
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      onClick={() => markGuestSeated(table)}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Mark Seated
+                    </Button>
+                  </div>
+                )}
+
+                {table.status === 'OCCUPIED' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => freeTable(table.id)}
+                    className="w-full"
+                  >
+                    Free Table
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
+
+      {/* Table Assignment Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              Assign Table for {selectedGuest?.name} ({selectedGuest?.count} guests)
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedGuest && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded">
+                <div>
+                  <span className="font-medium">{selectedGuest.name}</span>
+                  <span className="text-gray-600 ml-2">({selectedGuest.count} guests)</span>
+                </div>
+                <Badge variant="outline">{selectedGuest.showTime}</Badge>
+                {selectedGuest.pagerNumber && (
+                  <Badge className="bg-purple-100 text-purple-800">
+                    Pager #{selectedGuest.pagerNumber}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Available Tables:</h4>
+                
+                {/* Single Tables */}
+                <div className="grid grid-cols-4 gap-3">
+                  {tables
+                    .filter(table => table.status === 'AVAILABLE' && table.capacity >= selectedGuest.count)
+                    .map((table) => (
+                      <Button
+                        key={table.id}
+                        variant="outline"
+                        onClick={() => assignTable([table.id])}
+                        className="p-4 h-auto flex flex-col"
+                      >
+                        <span className="font-bold">{table.name}</span>
+                        <span className="text-sm text-gray-600">
+                          {table.capacity} seats
+                        </span>
+                      </Button>
+                    ))}
+                </div>
+
+                {/* Split Table Options */}
+                {selectedGuest.count > 4 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Split Table Options:</h4>
+                    <div className="space-y-2">
+                      {canSplitTables([6, 9], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([6, 9])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T6 & T9 (Split Tables)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: 8 seats (vertically adjacent)
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {tables.filter(table => table.status === 'AVAILABLE' && table.capacity >= selectedGuest.count).length === 0 && 
+                 !canSplitTables([6, 9], selectedGuest.count) && (
+                  <p className="text-red-600 text-center py-4">
+                    No suitable tables available for {selectedGuest.count} guests
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

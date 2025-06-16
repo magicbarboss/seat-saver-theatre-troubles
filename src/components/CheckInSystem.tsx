@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -45,6 +45,57 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [allocatedGuests, setAllocatedGuests] = useState<Set<number>>(new Set()); // Track guests with allocated tables
   const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date>(new Date());
+
+  // Auto-save functionality - save state every 30 seconds
+  useEffect(() => {
+    const saveState = () => {
+      const state = {
+        checkedInGuests: Array.from(checkedInGuests),
+        pagerAssignments: Array.from(pagerAssignments.entries()),
+        seatedGuests: Array.from(seatedGuests),
+        allocatedGuests: Array.from(allocatedGuests),
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('checkin-system-state', JSON.stringify(state));
+      setLastSaved(new Date());
+      console.log('Auto-saved state at', new Date().toLocaleTimeString());
+    };
+
+    // Load state on component mount
+    const loadState = () => {
+      try {
+        const savedState = localStorage.getItem('checkin-system-state');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          setCheckedInGuests(new Set(state.checkedInGuests || []));
+          setPagerAssignments(new Map(state.pagerAssignments || []));
+          setSeatedGuests(new Set(state.seatedGuests || []));
+          setAllocatedGuests(new Set(state.allocatedGuests || []));
+          console.log('Loaded saved state from', state.timestamp);
+          
+          toast({
+            title: "🔄 State Restored",
+            description: `Previous session data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load saved state:', error);
+      }
+    };
+
+    // Load state on mount
+    loadState();
+
+    // Set up auto-save interval
+    const interval = setInterval(saveState, 30000); // Save every 30 seconds
+
+    // Save on component unmount
+    return () => {
+      clearInterval(interval);
+      saveState();
+    };
+  }, [checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -358,6 +409,26 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
+  // Calculate total guests per show time
+  const getShowTimeStats = () => {
+    const stats = { '7:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
+    
+    groupedBookings.forEach(booking => {
+      const showTime = getShowTime(booking.mainBooking);
+      const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
+      
+      if (showTime === '7:00pm' || showTime === '7pm') {
+        stats['7:00pm'] += totalQty;
+      } else if (showTime === '9:00pm' || showTime === '9pm') {
+        stats['9:00pm'] += totalQty;
+      } else {
+        stats['Unknown'] += totalQty;
+      }
+    });
+    
+    return stats;
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
@@ -371,6 +442,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Grouped bookings: {groupedBookings.length}</p>
         <p className="text-xs">Available pagers: {getAvailablePagers().length}/12</p>
         <p className="text-xs">Allocated guests: {allocatedGuests.size}</p>
+        <p className="text-xs">Seated guests: {seatedGuests.size}</p>
+        <div className="flex items-center space-x-2 mt-2">
+          <Save className="h-4 w-4 text-green-600" />
+          <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
+        </div>
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
@@ -669,18 +745,28 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
                 <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                Show Times
+                Show Times (Total Guests)
               </h3>
               <div className="space-y-3">
-                {['7:00pm', '9:00pm'].map(time => {
-                  const count = groupedBookings.filter(booking => getShowTime(booking.mainBooking) === time).length;
-                  const percentage = groupedBookings.length > 0 ? Math.round((count / groupedBookings.length) * 100) : 0;
+                {Object.entries(getShowTimeStats()).map(([time, guestCount]) => {
+                  if (time === 'Unknown' && guestCount === 0) return null;
+                  const bookingCount = groupedBookings.filter(booking => {
+                    const showTime = getShowTime(booking.mainBooking);
+                    return (time === '7:00pm' && (showTime === '7:00pm' || showTime === '7pm')) ||
+                           (time === '9:00pm' && (showTime === '9:00pm' || showTime === '9pm')) ||
+                           (time === 'Unknown' && showTime !== '7:00pm' && showTime !== '7pm' && showTime !== '9:00pm' && showTime !== '9pm');
+                  }).length;
+                  
+                  const totalGuests = Object.values(getShowTimeStats()).reduce((sum, count) => sum + count, 0);
+                  const percentage = totalGuests > 0 ? Math.round((guestCount / totalGuests) * 100) : 0;
+                  
                   return (
                     <div key={time} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                       <span className="font-medium text-gray-700">{time} Show</span>
                       <div className="text-right">
-                        <span className="font-bold text-gray-900">{count}</span>
-                        <span className="text-sm text-gray-500 ml-2">({percentage}%)</span>
+                        <span className="font-bold text-gray-900">{guestCount}</span>
+                        <span className="text-sm text-gray-500 ml-2">guests</span>
+                        <div className="text-xs text-gray-400">({bookingCount} bookings, {percentage}%)</div>
                       </div>
                     </div>
                   );
