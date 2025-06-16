@@ -27,9 +27,10 @@ interface TableAllocationProps {
   onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
   checkedInGuests?: CheckedInGuest[];
   onPagerRelease?: (pagerNumber: number) => void;
+  onGuestSeated?: (guestIndex: number) => void;
 }
 
-const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }: TableAllocationProps) => {
+const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, onGuestSeated }: TableAllocationProps) => {
   // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
     // Tables 1-3: 2 seats each (front row)
@@ -90,11 +91,11 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }
   };
 
   const getSuitableGuests = (table: Table) => {
-    return checkedInGuests.filter(guest => guest.count <= table.seats);
+    return checkedInGuests.filter(guest => guest.count <= table.seats && !guest.hasBeenSeated);
   };
 
   const getLargeParties = (table: Table) => {
-    return checkedInGuests.filter(guest => guest.count > table.seats);
+    return checkedInGuests.filter(guest => guest.count > table.seats && !guest.hasBeenSeated);
   };
 
   const findSplitOptions = (guest: CheckedInGuest, clickedTable: Table) => {
@@ -165,6 +166,11 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }
     });
 
     setTables(updatedTables);
+    
+    // Mark guest as seated in the parent component
+    if (onGuestSeated) {
+      onGuestSeated(guest.originalIndex);
+    }
     
     // Call the callback for each table
     tablesToUse.forEach(table => {
@@ -433,7 +439,7 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }
               <div>
                 <h4 className="font-medium mb-3">Guests that fit ({selectedTable.seats} seats available):</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {getSuitableGuests(selectedTable).filter(guest => availableGuests.includes(guest)).map((guest, idx) => (
+                  {getSuitableGuests(selectedTable).map((guest, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
                       <div>
                         <div className="font-medium">{guest.name}</div>
@@ -457,21 +463,21 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }
                       </Button>
                     </div>
                   ))}
-                  {getSuitableGuests(selectedTable).filter(guest => availableGuests.includes(guest)).length === 0 && (
+                  {getSuitableGuests(selectedTable).length === 0 && (
                     <p className="text-gray-500 text-center py-4">No available checked-in guests fit this table size</p>
                   )}
                 </div>
               </div>
 
               {/* Large parties that need splitting */}
-              {getLargeParties(selectedTable).filter(guest => availableGuests.includes(guest)).length > 0 && (
+              {getLargeParties(selectedTable).length > 0 && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center">
                     <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
                     Large parties (need multiple tables):
                   </h4>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {getLargeParties(selectedTable).filter(guest => availableGuests.includes(guest)).map((guest, idx) => (
+                    {getLargeParties(selectedTable).map((guest, idx) => (
                       <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-orange-50">
                         <div>
                           <div className="font-medium">{guest.name}</div>
@@ -696,6 +702,7 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease }
               <p>• Only guests that fit will be shown first</p>
               <p>• Large parties will get split suggestions for adjacent tables</p>
               <p>• Use +/- to adjust table seating</p>
+              <p>• Pagers are automatically released when guests are seated</p>
             </div>
           </CardContent>
         </Card>

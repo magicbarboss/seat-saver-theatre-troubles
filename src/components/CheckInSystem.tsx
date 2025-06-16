@@ -30,6 +30,8 @@ interface CheckedInGuest {
   count: number;
   showTime: string;
   originalIndex: number;
+  pagerNumber?: number;
+  hasBeenSeated?: boolean;
 }
 
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
@@ -38,6 +40,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
+  const [seatedGuests, setSeatedGuests] = useState<Set<number>>(new Set()); // Track seated guests
   const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
 
@@ -248,11 +251,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
     
     if (newCheckedIn.has(mainIndex)) {
-      // Check out - remove pager assignment
+      // Check out - remove pager assignment and seated status
       newCheckedIn.delete(mainIndex);
       const newPagerAssignments = new Map(pagerAssignments);
       newPagerAssignments.delete(mainIndex);
       setPagerAssignments(newPagerAssignments);
+      
+      const newSeatedGuests = new Set(seatedGuests);
+      newSeatedGuests.delete(mainIndex);
+      setSeatedGuests(newSeatedGuests);
       
       toast({
         title: "✅ Checked Out",
@@ -273,6 +280,29 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
+  const handlePagerRelease = (pagerNumber: number) => {
+    // Find the guest with this pager and remove the assignment
+    const newPagerAssignments = new Map(pagerAssignments);
+    for (const [guestIndex, assignedPager] of pagerAssignments) {
+      if (assignedPager === pagerNumber) {
+        newPagerAssignments.delete(guestIndex);
+        break;
+      }
+    }
+    setPagerAssignments(newPagerAssignments);
+    
+    toast({
+      title: "📟 Pager Released",
+      description: `Pager ${pagerNumber} is now available`,
+    });
+  };
+
+  const handleGuestSeated = (guestIndex: number) => {
+    const newSeatedGuests = new Set(seatedGuests);
+    newSeatedGuests.add(guestIndex);
+    setSeatedGuests(newSeatedGuests);
+  };
+
   const getShowTimeBadgeStyle = (showTime: string) => {
     if (showTime === '7:00pm' || showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
     if (showTime === '9:00pm' || showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
@@ -286,12 +316,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
       const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
       const showTime = getShowTime(guest);
+      const pagerNumber = pagerAssignments.get(guestIndex);
+      const hasBeenSeated = seatedGuests.has(guestIndex);
       
       return {
         name: guestName,
         count: totalQty,
         showTime: showTime,
-        originalIndex: guestIndex
+        originalIndex: guestIndex,
+        pagerNumber: pagerNumber,
+        hasBeenSeated: hasBeenSeated
       };
     });
   };
@@ -451,6 +485,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
                   <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
@@ -458,6 +493,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableBody>
                 {filteredBookings.map((booking) => {
                   const isCheckedIn = checkedInGuests.has(booking.originalIndex);
+                  const isSeated = seatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   
                   const bookingCode = bookingCodeIndex >= 0 ? booking.mainBooking[bookingCodeIndex] || '' : '';
@@ -468,7 +504,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const note = noteIndex >= 0 ? booking.mainBooking[noteIndex] || '' : '';
                   
                   return (
-                    <TableRow key={booking.originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
+                    <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
                       <TableCell>
                         <div className="font-mono text-sm text-gray-700">
                           {bookingCode}
@@ -533,6 +569,21 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="text-center">
+                          {isSeated ? (
+                            <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold">
+                              Seated
+                            </div>
+                          ) : isCheckedIn ? (
+                            <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-bold">
+                              Checked In
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 text-sm">Waiting</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="text-sm text-gray-600 max-w-xs">
                           {note}
                         </div>
@@ -543,8 +594,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           variant={isCheckedIn ? "destructive" : "default"}
                           size="sm"
                           className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
+                          disabled={isSeated}
                         >
-                          {isCheckedIn ? '✓ Check Out' : 'Check In'}
+                          {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -566,6 +618,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           <TableAllocation 
             onTableAssign={handleTableAssign} 
             checkedInGuests={getCheckedInGuestsData()}
+            onPagerRelease={handlePagerRelease}
+            onGuestSeated={handleGuestSeated}
           />
         </TabsContent>
 
@@ -603,6 +657,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <span className="font-medium text-gray-700">Checked In</span>
                   <span className="font-bold text-green-600 text-xl">{checkedInGuests.size}</span>
                 </div>
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
+                  <span className="font-medium text-gray-700">Seated</span>
+                  <span className="font-bold text-blue-600 text-xl">{seatedGuests.size}</span>
+                </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <span className="font-medium text-gray-700">Waiting</span>
                   <span className="font-bold text-red-600 text-xl">{groupedBookings.length - checkedInGuests.size}</span>
@@ -611,7 +669,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <div className="text-3xl font-bold text-gray-800">
                     {groupedBookings.length > 0 ? Math.round((checkedInGuests.size / groupedBookings.length) * 100) : 0}%
                   </div>
-                  <div className="text-gray-600">Completion Rate</div>
+                  <div className="text-gray-600">Check-in Rate</div>
                 </div>
               </div>
             </div>
