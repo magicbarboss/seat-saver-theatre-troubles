@@ -31,14 +31,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   const bookerIndex = getColumnIndex('booker');
   const statusIndex = getColumnIndex('status');
-  const firstNameIndex = getColumnIndex('first name');
-  const lastNameIndex = getColumnIndex('last name');
-  const emailIndex = getColumnIndex('email');
-  const bookingCodeIndex = getColumnIndex('booking code');
   const totalQtyIndex = getColumnIndex('total quantity');
-  const magicIndex = getColumnIndex('magic');
-  const dietIndex = getColumnIndex('diet');
-  const friendsIndex = getColumnIndex('friends');
   const startTimeIndex = getColumnIndex('start time');
 
   // Get unique statuses for filter
@@ -61,26 +54,20 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return guests.filter((guest, index) => {
       const booker = guest[bookerIndex] || '';
       const status = guest[statusIndex] || '';
-      const firstName = guest[firstNameIndex] || '';
-      const lastName = guest[lastNameIndex] || '';
-      const email = guest[emailIndex] || '';
       
       const matchesSearch = searchTerm === '' || 
-        booker.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        email.toLowerCase().includes(searchTerm.toLowerCase());
+        booker.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || status === statusFilter;
       
       return matchesSearch && matchesStatus;
     });
-  }, [guests, headers, searchTerm, statusFilter, bookerIndex, statusIndex, firstNameIndex, lastNameIndex, emailIndex]);
+  }, [guests, searchTerm, statusFilter, bookerIndex, statusIndex]);
 
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[guestIndex];
-    const guestName = `${guest[firstNameIndex] || ''} ${guest[lastNameIndex] || ''}`.trim() || guest[bookerIndex] || 'Guest';
+    const guestName = guest[bookerIndex] || 'Guest';
     
     if (newCheckedIn.has(guestIndex)) {
       newCheckedIn.delete(guestIndex);
@@ -118,12 +105,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-gray-800">🎭 Theatre Check-In</h2>
-            <p className="text-gray-600 mt-1">Welcome to your show management system</p>
+            <p className="text-gray-600 mt-1">Simple guest management</p>
           </div>
           <div className="flex items-center space-x-6 text-lg">
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -154,12 +141,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <div className="flex space-x-4 items-end">
               <div className="flex-1">
-                <Label htmlFor="search" className="text-base font-medium text-gray-700">Search Guests</Label>
+                <Label htmlFor="search" className="text-base font-medium text-gray-700">Search by Booker Name</Label>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                   <Input
                     id="search"
-                    placeholder="Search by name, booker, or email..."
+                    placeholder="Search by booker name..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-12 h-12 text-base"
@@ -188,10 +175,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Guest Info</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Booking</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Guests</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Special Notes</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -200,15 +186,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const originalIndex = guests.indexOf(guest);
                   const isCheckedIn = checkedInGuests.has(originalIndex);
                   
-                  const guestName = `${guest[firstNameIndex] || ''} ${guest[lastNameIndex] || ''}`.trim();
-                  const booker = guest[bookerIndex] || '';
-                  const email = guest[emailIndex] || '';
+                  const booker = guest[bookerIndex] || 'Unknown Guest';
                   const status = guest[statusIndex] || 'Unknown';
-                  const bookingCode = guest[bookingCodeIndex] || '';
-                  const totalQty = guest[totalQtyIndex] || '0';
-                  const magic = guest[magicIndex] || '';
-                  const diet = guest[dietIndex] || '';
-                  const friends = guest[friendsIndex] || '';
+                  const totalQty = guest[totalQtyIndex] || '1';
                   const showTime = getShowTime(guest);
                   
                   return (
@@ -219,53 +199,21 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-semibold text-gray-900">
-                            {guestName || booker || 'Guest'}
-                          </div>
-                          {email && (
-                            <div className="text-sm text-gray-600">{email}</div>
-                          )}
+                        <div className="font-semibold text-gray-900 text-lg">
+                          {booker}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-gray-900">
-                            {bookingCode || 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            Qty: {totalQty}
-                          </div>
-                          {booker && booker !== guestName && (
-                            <div className="text-sm text-gray-500">
-                              Booker: {booker}
-                            </div>
-                          )}
+                        <div className="flex items-center space-x-2">
+                          <Users className="h-4 w-4 text-gray-500" />
+                          <span className="font-medium text-gray-900 text-lg">{totalQty}</span>
+                          <span className="text-gray-500">guests</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeStyle(status)}`}>
                           {status}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-sm">
-                          {magic && (
-                            <div className="text-purple-700 bg-purple-50 px-2 py-1 rounded text-xs">
-                              🎩 {magic}
-                            </div>
-                          )}
-                          {diet && (
-                            <div className="text-orange-700 bg-orange-50 px-2 py-1 rounded text-xs">
-                              🍽️ {diet}
-                            </div>
-                          )}
-                          {friends && (
-                            <div className="text-green-700 bg-green-50 px-2 py-1 rounded text-xs">
-                              👥 {friends}
-                            </div>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <Button
