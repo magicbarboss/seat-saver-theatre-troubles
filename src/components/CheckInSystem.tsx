@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -200,7 +201,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 <TableRow className="bg-gray-50">
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Guests</TableHead>
+                  <TableHead className="font-semibold text-gray-700">TOTAL QUANTITY</TableHead>
                   <TableHead className="font-semibold text-gray-700">Ticket Type</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
