@@ -20,7 +20,7 @@ interface CheckInSystemProps {
 
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [showFilter, setShowFilter] = useState('all'); // Changed from statusFilter to showFilter
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
 
   // Get column indices for essential fields only
@@ -30,39 +30,32 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   const bookerIndex = getColumnIndex('booker');
-  const statusIndex = getColumnIndex('status');
   const totalQtyIndex = getColumnIndex('total quantity');
   const startTimeIndex = getColumnIndex('start time');
-
-  // Get unique statuses for filter
-  const statuses = useMemo(() => {
-    if (statusIndex === -1) return [];
-    const uniqueStatuses = [...new Set(guests.map(guest => guest[statusIndex] || '').filter(Boolean))];
-    return uniqueStatuses;
-  }, [guests, statusIndex]);
+  const ticketTypeIndex = getColumnIndex('ticket type');
 
   // Get show time (7pm or 9pm)
   const getShowTime = (guest: Guest) => {
     const startTime = guest[startTimeIndex] || '';
-    if (startTime.includes('19:') || startTime.includes('7')) return '7pm Show';
-    if (startTime.includes('21:') || startTime.includes('9')) return '9pm Show';
-    return startTime || 'Unknown';
+    if (startTime.includes('19:') || startTime.includes('7')) return '7pm';
+    if (startTime.includes('21:') || startTime.includes('9')) return '9pm';
+    return 'Unknown';
   };
 
-  // Filter guests based on search and status
+  // Filter guests based on search and show time
   const filteredGuests = useMemo(() => {
     return guests.filter((guest, index) => {
       const booker = guest[bookerIndex] || '';
-      const status = guest[statusIndex] || '';
+      const showTime = getShowTime(guest);
       
       const matchesSearch = searchTerm === '' || 
         booker.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || status === statusFilter;
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesShow;
     });
-  }, [guests, searchTerm, statusFilter, bookerIndex, statusIndex]);
+  }, [guests, searchTerm, showFilter, bookerIndex, startTimeIndex]);
 
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
@@ -85,22 +78,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setCheckedInGuests(newCheckedIn);
   };
 
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status?.toUpperCase()) {
-      case 'PAID':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'VIATOR':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'PAID GYG':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   const getShowTimeBadgeStyle = (showTime: string) => {
-    if (showTime.includes('7pm')) return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (showTime.includes('9pm')) return 'bg-purple-100 text-purple-800 border-purple-200';
+    if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
@@ -154,18 +134,30 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 </div>
               </div>
               <div className="w-60">
-                <Label htmlFor="status-filter" className="text-base font-medium text-gray-700">Filter by Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="h-12 mt-2">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {statuses.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={showFilter === 'all' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('all')}
+                    className="flex-1"
+                  >
+                    All Shows
+                  </Button>
+                  <Button
+                    variant={showFilter === '7pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('7pm')}
+                    className="flex-1"
+                  >
+                    7pm Show
+                  </Button>
+                  <Button
+                    variant={showFilter === '9pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('9pm')}
+                    className="flex-1"
+                  >
+                    9pm Show
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -177,7 +169,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Guests</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Ticket Type</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -187,9 +179,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const isCheckedIn = checkedInGuests.has(originalIndex);
                   
                   const booker = guest[bookerIndex] || 'Unknown Guest';
-                  const status = guest[statusIndex] || 'Unknown';
                   const totalQty = guest[totalQtyIndex] || '1';
                   const showTime = getShowTime(guest);
+                  const ticketType = guest[ticketTypeIndex] || 'Standard Ticket';
                   
                   return (
                     <TableRow key={originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
@@ -204,16 +196,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium text-gray-900 text-lg">{totalQty}</span>
-                          <span className="text-gray-500">guests</span>
+                        <div className="text-center">
+                          <span className="font-bold text-gray-900 text-xl">{totalQty}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadgeStyle(status)}`}>
-                          {status}
-                        </span>
+                        <div className="text-sm text-gray-700 max-w-xs">
+                          {ticketType}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Button
@@ -248,12 +238,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 Show Times
               </h3>
               <div className="space-y-3">
-                {['7pm Show', '9pm Show'].map(time => {
+                {['7pm', '9pm'].map(time => {
                   const count = guests.filter(guest => getShowTime(guest) === time).length;
                   const percentage = guests.length > 0 ? Math.round((count / guests.length) * 100) : 0;
                   return (
                     <div key={time} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium text-gray-700">{time}</span>
+                      <span className="font-medium text-gray-700">{time} Show</span>
                       <div className="text-right">
                         <span className="font-bold text-gray-900">{count}</span>
                         <span className="text-sm text-gray-500 ml-2">({percentage}%)</span>
@@ -290,22 +280,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
                 <Users className="h-5 w-5 mr-2 text-purple-600" />
-                Booking Status
+                Total Guests
               </h3>
-              <div className="space-y-3">
-                {statuses.map(status => {
-                  const count = guests.filter(guest => guest[statusIndex] === status).length;
-                  const percentage = guests.length > 0 ? Math.round((count / guests.length) * 100) : 0;
-                  return (
-                    <div key={status} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium text-gray-700">{status}</span>
-                      <div className="text-right">
-                        <span className="font-bold text-gray-900">{count}</span>
-                        <span className="text-sm text-gray-500 ml-2">({percentage}%)</span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="text-center">
+                <div className="text-4xl font-bold text-purple-600 mb-2">
+                  {guests.reduce((total, guest) => total + parseInt(guest[totalQtyIndex] || '1'), 0)}
+                </div>
+                <div className="text-gray-600">Total Attendees</div>
               </div>
             </div>
           </div>
