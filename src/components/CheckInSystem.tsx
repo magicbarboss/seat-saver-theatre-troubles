@@ -25,6 +25,13 @@ interface BookingGroup {
   addOnIndices: number[];
 }
 
+interface CheckedInGuest {
+  name: string;
+  count: number;
+  showTime: string;
+  originalIndex: number;
+}
+
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState('all');
@@ -270,6 +277,23 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     if (showTime === '7:00pm' || showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
     if (showTime === '9:00pm' || showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  // Add function to get checked-in guests data for table allocation
+  const getCheckedInGuestsData = (): CheckedInGuest[] => {
+    return Array.from(checkedInGuests).map(guestIndex => {
+      const guest = guests[guestIndex];
+      const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
+      const showTime = getShowTime(guest);
+      
+      return {
+        name: guestName,
+        count: totalQty,
+        showTime: showTime,
+        originalIndex: guestIndex
+      };
+    });
   };
 
   return (
@@ -539,7 +563,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         </TabsContent>
 
         <TabsContent value="tables" className="space-y-6">
-          <TableAllocation onTableAssign={handleTableAssign} />
+          <TableAllocation 
+            onTableAssign={handleTableAssign} 
+            checkedInGuests={getCheckedInGuestsData()}
+          />
         </TabsContent>
 
         <TabsContent value="stats" className="space-y-6">

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, Check, X, Plus, Minus } from 'lucide-react';
+import { Users, Check, X, Plus, Minus, AlertTriangle } from 'lucide-react';
 
 interface Table {
   id: number;
@@ -14,11 +14,19 @@ interface Table {
   showTime?: string;
 }
 
-interface TableAllocationProps {
-  onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
+interface CheckedInGuest {
+  name: string;
+  count: number;
+  showTime: string;
+  originalIndex: number;
 }
 
-const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
+interface TableAllocationProps {
+  onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
+  checkedInGuests?: CheckedInGuest[];
+}
+
+const TableAllocation = ({ onTableAssign, checkedInGuests = [] }: TableAllocationProps) => {
   // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
     // Tables 1-3: 2 seats each (front row)
@@ -39,29 +47,118 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
     { id: 13, seats: 2, isOccupied: false },
   ]);
 
-  const [selectedGuest, setSelectedGuest] = useState<{
-    name: string;
-    count: number;
-    showTime: string;
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [splitSuggestion, setSplitSuggestion] = useState<{
+    guest: CheckedInGuest;
+    tables: Table[];
   } | null>(null);
 
-  const assignTable = (tableId: number) => {
-    if (!selectedGuest) return;
+  // Define adjacent table groups for splitting suggestions
+  const adjacentTableGroups = [
+    [1, 2, 3], // Front row
+    [4, 5, 6], // Row 2
+    [7, 8, 9], // Row 3
+    [10, 11, 12, 13], // Back row
+    [4, 5], [5, 6], // Adjacent pairs in row 2
+    [7, 8], [8, 9], // Adjacent pairs in row 3
+    [10, 11], [11, 12], [12, 13], // Adjacent pairs in back row
+  ];
 
-    setTables(prev => prev.map(table => 
-      table.id === tableId 
-        ? { 
-            ...table, 
-            isOccupied: true, 
-            guestName: selectedGuest.name,
-            guestCount: selectedGuest.count,
-            showTime: selectedGuest.showTime
+  const getAdjacentTables = (tableId: number): number[] => {
+    for (const group of adjacentTableGroups) {
+      if (group.includes(tableId)) {
+        return group.filter(id => id !== tableId);
+      }
+    }
+    return [];
+  };
+
+  const getSuitableGuests = (table: Table) => {
+    return checkedInGuests.filter(guest => guest.count <= table.seats);
+  };
+
+  const getLargeParties = (table: Table) => {
+    return checkedInGuests.filter(guest => guest.count > table.seats);
+  };
+
+  const findSplitOptions = (guest: CheckedInGuest, clickedTable: Table) => {
+    const adjacentTableIds = getAdjacentTables(clickedTable.id);
+    const availableAdjacent = tables.filter(t => 
+      adjacentTableIds.includes(t.id) && !t.isOccupied
+    );
+
+    const splitOptions: Table[][] = [];
+    
+    // Try combinations of clicked table + adjacent tables
+    for (let i = 0; i < availableAdjacent.length; i++) {
+      const combo = [clickedTable, availableAdjacent[i]];
+      const totalSeats = combo.reduce((sum, t) => sum + t.seats, 0);
+      if (totalSeats >= guest.count) {
+        splitOptions.push(combo);
+      }
+    }
+
+    // Try combinations of 3 tables if needed
+    if (guest.count > clickedTable.seats + Math.max(...availableAdjacent.map(t => t.seats))) {
+      for (let i = 0; i < availableAdjacent.length; i++) {
+        for (let j = i + 1; j < availableAdjacent.length; j++) {
+          const combo = [clickedTable, availableAdjacent[i], availableAdjacent[j]];
+          const totalSeats = combo.reduce((sum, t) => sum + t.seats, 0);
+          if (totalSeats >= guest.count) {
+            splitOptions.push(combo);
           }
-        : table
-    ));
+        }
+      }
+    }
 
-    onTableAssign(tableId, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
-    setSelectedGuest(null);
+    return splitOptions;
+  };
+
+  const handleTableClick = (table: Table) => {
+    if (table.isOccupied) return;
+    
+    setSelectedTable(table);
+    setShowAssignmentDialog(true);
+    setSplitSuggestion(null);
+  };
+
+  const assignGuestToTable = (guest: CheckedInGuest, tablesToUse: Table[]) => {
+    const updatedTables = tables.map(table => {
+      if (tablesToUse.some(t => t.id === table.id)) {
+        return {
+          ...table,
+          isOccupied: true,
+          guestName: guest.name,
+          guestCount: guest.count,
+          showTime: guest.showTime
+        };
+      }
+      return table;
+    });
+
+    setTables(updatedTables);
+    
+    // Call the callback for each table
+    tablesToUse.forEach(table => {
+      onTableAssign(table.id, guest.name, guest.count, guest.showTime);
+    });
+
+    setShowAssignmentDialog(false);
+    setSelectedTable(null);
+    setSplitSuggestion(null);
+  };
+
+  const suggestSplit = (guest: CheckedInGuest) => {
+    if (!selectedTable) return;
+    
+    const splitOptions = findSplitOptions(guest, selectedTable);
+    if (splitOptions.length > 0) {
+      setSplitSuggestion({
+        guest,
+        tables: splitOptions[0] // Use the first (best) option
+      });
+    }
   };
 
   const clearTable = (tableId: number) => {
@@ -121,13 +218,9 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
             className={`
               p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
               ${getTableColor(table)}
-              ${selectedGuest ? 'hover:shadow-lg' : ''}
+              ${!table.isOccupied ? 'hover:shadow-lg' : ''}
             `}
-            onClick={() => {
-              if (selectedGuest && !table.isOccupied) {
-                assignTable(table.id);
-              }
-            }}
+            onClick={() => handleTableClick(table)}
           >
             <div className="text-center">
               <div className="font-bold text-sm mb-1">T{table.id}</div>
@@ -207,13 +300,9 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
             className={`
               p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
               ${getTableColor(table)}
-              ${selectedGuest ? 'hover:shadow-lg' : ''}
+              ${!table.isOccupied ? 'hover:shadow-lg' : ''}
             `}
-            onClick={() => {
-              if (selectedGuest && !table.isOccupied) {
-                assignTable(table.id);
-              }
-            }}
+            onClick={() => handleTableClick(table)}
           >
             <div className="text-center">
               <div className="font-bold text-sm mb-1">T{table.id}</div>
@@ -287,6 +376,122 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Table Assignment Dialog */}
+      <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Guests to Table {selectedTable?.id}</DialogTitle>
+          </DialogHeader>
+          
+          {selectedTable && (
+            <div className="space-y-6">
+              {/* Suitable guests (fit in this table) */}
+              <div>
+                <h4 className="font-medium mb-3">Guests that fit ({selectedTable.seats} seats available):</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {getSuitableGuests(selectedTable).map((guest, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
+                      <div>
+                        <div className="font-medium">{guest.name}</div>
+                        <div className="text-sm text-gray-600">{guest.count} guests • {guest.showTime}</div>
+                      </div>
+                      <Button
+                        onClick={() => assignGuestToTable(guest, [selectedTable])}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Assign
+                      </Button>
+                    </div>
+                  ))}
+                  {getSuitableGuests(selectedTable).length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No checked-in guests fit this table size</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Large parties that need splitting */}
+              {getLargeParties(selectedTable).length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-3 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2 text-orange-500" />
+                    Large parties (need multiple tables):
+                  </h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {getLargeParties(selectedTable).map((guest, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 border rounded-lg bg-orange-50">
+                        <div>
+                          <div className="font-medium">{guest.name}</div>
+                          <div className="text-sm text-gray-600">{guest.count} guests • {guest.showTime}</div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => suggestSplit(guest)}
+                          className="border-orange-300"
+                        >
+                          Suggest Split
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Split Suggestion Dialog */}
+      <Dialog open={splitSuggestion !== null} onOpenChange={() => setSplitSuggestion(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Split Party Suggestion</DialogTitle>
+          </DialogHeader>
+          
+          {splitSuggestion && (
+            <div className="space-y-4">
+              <p className="text-gray-700">
+                <strong>{splitSuggestion.guest.name}</strong> has {splitSuggestion.guest.count} guests.
+              </p>
+              
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Suggested table combination:</h4>
+                <div className="flex items-center space-x-2 mb-2">
+                  {splitSuggestion.tables.map((table, idx) => (
+                    <div key={table.id} className="flex items-center">
+                      <Badge variant="outline" className="bg-white">
+                        Table {table.id} ({table.seats} seats)
+                      </Badge>
+                      {idx < splitSuggestion.tables.length - 1 && (
+                        <span className="mx-2 text-gray-500">+</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-600">
+                  Total seats: {splitSuggestion.tables.reduce((sum, t) => sum + t.seats, 0)}
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <Button
+                  onClick={() => assignGuestToTable(splitSuggestion.guest, splitSuggestion.tables)}
+                  className="flex-1"
+                >
+                  Split Party Across These Tables
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSplitSuggestion(null)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
@@ -349,53 +554,15 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
+            <CardTitle className="text-lg">Instructions</CardTitle>
           </CardHeader>
           <CardContent>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="w-full mb-2">
-                  Assign Guest to Table
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Select Guest Details</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Guest name"
-                    className="w-full p-2 border rounded"
-                    onChange={(e) => setSelectedGuest(prev => ({ ...prev!, name: e.target.value }))}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Number of guests"
-                    className="w-full p-2 border rounded"
-                    onChange={(e) => setSelectedGuest(prev => ({ ...prev!, count: parseInt(e.target.value) }))}
-                  />
-                  <select
-                    className="w-full p-2 border rounded"
-                    onChange={(e) => setSelectedGuest(prev => ({ ...prev!, showTime: e.target.value }))}
-                  >
-                    <option value="">Select show time</option>
-                    <option value="7pm">7pm Show</option>
-                    <option value="9pm">9pm Show</option>
-                  </select>
-                  <Button 
-                    onClick={() => {
-                      if (selectedGuest?.name && selectedGuest?.count && selectedGuest?.showTime) {
-                        // Guest details are set, now they can click on a table
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    Ready - Click on a Table
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>• Click any available table to see checked-in guests</p>
+              <p>• Only guests that fit will be shown first</p>
+              <p>• Large parties will get split suggestions for adjacent tables</p>
+              <p>• Use +/- to adjust table seating</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -445,9 +612,9 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
             
             {/* Legend for seating */}
             <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
+              <p>• Click any available table to assign checked-in guests</p>
+              <p>• Large parties will get suggestions for adjacent table splits</p>
               <p>• Use +/- buttons to adjust seating for available tables</p>
-              <p>• Dark gray seats face the stage, light gray seats have backs to stage</p>
-              <p>• Tables 1-3 and 10-13 only have seats facing the stage</p>
             </div>
           </div>
         </CardContent>
