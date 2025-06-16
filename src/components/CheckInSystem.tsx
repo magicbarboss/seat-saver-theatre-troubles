@@ -1,13 +1,12 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Users, CheckCircle, User, Clock } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import TableAllocation from './TableAllocation';
 
 interface Guest {
   [key: string]: string;
@@ -20,8 +19,9 @@ interface CheckInSystemProps {
 
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState('all'); // Changed from statusFilter to showFilter
+  const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
+  const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
 
   // Get column indices for essential fields only
   const getColumnIndex = (columnName: string) => {
@@ -78,6 +78,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setCheckedInGuests(newCheckedIn);
   };
 
+  const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
+    toast({
+      title: "🪑 Table Assigned",
+      description: `${guestName} (${guestCount} guests) assigned to Table ${tableId}`,
+    });
+  };
+
   const getShowTimeBadgeStyle = (showTime: string) => {
     if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
     if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
@@ -108,9 +115,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       </div>
 
       <Tabs defaultValue="checkin" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-white shadow-sm">
+        <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
           <TabsTrigger value="checkin" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
             Check-In System
+          </TabsTrigger>
+          <TabsTrigger value="tables" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+            Table Management
           </TabsTrigger>
           <TabsTrigger value="stats" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
             Show Statistics
@@ -228,6 +238,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="tables" className="space-y-6">
+          <TableAllocation onTableAssign={handleTableAssign} />
         </TabsContent>
 
         <TabsContent value="stats" className="space-y-6">
