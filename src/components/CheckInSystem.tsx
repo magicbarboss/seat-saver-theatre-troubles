@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,25 +57,40 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     bookingCode: bookingCodeIndex
   });
 
-  // Parse booking code to extract show time and add-ons
-  const parseBookingCode = (bookingCode: string) => {
-    console.log('Parsing booking code:', bookingCode);
+  // Extract show time from Column B (Item field) - looking for [7:00pm] or [9:00pm] patterns
+  const extractShowTime = (itemField: string) => {
+    if (!itemField) return 'Unknown';
     
-    let showTime = 'Unknown';
-    let addOns: string[] = [];
-    
-    if (bookingCode) {
-      // Example parsing logic - adjust based on your actual encoding system
-      if (bookingCode.includes('FNKV')) {
-        showTime = '9pm'; // FNKV might indicate 9pm show
-        if (bookingCode.includes('070625')) {
-          addOns.push('salt & pepper fries');
-        }
-      }
-      // Add more parsing rules based on your booking code format
+    // Look for time patterns in square brackets like [7:00pm] or [9:00pm]
+    const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
+    if (timeMatch) {
+      return timeMatch[1];
     }
     
-    return { showTime, addOns };
+    // Fallback patterns
+    if (itemField.includes('7:00pm') || itemField.includes('7pm')) return '7:00pm';
+    if (itemField.includes('9:00pm') || itemField.includes('9pm')) return '9:00pm';
+    
+    return 'Unknown';
+  };
+
+  // Get ticket types from columns I to V (indices 8 to 21)
+  const getTicketTypes = (guest: Guest) => {
+    const ticketTypes: string[] = [];
+    
+    // Check columns I through V (indices 8-21)
+    for (let i = 8; i <= 21 && i < headers.length; i++) {
+      const value = guest[i];
+      if (value && value.trim() !== '' && value !== '0') {
+        const header = headers[i];
+        // Only include if it looks like a ticket quantity
+        if (!isNaN(parseInt(value))) {
+          ticketTypes.push(`${value}x ${header}`);
+        }
+      }
+    }
+    
+    return ticketTypes;
   };
 
   // Extract guest name from booker field
@@ -98,42 +114,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return parts.length > 2 ? parts[2].trim() : parts[0].trim();
   };
 
-  // Get show time from booking code or item field
+  // Get show time from item field (Column B)
   const getShowTime = (guest: Guest) => {
-    const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
     const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
-    
-    // First try to parse from booking code
-    const parsed = parseBookingCode(bookingCode);
-    if (parsed.showTime !== 'Unknown') {
-      return parsed.showTime;
-    }
-    
-    // Fallback to item field
-    if (itemField.includes('9pm') || itemField.includes('21:')) return '9pm';
-    if (itemField.includes('7pm') || itemField.includes('19:')) return '7pm';
-    
-    return 'Unknown';
-  };
-
-  // Get add-ons from booking code or item field
-  const getAddOns = (guest: Guest) => {
-    const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
-    const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
-    
-    // First try to parse from booking code
-    const parsed = parseBookingCode(bookingCode);
-    if (parsed.addOns.length > 0) {
-      return parsed.addOns;
-    }
-    
-    // Fallback to parsing from item field
-    const addOns: string[] = [];
-    if (itemField.toLowerCase().includes('fries')) {
-      addOns.push('salt & pepper fries');
-    }
-    
-    return addOns;
+    return extractShowTime(itemField);
   };
 
   // Filter guests based on search and show time
@@ -150,7 +134,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       
       return matchesSearch && matchesShow;
     });
-  }, [guests, searchTerm, showFilter, bookerIndex, bookingCodeIndex, itemIndex]);
+  }, [guests, searchTerm, showFilter, bookerIndex, itemIndex]);
 
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
@@ -181,8 +165,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   const getShowTimeBadgeStyle = (showTime: string) => {
-    if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
+    if (showTime === '7:00pm' || showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (showTime === '9:00pm' || showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
@@ -194,7 +178,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Headers: {headers.join(', ')}</p>
         <p className="text-xs">Booker Index: {bookerIndex} ({bookerIndex >= 0 ? headers[bookerIndex] : 'Not found'})</p>
         <p className="text-xs">Total Qty Index: {totalQtyIndex} ({totalQtyIndex >= 0 ? headers[totalQtyIndex] : 'Not found'})</p>
-        <p className="text-xs">Booking Code Index: {bookingCodeIndex} ({bookingCodeIndex >= 0 ? headers[bookingCodeIndex] : 'Not found'})</p>
+        <p className="text-xs">Item Index: {itemIndex} ({itemIndex >= 0 ? headers[itemIndex] : 'Not found'})</p>
+        <p className="text-xs">Ticket columns (I-V): {headers.slice(8, 22).join(', ')}</p>
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
@@ -258,15 +243,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                     All Shows
                   </Button>
                   <Button
-                    variant={showFilter === '7pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('7pm')}
+                    variant={showFilter === '7:00pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('7:00pm')}
                     className="flex-1"
                   >
                     7pm Show
                   </Button>
                   <Button
-                    variant={showFilter === '9pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('9pm')}
+                    variant={showFilter === '9:00pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('9:00pm')}
                     className="flex-1"
                   >
                     9pm Show
@@ -284,7 +269,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
@@ -298,7 +283,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const booker = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
                   const totalQty = totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1';
                   const showTime = getShowTime(guest);
-                  const addOns = getAddOns(guest);
+                  const ticketTypes = getTicketTypes(guest);
                   const note = noteIndex >= 0 ? guest[noteIndex] || '' : '';
                   
                   return (
@@ -324,8 +309,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-gray-700">
-                          {addOns.length > 0 ? addOns.join(', ') : 'None'}
+                        <div className="text-sm text-gray-700 max-w-xs">
+                          {ticketTypes.length > 0 ? (
+                            <div className="space-y-1">
+                              {ticketTypes.map((ticket, idx) => (
+                                <div key={idx} className="bg-blue-50 px-2 py-1 rounded text-xs">
+                                  {ticket}
+                                </div>
+                              ))}
+                            </div>
+                          ) : 'No tickets'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -370,7 +363,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 Show Times
               </h3>
               <div className="space-y-3">
-                {['7pm', '9pm'].map(time => {
+                {['7:00pm', '9:00pm'].map(time => {
                   const count = guests.filter(guest => getShowTime(guest) === time).length;
                   const percentage = guests.length > 0 ? Math.round((count / guests.length) * 100) : 0;
                   return (
