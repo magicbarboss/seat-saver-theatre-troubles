@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, Check, X, Plus, Minus, AlertTriangle, Bell } from 'lucide-react';
+import { Users, Check, X, Plus, Minus, AlertTriangle, Bell, MapPin } from 'lucide-react';
 
 interface Table {
   id: number;
@@ -12,6 +12,7 @@ interface Table {
   guestName?: string;
   guestCount?: number;
   showTime?: string;
+  isAllocated?: boolean; // New: table is allocated but guest not seated yet
 }
 
 interface CheckedInGuest {
@@ -21,6 +22,7 @@ interface CheckedInGuest {
   originalIndex: number;
   pagerNumber?: number;
   hasBeenSeated?: boolean;
+  hasTableAllocated?: boolean; // New: guest has table allocated but not seated
 }
 
 interface TableAllocationProps {
@@ -28,9 +30,10 @@ interface TableAllocationProps {
   checkedInGuests?: CheckedInGuest[];
   onPagerRelease?: (pagerNumber: number) => void;
   onGuestSeated?: (guestIndex: number) => void;
+  onTableAllocated?: (guestIndex: number, tableIds: number[]) => void; // New callback
 }
 
-const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, onGuestSeated }: TableAllocationProps) => {
+const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, onGuestSeated, onTableAllocated }: TableAllocationProps) => {
   // Initialize with your specific table layout
   const [tables, setTables] = useState<Table[]>([
     // Tables 1-3: 2 seats each (front row)
@@ -91,17 +94,25 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
   };
 
   const getSuitableGuests = (table: Table) => {
-    return checkedInGuests.filter(guest => guest.count <= table.seats && !guest.hasBeenSeated);
+    return checkedInGuests.filter(guest => 
+      guest.count <= table.seats && 
+      !guest.hasBeenSeated && 
+      !guest.hasTableAllocated
+    );
   };
 
   const getLargeParties = (table: Table) => {
-    return checkedInGuests.filter(guest => guest.count > table.seats && !guest.hasBeenSeated);
+    return checkedInGuests.filter(guest => 
+      guest.count > table.seats && 
+      !guest.hasBeenSeated && 
+      !guest.hasTableAllocated
+    );
   };
 
   const findSplitOptions = (guest: CheckedInGuest, clickedTable: Table) => {
     const adjacentTableIds = getAdjacentTables(clickedTable.id);
     const availableAdjacent = tables.filter(t => 
-      adjacentTableIds.includes(t.id) && !t.isOccupied
+      adjacentTableIds.includes(t.id) && !t.isOccupied && !t.isAllocated
     );
 
     const splitOptions: Table[][] = [];
@@ -137,6 +148,58 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
     setSelectedTable(table);
     setShowAssignmentDialog(true);
     setSplitSuggestion(null);
+  };
+
+  // New: Allocate table (not seat yet)
+  const allocateTableToGuest = (guest: CheckedInGuest, tablesToUse: Table[]) => {
+    const updatedTables = tables.map(table => {
+      if (tablesToUse.some(t => t.id === table.id)) {
+        return {
+          ...table,
+          isAllocated: true,
+          guestName: guest.name,
+          guestCount: guest.count,
+          showTime: guest.showTime
+        };
+      }
+      return table;
+    });
+
+    setTables(updatedTables);
+    
+    // Mark guest as having table allocated
+    if (onTableAllocated) {
+      onTableAllocated(guest.originalIndex, tablesToUse.map(t => t.id));
+    }
+    
+    setShowAssignmentDialog(false);
+    setSelectedTable(null);
+    setSplitSuggestion(null);
+  };
+
+  // New: Mark guest as seated (convert allocation to occupied)
+  const markGuestAsSeated = (tableId: number) => {
+    const updatedTables = tables.map(table => {
+      if (table.id === tableId && table.isAllocated) {
+        return {
+          ...table,
+          isAllocated: false,
+          isOccupied: true
+        };
+      }
+      return table;
+    });
+
+    setTables(updatedTables);
+    
+    // Find the guest and mark as seated
+    const table = tables.find(t => t.id === tableId);
+    if (table && table.guestName) {
+      const guest = checkedInGuests.find(g => g.name === table.guestName);
+      if (guest && onGuestSeated) {
+        onGuestSeated(guest.originalIndex);
+      }
+    }
   };
 
   const assignGuestToTable = (guest: CheckedInGuest, tablesToUse: Table[]) => {
@@ -211,14 +274,21 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
   const clearTable = (tableId: number) => {
     setTables(prev => prev.map(table => 
       table.id === tableId 
-        ? { ...table, isOccupied: false, guestName: undefined, guestCount: undefined, showTime: undefined }
+        ? { 
+            ...table, 
+            isOccupied: false, 
+            isAllocated: false,
+            guestName: undefined, 
+            guestCount: undefined, 
+            showTime: undefined 
+          }
         : table
     ));
   };
 
   const adjustSeating = (tableId: number, increment: boolean) => {
     setTables(prev => prev.map(table => {
-      if (table.id === tableId && !table.isOccupied) {
+      if (table.id === tableId && !table.isOccupied && !table.isAllocated) {
         const newSeats = increment ? table.seats + 1 : Math.max(1, table.seats - 1);
         return { ...table, seats: Math.min(12, newSeats) }; // Max 12 seats per table
       }
@@ -227,14 +297,20 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
   };
 
   const getTableColor = (table: Table) => {
-    if (!table.isOccupied) return 'bg-green-100 border-green-300 hover:bg-green-200';
-    return table.showTime === '7pm' 
-      ? 'bg-orange-100 border-orange-300' 
-      : 'bg-purple-100 border-purple-300';
+    if (table.isOccupied) {
+      return table.showTime === '7:00pm' || table.showTime === '7pm'
+        ? 'bg-orange-100 border-orange-300' 
+        : 'bg-purple-100 border-purple-300';
+    }
+    if (table.isAllocated) {
+      return 'bg-blue-100 border-blue-300'; // New color for allocated tables
+    }
+    return 'bg-green-100 border-green-300 hover:bg-green-200';
   };
 
   const occupiedTables = tables.filter(t => t.isOccupied).length;
-  const availableTables = tables.filter(t => !t.isOccupied).length;
+  const allocatedTables = tables.filter(t => t.isAllocated).length;
+  const availableTables = tables.filter(t => !t.isOccupied && !t.isAllocated).length;
 
   // Define table rows for layout - front to back
   const tableRows = [
@@ -265,7 +341,7 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
             className={`
               p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
               ${getTableColor(table)}
-              ${!table.isOccupied ? 'hover:shadow-lg' : ''}
+              ${(!table.isOccupied && !table.isAllocated) ? 'hover:shadow-lg' : ''}
             `}
             onClick={() => handleTableClick(table)}
           >
@@ -281,6 +357,43 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
                       {table.showTime}
                     </Badge>
                   </div>
+                  <div className="text-xs text-green-600 font-bold">SEATED</div>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="mt-1 h-5 text-xs px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearTable(table.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : table.isAllocated ? (
+                <div className="space-y-1">
+                  <div className="font-medium text-xs">{table.guestName}</div>
+                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
+                  <div className="text-xs">
+                    <Badge variant="outline" className="text-xs py-0">
+                      {table.showTime}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-blue-600 font-bold flex items-center justify-center">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    ALLOCATED
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="mt-1 h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markGuestAsSeated(table.id);
+                    }}
+                  >
+                    Mark Seated
+                  </Button>
                   <Button
                     size="sm"
                     variant="destructive"
@@ -347,7 +460,7 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
             className={`
               p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
               ${getTableColor(table)}
-              ${!table.isOccupied ? 'hover:shadow-lg' : ''}
+              ${(!table.isOccupied && !table.isAllocated) ? 'hover:shadow-lg' : ''}
             `}
             onClick={() => handleTableClick(table)}
           >
@@ -363,6 +476,43 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
                       {table.showTime}
                     </Badge>
                   </div>
+                  <div className="text-xs text-green-600 font-bold">SEATED</div>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="mt-1 h-5 text-xs px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearTable(table.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : table.isAllocated ? (
+                <div className="space-y-1">
+                  <div className="font-medium text-xs">{table.guestName}</div>
+                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
+                  <div className="text-xs">
+                    <Badge variant="outline" className="text-xs py-0">
+                      {table.showTime}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-blue-600 font-bold flex items-center justify-center">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    ALLOCATED
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="mt-1 h-6 text-xs px-2 bg-green-600 hover:bg-green-700"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markGuestAsSeated(table.id);
+                    }}
+                  >
+                    Mark Seated
+                  </Button>
                   <Button
                     size="sm"
                     variant="destructive"
@@ -421,8 +571,8 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
     }
   };
 
-  // Filter out guests who have already been seated
-  const availableGuests = checkedInGuests.filter(guest => !guest.hasBeenSeated);
+  // Filter out guests who have already been seated or have tables allocated
+  const availableGuests = checkedInGuests.filter(guest => !guest.hasBeenSeated && !guest.hasTableAllocated);
 
   return (
     <div className="space-y-6">
@@ -430,7 +580,7 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
       <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Assign Guests to Table {selectedTable?.id}</DialogTitle>
+            <DialogTitle>Allocate Table {selectedTable?.id}</DialogTitle>
           </DialogHeader>
           
           {selectedTable && (
@@ -456,10 +606,11 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
                         </div>
                       </div>
                       <Button
-                        onClick={() => assignGuestToTable(guest, [selectedTable])}
-                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => allocateTableToGuest(guest, [selectedTable])}
+                        className="bg-blue-600 hover:bg-blue-700"
                       >
-                        Assign
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Allocate Table
                       </Button>
                     </div>
                   ))}
@@ -552,10 +703,11 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
 
               <div className="flex space-x-3">
                 <Button
-                  onClick={() => assignGuestToTable(splitSuggestion.guest, splitSuggestion.tables)}
+                  onClick={() => allocateTableToGuest(splitSuggestion.guest, splitSuggestion.tables)}
                   className="flex-1"
                 >
-                  Split Party Across These Tables
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Allocate These Tables
                 </Button>
                 <Button
                   variant="outline"
@@ -649,8 +801,14 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
                 </Badge>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Occupied:</span>
-                <Badge variant="outline" className="bg-red-50 text-red-700">
+                <span className="text-gray-600">Allocated:</span>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                  {allocatedTables}
+                </Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Seated:</span>
+                <Badge variant="outline" className="bg-purple-50 text-purple-700">
                   {occupiedTables}
                 </Badge>
               </div>
@@ -673,20 +831,16 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
                 <span className="text-sm">Available</span>
               </div>
               <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
+                <span className="text-sm">Allocated (not seated)</span>
+              </div>
+              <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-orange-100 border border-orange-300 rounded"></div>
-                <span className="text-sm">7pm Show</span>
+                <span className="text-sm">Seated - 7pm Show</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-purple-100 border border-purple-300 rounded"></div>
-                <span className="text-sm">9pm Show</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-gray-400 rounded-full"></div>
-                <span className="text-sm">Seats facing stage</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
-                <span className="text-sm">Seats back to stage</span>
+                <span className="text-sm">Seated - 9pm Show</span>
               </div>
             </div>
           </CardContent>
@@ -698,11 +852,11 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Click any available table to see checked-in guests</p>
-              <p>• Only guests that fit will be shown first</p>
-              <p>• Large parties will get split suggestions for adjacent tables</p>
-              <p>• Use +/- to adjust table seating</p>
-              <p>• Pagers are automatically released when guests are seated</p>
+              <p>• Click any available table to allocate to checked-in guests</p>
+              <p>• Allocated tables show guest info and pager number</p>
+              <p>• Page guests manually when ready</p>
+              <p>• Click "Mark Seated" when guest arrives at table</p>
+              <p>• Return pager manually when guests are seated</p>
             </div>
           </CardContent>
         </Card>
@@ -753,9 +907,9 @@ const TableAllocation = ({ onTableAssign, checkedInGuests = [], onPagerRelease, 
             
             {/* Legend for seating */}
             <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
-              <p>• Click any available table to assign checked-in guests</p>
-              <p>• Large parties will get suggestions for adjacent table splits (including T6+T9, T5+T8, etc.)</p>
-              <p>• Pagers will be automatically released when guests are seated</p>
+              <p>• Click any available table to allocate to checked-in guests</p>
+              <p>• Allocated tables (blue) are reserved but guests not seated yet</p>
+              <p>• Use "Mark Seated" button when guests arrive at their table</p>
             </div>
           </div>
         </CardContent>
