@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload } from 'lucide-react';
 import CheckInSystem from './CheckInSystem';
+import * as XLSX from 'xlsx';
 
 interface CsvData {
   headers: string[];
@@ -25,20 +25,44 @@ const CsvUpload = () => {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim() !== '');
+      const data = e.target?.result;
       
-      if (lines.length === 0) return;
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        // Handle Excel files
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (jsonData.length === 0) return;
+        
+        const headers = (jsonData[0] as string[]).map(header => String(header || '').trim());
+        const rows = jsonData.slice(1).map(row => 
+          (row as any[]).map(cell => String(cell || '').trim())
+        );
+        
+        setCsvData({ headers, rows });
+      } else {
+        // Handle CSV/TSV files (existing logic)
+        const text = data as string;
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        
+        if (lines.length === 0) return;
 
-      const headers = lines[0].split('\t').map(header => header.trim().replace(/"/g, ''));
-      const rows = lines.slice(1).map(line => 
-        line.split('\t').map(cell => cell.trim().replace(/"/g, ''))
-      );
+        const headers = lines[0].split('\t').map(header => header.trim().replace(/"/g, ''));
+        const rows = lines.slice(1).map(line => 
+          line.split('\t').map(cell => cell.trim().replace(/"/g, ''))
+        );
 
-      setCsvData({ headers, rows });
+        setCsvData({ headers, rows });
+      }
     };
 
-    reader.readAsText(file);
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
+    }
   };
 
   if (showCheckIn && csvData) {
@@ -69,12 +93,12 @@ const CsvUpload = () => {
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="csv-upload">Upload Your Theatre CSV File</Label>
+        <Label htmlFor="csv-upload">Upload Your Theatre File (Excel or CSV)</Label>
         <div className="flex items-center space-x-2">
           <Input
             id="csv-upload"
             type="file"
-            accept=".csv,.tsv"
+            accept=".csv,.tsv,.xlsx,.xls"
             onChange={handleFileUpload}
             className="flex-1"
           />
@@ -87,12 +111,15 @@ const CsvUpload = () => {
             Loaded: {fileName}
           </p>
         )}
+        <p className="text-xs text-muted-foreground">
+          Supports Excel (.xlsx, .xls) and CSV/TSV files. Excel files provide better data parsing.
+        </p>
       </div>
 
       {csvData && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">CSV Contents</h3>
+            <h3 className="text-lg font-semibold">File Contents</h3>
             <Button onClick={() => setShowCheckIn(true)}>
               Start Check-In System
             </Button>
