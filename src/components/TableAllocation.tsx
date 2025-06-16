@@ -83,6 +83,16 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
   const occupiedTables = tables.filter(t => t.isOccupied).length;
   const availableTables = tables.filter(t => !t.isOccupied).length;
 
+  // Define table rows for layout
+  const tableRows = [
+    { label: 'Row 1', tableIds: [1, 2, 3] },
+    { label: 'Row 2', tableIds: [4, 5, 6] },
+    { label: 'Row 3', tableIds: [7, 8, 9] },
+    { label: 'Row 4', tableIds: [10, 11, 12, 13] }
+  ];
+
+  const getTableById = (id: number) => tables.find(table => table.id === id);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -195,51 +205,63 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
           <CardTitle className="text-xl">🎭 Theatre Seating Layout</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {tables.map((table) => (
-              <div
-                key={table.id}
-                className={`
-                  p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
-                  ${getTableColor(table)}
-                  ${selectedGuest ? 'hover:shadow-lg' : ''}
-                `}
-                onClick={() => {
-                  if (selectedGuest && !table.isOccupied) {
-                    assignTable(table.id);
-                  }
-                }}
-              >
-                <div className="text-center">
-                  <div className="font-bold text-lg mb-1">Table {table.id}</div>
-                  <div className="text-sm text-gray-600 mb-2">{table.seats} seats</div>
-                  
-                  {table.isOccupied ? (
-                    <div className="space-y-1">
-                      <div className="font-medium text-sm">{table.guestName}</div>
-                      <div className="text-xs text-gray-600">{table.guestCount} guests</div>
-                      <div className="text-xs">
-                        <Badge variant="outline" className="text-xs">
-                          {table.showTime}
-                        </Badge>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="mt-2 h-6 text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          clearTable(table.id);
+          <div className="space-y-6">
+            {tableRows.map((row) => (
+              <div key={row.label} className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-700">{row.label}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {row.tableIds.map((tableId) => {
+                    const table = getTableById(tableId);
+                    if (!table) return null;
+                    
+                    return (
+                      <div
+                        key={table.id}
+                        className={`
+                          p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
+                          ${getTableColor(table)}
+                          ${selectedGuest ? 'hover:shadow-lg' : ''}
+                        `}
+                        onClick={() => {
+                          if (selectedGuest && !table.isOccupied) {
+                            assignTable(table.id);
+                          }
                         }}
                       >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="text-green-600 font-medium text-sm">
-                      Available
-                    </div>
-                  )}
+                        <div className="text-center">
+                          <div className="font-bold text-lg mb-1">Table {table.id}</div>
+                          <div className="text-sm text-gray-600 mb-2">{table.seats} seats</div>
+                          
+                          {table.isOccupied ? (
+                            <div className="space-y-1">
+                              <div className="font-medium text-sm">{table.guestName}</div>
+                              <div className="text-xs text-gray-600">{table.guestCount} guests</div>
+                              <div className="text-xs">
+                                <Badge variant="outline" className="text-xs">
+                                  {table.showTime}
+                                </Badge>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="mt-2 h-6 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  clearTable(table.id);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="text-green-600 font-medium text-sm">
+                              Available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
