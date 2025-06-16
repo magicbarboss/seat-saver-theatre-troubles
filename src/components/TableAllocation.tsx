@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Users, Check, X } from 'lucide-react';
+import { Users, Check, X, Plus, Minus } from 'lucide-react';
 
 interface Table {
   id: number;
@@ -72,6 +72,16 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
     ));
   };
 
+  const adjustSeating = (tableId: number, increment: boolean) => {
+    setTables(prev => prev.map(table => {
+      if (table.id === tableId && !table.isOccupied) {
+        const newSeats = increment ? table.seats + 1 : Math.max(1, table.seats - 1);
+        return { ...table, seats: Math.min(12, newSeats) }; // Max 12 seats per table
+      }
+      return table;
+    }));
+  };
+
   const getTableColor = (table: Table) => {
     if (!table.isOccupied) return 'bg-green-100 border-green-300 hover:bg-green-200';
     return table.showTime === '7pm' 
@@ -91,6 +101,189 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
   ];
 
   const getTableById = (id: number) => tables.find(table => table.id === id);
+
+  const renderSeatingAroundTable = (table: Table) => {
+    const is2SeatTable = [1, 2, 3, 10, 11, 12, 13].includes(table.id);
+    
+    if (is2SeatTable) {
+      // 2-seat tables: only seats at the back (facing stage)
+      return (
+        <div className="flex flex-col items-center space-y-2">
+          {/* Seating behind table (facing stage) */}
+          <div className="flex space-x-1">
+            {Array.from({ length: table.seats }).map((_, i) => (
+              <div key={i} className="w-4 h-4 bg-gray-400 rounded-full border border-gray-600"></div>
+            ))}
+          </div>
+          
+          {/* Table */}
+          <div
+            className={`
+              p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
+              ${getTableColor(table)}
+              ${selectedGuest ? 'hover:shadow-lg' : ''}
+            `}
+            onClick={() => {
+              if (selectedGuest && !table.isOccupied) {
+                assignTable(table.id);
+              }
+            }}
+          >
+            <div className="text-center">
+              <div className="font-bold text-sm mb-1">T{table.id}</div>
+              
+              {table.isOccupied ? (
+                <div className="space-y-1">
+                  <div className="font-medium text-xs">{table.guestName}</div>
+                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
+                  <div className="text-xs">
+                    <Badge variant="outline" className="text-xs py-0">
+                      {table.showTime}
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="mt-1 h-5 text-xs px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearTable(table.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-green-600 font-medium text-xs">Free</div>
+                  <div className="text-xs text-gray-500">{table.seats} seats</div>
+                  <div className="flex justify-center space-x-1 mt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-5 w-5 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        adjustSeating(table.id, false);
+                      }}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-5 w-5 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        adjustSeating(table.id, true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      // 4+ seat tables: seats on both sides
+      const seatsPerSide = Math.ceil(table.seats / 2);
+      const backSeats = seatsPerSide;
+      const frontSeats = table.seats - seatsPerSide;
+
+      return (
+        <div className="flex flex-col items-center space-y-2">
+          {/* Seating behind table (facing stage) */}
+          <div className="flex space-x-1">
+            {Array.from({ length: backSeats }).map((_, i) => (
+              <div key={i} className="w-4 h-4 bg-gray-400 rounded-full border border-gray-600"></div>
+            ))}
+          </div>
+          
+          {/* Table */}
+          <div
+            className={`
+              p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
+              ${getTableColor(table)}
+              ${selectedGuest ? 'hover:shadow-lg' : ''}
+            `}
+            onClick={() => {
+              if (selectedGuest && !table.isOccupied) {
+                assignTable(table.id);
+              }
+            }}
+          >
+            <div className="text-center">
+              <div className="font-bold text-sm mb-1">T{table.id}</div>
+              
+              {table.isOccupied ? (
+                <div className="space-y-1">
+                  <div className="font-medium text-xs">{table.guestName}</div>
+                  <div className="text-xs text-gray-600">{table.guestCount}p</div>
+                  <div className="text-xs">
+                    <Badge variant="outline" className="text-xs py-0">
+                      {table.showTime}
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="mt-1 h-5 text-xs px-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearTable(table.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <div className="text-green-600 font-medium text-xs">Free</div>
+                  <div className="text-xs text-gray-500">{table.seats} seats</div>
+                  <div className="flex justify-center space-x-1 mt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-5 w-5 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        adjustSeating(table.id, false);
+                      }}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-5 w-5 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        adjustSeating(table.id, true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Seating in front of table (backs to stage) */}
+          {frontSeats > 0 && (
+            <div className="flex space-x-1">
+              {Array.from({ length: frontSeats }).map((_, i) => (
+                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -141,6 +334,14 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-purple-100 border border-purple-300 rounded"></div>
                 <span className="text-sm">9pm Show</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-gray-400 rounded-full"></div>
+                <span className="text-sm">Seats facing stage</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+                <span className="text-sm">Seats back to stage</span>
               </div>
             </div>
           </CardContent>
@@ -231,65 +432,8 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
                         if (!table) return null;
                         
                         return (
-                          <div key={table.id} className="flex flex-col items-center space-y-2">
-                            {/* Seating behind table (facing stage) */}
-                            <div className="flex space-x-1">
-                              {Array.from({ length: table.seats / 2 }).map((_, i) => (
-                                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
-                              ))}
-                            </div>
-                            
-                            {/* Table */}
-                            <div
-                              className={`
-                                p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 min-w-20
-                                ${getTableColor(table)}
-                                ${selectedGuest ? 'hover:shadow-lg' : ''}
-                              `}
-                              onClick={() => {
-                                if (selectedGuest && !table.isOccupied) {
-                                  assignTable(table.id);
-                                }
-                              }}
-                            >
-                              <div className="text-center">
-                                <div className="font-bold text-sm mb-1">T{table.id}</div>
-                                
-                                {table.isOccupied ? (
-                                  <div className="space-y-1">
-                                    <div className="font-medium text-xs">{table.guestName}</div>
-                                    <div className="text-xs text-gray-600">{table.guestCount}p</div>
-                                    <div className="text-xs">
-                                      <Badge variant="outline" className="text-xs py-0">
-                                        {table.showTime}
-                                      </Badge>
-                                    </div>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      className="mt-1 h-5 text-xs px-1"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        clearTable(table.id);
-                                      }}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="text-green-600 font-medium text-xs">
-                                    Free
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Seating in front of table (backs to stage) */}
-                            <div className="flex space-x-1">
-                              {Array.from({ length: table.seats / 2 }).map((_, i) => (
-                                <div key={i} className="w-4 h-4 bg-gray-300 rounded-full border border-gray-400"></div>
-                              ))}
-                            </div>
+                          <div key={table.id}>
+                            {renderSeatingAroundTable(table)}
                           </div>
                         );
                       })}
@@ -301,9 +445,9 @@ const TableAllocation = ({ onTableAssign }: TableAllocationProps) => {
             
             {/* Legend for seating */}
             <div className="text-center text-sm text-gray-600 bg-blue-50 p-3 rounded">
-              <p>• Gray circles represent seating positions</p>
-              <p>• Top seats face the stage, bottom seats have backs to stage</p>
-              <p>• Each table serves as dining surface for all seats</p>
+              <p>• Use +/- buttons to adjust seating for available tables</p>
+              <p>• Dark gray seats face the stage, light gray seats have backs to stage</p>
+              <p>• Tables 1-3 and 10-13 only have seats facing the stage</p>
             </div>
           </div>
         </CardContent>
