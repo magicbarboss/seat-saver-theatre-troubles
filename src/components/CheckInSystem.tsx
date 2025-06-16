@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,24 +23,43 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
 
-  // Get column indices for essential fields
-  const getColumnIndex = (columnName: string) => {
-    const index = headers.findIndex(header => header.toLowerCase().includes(columnName.toLowerCase()));
-    return index !== -1 ? index : -1;
+  // Debug: Log headers to see what we're working with
+  console.log('Available headers:', headers);
+  console.log('Sample guest data:', guests[0]);
+
+  // Improved column detection with more flexible matching
+  const getColumnIndex = (searchTerms: string[]) => {
+    for (const term of searchTerms) {
+      const index = headers.findIndex(header => 
+        header.toLowerCase().includes(term.toLowerCase())
+      );
+      if (index !== -1) {
+        console.log(`Found column "${headers[index]}" at index ${index} for search term "${term}"`);
+        return index;
+      }
+    }
+    console.log(`No column found for search terms: ${searchTerms.join(', ')}`);
+    return -1;
   };
 
-  const bookerIndex = getColumnIndex('booker');
-  const totalQtyIndex = getColumnIndex('total quantity');
-  const noteIndex = getColumnIndex('note');
-  const itemIndex = getColumnIndex('item');
-  const bookingCodeIndex = getColumnIndex('booking code') || getColumnIndex('code');
+  const bookerIndex = getColumnIndex(['booker', 'name', 'customer']);
+  const totalQtyIndex = getColumnIndex(['total quantity', 'quantity', 'qty', 'guests', 'pax']);
+  const noteIndex = getColumnIndex(['note', 'notes', 'message', 'comment']);
+  const itemIndex = getColumnIndex(['item', 'show', 'product']);
+  const bookingCodeIndex = getColumnIndex(['booking code', 'code', 'reference', 'booking ref']);
+
+  console.log('Column indices:', {
+    booker: bookerIndex,
+    totalQty: totalQtyIndex,
+    note: noteIndex,
+    item: itemIndex,
+    bookingCode: bookingCodeIndex
+  });
 
   // Parse booking code to extract show time and add-ons
   const parseBookingCode = (bookingCode: string) => {
     console.log('Parsing booking code:', bookingCode);
     
-    // For FNKV-070625 format, we need to decode the information
-    // This is a simplified parser - you may need to adjust based on your actual encoding
     let showTime = 'Unknown';
     let addOns: string[] = [];
     
@@ -63,6 +81,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const extractGuestName = (bookerField: string) => {
     if (!bookerField) return 'Unknown Guest';
     
+    // If it's already a clean name, return it
+    if (bookerField.match(/^[A-Za-z\s]+$/)) {
+      return bookerField.trim();
+    }
+    
     // Clean up the booker field to get just the name
     const parts = bookerField.split(',');
     for (const part of parts) {
@@ -77,8 +100,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Get show time from booking code or item field
   const getShowTime = (guest: Guest) => {
-    const bookingCode = guest[bookingCodeIndex] || '';
-    const itemField = guest[itemIndex] || '';
+    const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
+    const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
     
     // First try to parse from booking code
     const parsed = parseBookingCode(bookingCode);
@@ -95,8 +118,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Get add-ons from booking code or item field
   const getAddOns = (guest: Guest) => {
-    const bookingCode = guest[bookingCodeIndex] || '';
-    const itemField = guest[itemIndex] || '';
+    const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
+    const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
     
     // First try to parse from booking code
     const parsed = parseBookingCode(bookingCode);
@@ -109,7 +132,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     if (itemField.toLowerCase().includes('fries')) {
       addOns.push('salt & pepper fries');
     }
-    // Add more add-on detection logic here
     
     return addOns;
   };
@@ -117,7 +139,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Filter guests based on search and show time
   const filteredGuests = useMemo(() => {
     return guests.filter((guest, index) => {
-      const bookerField = guest[bookerIndex] || '';
+      const bookerField = bookerIndex >= 0 ? guest[bookerIndex] || '' : '';
       const guestName = extractGuestName(bookerField);
       const showTime = getShowTime(guest);
       
@@ -133,7 +155,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest[bookerIndex] || '');
+    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
     
     if (newCheckedIn.has(guestIndex)) {
       newCheckedIn.delete(guestIndex);
@@ -166,6 +188,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+      {/* Debug info - remove this after fixing */}
+      <div className="bg-yellow-50 p-4 rounded border">
+        <h4 className="font-semibold text-sm">Debug Info:</h4>
+        <p className="text-xs">Headers: {headers.join(', ')}</p>
+        <p className="text-xs">Booker Index: {bookerIndex} ({bookerIndex >= 0 ? headers[bookerIndex] : 'Not found'})</p>
+        <p className="text-xs">Total Qty Index: {totalQtyIndex} ({totalQtyIndex >= 0 ? headers[totalQtyIndex] : 'Not found'})</p>
+        <p className="text-xs">Booking Code Index: {bookingCodeIndex} ({bookingCodeIndex >= 0 ? headers[bookingCodeIndex] : 'Not found'})</p>
+      </div>
+
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <div className="flex justify-between items-center">
           <div>
@@ -263,12 +294,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const originalIndex = guests.indexOf(guest);
                   const isCheckedIn = checkedInGuests.has(originalIndex);
                   
-                  const bookingCode = guest[bookingCodeIndex] || '';
-                  const booker = extractGuestName(guest[bookerIndex] || '');
-                  const totalQty = guest[totalQtyIndex] || '1';
+                  const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
+                  const booker = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+                  const totalQty = totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1';
                   const showTime = getShowTime(guest);
                   const addOns = getAddOns(guest);
-                  const note = guest[noteIndex] || '';
+                  const note = noteIndex >= 0 ? guest[noteIndex] || '' : '';
                   
                   return (
                     <TableRow key={originalIndex} className={`${isCheckedIn ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'} transition-colors`}>
@@ -385,7 +416,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               </h3>
               <div className="text-center">
                 <div className="text-4xl font-bold text-purple-600 mb-2">
-                  {guests.reduce((total, guest) => total + parseInt(guest[totalQtyIndex] || '1'), 0)}
+                  {guests.reduce((total, guest) => {
+                    const qty = totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1';
+                    return total + parseInt(qty);
+                  }, 0)}
                 </div>
                 <div className="text-gray-600">Total Attendees</div>
               </div>
