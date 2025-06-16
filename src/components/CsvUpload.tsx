@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,16 +31,36 @@ const CsvUpload = () => {
       if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
         // Handle Excel files
         const workbook = XLSX.read(data, { type: 'binary' });
+        console.log('Available sheets:', workbook.SheetNames);
+        
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
+        console.log('Raw Excel data:', jsonData.slice(0, 5));
+        
         if (jsonData.length === 0) return;
         
-        const headers = (jsonData[0] as string[]).map(header => String(header || '').trim());
-        const rows = jsonData.slice(1).map(row => 
-          (row as any[]).map(cell => String(cell || '').trim())
-        );
+        // Find the actual header row (look for a row with multiple columns)
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(5, jsonData.length); i++) {
+          const row = jsonData[i] as any[];
+          if (row && row.length > 3) {
+            headerRowIndex = i;
+            console.log('Found header row at index:', i, 'with data:', row);
+            break;
+          }
+        }
+        
+        const headers = (jsonData[headerRowIndex] as string[]).map(header => String(header || '').trim());
+        const rows = jsonData.slice(headerRowIndex + 1)
+          .filter(row => row && (row as any[]).length > 1)
+          .map(row => 
+            (row as any[]).map(cell => String(cell || '').trim())
+          );
+        
+        console.log('Processed headers:', headers);
+        console.log('Sample processed rows:', rows.slice(0, 3));
         
         setCsvData({ headers, rows });
       } else {
