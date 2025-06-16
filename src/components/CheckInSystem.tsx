@@ -34,6 +34,26 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const startTimeIndex = getColumnIndex('start time');
   const ticketTypeIndex = getColumnIndex('ticket type');
 
+  // Extract just the name from the booker field
+  const extractGuestName = (bookerField: string) => {
+    if (!bookerField) return 'Unknown Guest';
+    
+    // Split by comma and find the part that looks like a name (usually the 3rd part in your format)
+    const parts = bookerField.split(',');
+    
+    // Look for the part that contains a name (letters and spaces, no numbers or special chars)
+    for (const part of parts) {
+      const trimmed = part.trim();
+      // Check if it looks like a name (contains letters, may have spaces, no numbers/special chars except spaces)
+      if (trimmed.match(/^[A-Za-z\s]+$/) && trimmed.length > 1 && !trimmed.includes('@')) {
+        return trimmed;
+      }
+    }
+    
+    // Fallback: return the part after the first comma if it exists
+    return parts.length > 2 ? parts[2].trim() : parts[0].trim();
+  };
+
   // Get show time (7pm or 9pm)
   const getShowTime = (guest: Guest) => {
     const startTime = guest[startTimeIndex] || '';
@@ -45,11 +65,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Filter guests based on search and show time
   const filteredGuests = useMemo(() => {
     return guests.filter((guest, index) => {
-      const booker = guest[bookerIndex] || '';
+      const bookerField = guest[bookerIndex] || '';
+      const guestName = extractGuestName(bookerField);
       const showTime = getShowTime(guest);
       
       const matchesSearch = searchTerm === '' || 
-        booker.toLowerCase().includes(searchTerm.toLowerCase());
+        guestName.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesShow = showFilter === 'all' || showTime === showFilter;
       
@@ -60,7 +81,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[guestIndex];
-    const guestName = guest[bookerIndex] || 'Guest';
+    const guestName = extractGuestName(guest[bookerIndex] || '');
     
     if (newCheckedIn.has(guestIndex)) {
       newCheckedIn.delete(guestIndex);
@@ -85,6 +106,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
+  // Get show time (7pm or 9pm)
   const getShowTimeBadgeStyle = (showTime: string) => {
     if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
     if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
@@ -188,7 +210,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const originalIndex = guests.indexOf(guest);
                   const isCheckedIn = checkedInGuests.has(originalIndex);
                   
-                  const booker = guest[bookerIndex] || 'Unknown Guest';
+                  const bookerField = guest[bookerIndex] || '';
+                  const booker = extractGuestName(bookerField);
                   const totalQty = guest[totalQtyIndex] || '1';
                   const showTime = getShowTime(guest);
                   const ticketType = guest[ticketTypeIndex] || 'Standard Ticket';
