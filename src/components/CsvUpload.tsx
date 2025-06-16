@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,19 +36,17 @@ const CsvUpload = () => {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        console.log('Raw Excel data:', jsonData.slice(0, 5));
+        console.log('Raw Excel data:', jsonData.slice(0, 10));
         
         if (jsonData.length === 0) return;
         
-        // Find the actual header row (look for a row with multiple columns)
-        let headerRowIndex = 0;
-        for (let i = 0; i < Math.min(5, jsonData.length); i++) {
-          const row = jsonData[i] as any[];
-          if (row && row.length > 3) {
-            headerRowIndex = i;
-            console.log('Found header row at index:', i, 'with data:', row);
-            break;
-          }
+        // Look for headers starting from row 4 (index 3)
+        const headerRowIndex = 3;
+        console.log('Using header row at index:', headerRowIndex, 'with data:', jsonData[headerRowIndex]);
+        
+        if (jsonData.length <= headerRowIndex) {
+          console.log('Not enough rows in the file');
+          return;
         }
         
         const headers = (jsonData[headerRowIndex] as string[]).map(header => String(header || '').trim());
