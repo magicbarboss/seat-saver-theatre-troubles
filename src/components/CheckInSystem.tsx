@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -29,6 +30,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
+  const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
+  const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -197,23 +201,60 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   }, [groupedBookings, searchTerm, showFilter, bookerIndex, itemIndex]);
 
+  // Get available pagers (not currently assigned)
+  const getAvailablePagers = () => {
+    const assignedPagers = new Set(Array.from(pagerAssignments.values()));
+    return availablePagers.filter(pager => !assignedPagers.has(pager));
+  };
+
+  const assignPager = (guestIndex: number, pagerId: number) => {
+    const newAssignments = new Map(pagerAssignments);
+    newAssignments.set(guestIndex, pagerId);
+    setPagerAssignments(newAssignments);
+    
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    
+    toast({
+      title: "📟 Pager Assigned",
+      description: `Pager ${pagerId} assigned to ${guestName}`,
+    });
+    
+    setSelectedGuestForPager(null);
+  };
+
+  const bypassPager = (guestIndex: number) => {
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    
+    toast({
+      title: "✅ Pager Bypassed",
+      description: `${guestName} seated without pager`,
+    });
+    
+    setSelectedGuestForPager(null);
+  };
+
   const handleCheckIn = (mainIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[mainIndex];
     const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
     
     if (newCheckedIn.has(mainIndex)) {
+      // Check out - remove pager assignment
       newCheckedIn.delete(mainIndex);
+      const newPagerAssignments = new Map(pagerAssignments);
+      newPagerAssignments.delete(mainIndex);
+      setPagerAssignments(newPagerAssignments);
+      
       toast({
         title: "✅ Checked Out",
-        description: `${guestName} has been checked out.`,
+        description: `${guestName} has been checked out and pager freed.`,
       });
     } else {
+      // Check in - need to assign pager
       newCheckedIn.add(mainIndex);
-      toast({
-        title: "🎉 Checked In",
-        description: `${guestName} has been checked in successfully!`,
-      });
+      setSelectedGuestForPager(mainIndex);
     }
     setCheckedInGuests(newCheckedIn);
   };
@@ -242,14 +283,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Item Index: {itemIndex} ({itemIndex >= 0 ? headers[itemIndex] : 'Not found'})</p>
         <p className="text-xs">Ticket columns (I-AG): {headers.slice(8, 33).join(', ')}</p>
         <p className="text-xs">Grouped bookings: {groupedBookings.length}</p>
-        <p className="text-xs">Duplicate headers found: {headers.filter((header, index) => headers.indexOf(header) !== index).join(', ')}</p>
+        <p className="text-xs">Available pagers: {getAvailablePagers().length}/12</p>
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-3xl font-bold text-gray-800">🎭 Theatre Check-In</h2>
-            <p className="text-gray-600 mt-1">Simple guest management with add-ons</p>
+            <p className="text-gray-600 mt-1">Simple guest management with pager assignment</p>
           </div>
           <div className="flex items-center space-x-6 text-lg">
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -262,9 +303,60 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <span className="font-semibold text-gray-700">{checkedInGuests.size}</span>
               <span className="text-gray-500">Checked In</span>
             </div>
+            <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
+              <Radio className="h-5 w-5 text-purple-600" />
+              <span className="font-semibold text-gray-700">{getAvailablePagers().length}</span>
+              <span className="text-gray-500">Pagers Free</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Pager Assignment Dialog */}
+      <Dialog open={selectedGuestForPager !== null} onOpenChange={() => setSelectedGuestForPager(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Pager</DialogTitle>
+          </DialogHeader>
+          {selectedGuestForPager !== null && (
+            <div className="space-y-4">
+              <p className="text-gray-700">
+                Assign a pager to <strong>{extractGuestName(bookerIndex >= 0 ? guests[selectedGuestForPager][bookerIndex] || '' : '')}</strong>
+              </p>
+              
+              <div className="space-y-3">
+                <h4 className="font-medium">Available Pagers:</h4>
+                <div className="grid grid-cols-4 gap-2">
+                  {getAvailablePagers().map(pagerId => (
+                    <Button
+                      key={pagerId}
+                      variant="outline"
+                      onClick={() => assignPager(selectedGuestForPager, pagerId)}
+                      className="h-12 text-lg font-bold"
+                    >
+                      #{pagerId}
+                    </Button>
+                  ))}
+                </div>
+                
+                {getAvailablePagers().length === 0 && (
+                  <p className="text-red-600 text-sm">No pagers available</p>
+                )}
+                
+                <div className="pt-4 border-t">
+                  <Button
+                    variant="secondary"
+                    onClick={() => bypassPager(selectedGuestForPager)}
+                    className="w-full"
+                  >
+                    Bypass Pager (Seated Together)
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
@@ -334,6 +426,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
                   <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
@@ -341,6 +434,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableBody>
                 {filteredBookings.map((booking) => {
                   const isCheckedIn = checkedInGuests.has(booking.originalIndex);
+                  const assignedPager = pagerAssignments.get(booking.originalIndex);
                   
                   const bookingCode = bookingCodeIndex >= 0 ? booking.mainBooking[bookingCodeIndex] || '' : '';
                   const booker = extractGuestName(bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '');
@@ -399,6 +493,19 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                               })}
                             </div>
                           ) : 'No add-ons'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-center">
+                          {assignedPager ? (
+                            <div className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-bold">
+                              #{assignedPager}
+                            </div>
+                          ) : isCheckedIn ? (
+                            <div className="text-gray-500 text-sm">Bypassed</div>
+                          ) : (
+                            <div className="text-gray-400 text-sm">-</div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -484,17 +591,22 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
             
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
-                <Users className="h-5 w-5 mr-2 text-purple-600" />
-                Total Guests
+                <Radio className="h-5 w-5 mr-2 text-purple-600" />
+                Pager Status
               </h3>
-              <div className="text-center">
-                <div className="text-4xl font-bold text-purple-600 mb-2">
-                  {groupedBookings.reduce((total, booking) => {
-                    const qty = totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1';
-                    return total + parseInt(qty);
-                  }, 0)}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
+                  <span className="font-medium text-gray-700">In Use</span>
+                  <span className="font-bold text-purple-600 text-xl">{pagerAssignments.size}</span>
                 </div>
-                <div className="text-gray-600">Total Attendees</div>
+                <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                  <span className="font-medium text-gray-700">Available</span>
+                  <span className="font-bold text-green-600 text-xl">{getAvailablePagers().length}</span>
+                </div>
+                <div className="text-center pt-4">
+                  <div className="text-3xl font-bold text-gray-800">12</div>
+                  <div className="text-gray-600">Total Pagers</div>
+                </div>
               </div>
             </div>
           </div>
