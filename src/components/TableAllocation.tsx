@@ -898,6 +898,79 @@ const TableAllocation = ({
     </div>
   );
 
+  const renderMainTableLayout = () => {
+    const { row1, row2, row3, row4 } = organizeTablesByRows();
+    
+    return (
+      <div className="space-y-6">
+        {/* Stage indicator */}
+        <div className="text-center py-2 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg border-2 border-dashed border-purple-300">
+          <span className="text-sm font-bold text-purple-700">🎭 STAGE 🎭</span>
+        </div>
+
+        {/* Row 1 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 1 (Front) - 2-seat tables</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row1.map(table => (
+              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
+                <h3 className="font-bold text-center mb-2 text-sm">
+                  {table.name} ({table.totalCapacity} seats)
+                </h3>
+                {table.sections.map(section => renderSection(section, table))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 2 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 2 - 4-seat tables (front & back sections)</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row2.map(table => (
+              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
+                <h3 className="font-bold text-center mb-2 text-sm">
+                  {table.name} ({table.totalCapacity} seats)
+                </h3>
+                {table.sections.map(section => renderSection(section, table))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 3 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 3 - 4-seat tables (front & back sections)</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row3.map(table => (
+              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
+                <h3 className="font-bold text-center mb-2 text-sm">
+                  {table.name} ({table.totalCapacity} seats)
+                </h3>
+                {table.sections.map(section => renderSection(section, table))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 4 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 4 (Back) - 2-seat tables</h4>
+          <div className="grid grid-cols-4 gap-2">
+            {row4.map(table => (
+              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
+                <h3 className="font-bold text-center mb-2 text-sm">
+                  {table.name} ({table.totalCapacity} seats)
+                </h3>
+                {table.sections.map(section => renderSection(section, table))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Guests waiting for table allocation */}
@@ -958,10 +1031,7 @@ const TableAllocation = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {/* Render assignment options in the same layout as main table layout */}
-            {renderAssignmentLayout()}
-          </div>
+          {renderMainTableLayout()}
         </CardContent>
       </Card>
 
@@ -1033,7 +1103,7 @@ const TableAllocation = ({
                     .filter(option => option.type !== 'section' || option.section!.id !== currentSectionId)
                     .map((option) => (
                       <Button
-                        key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
+                        key={option.type === 'section' ? option.section!.id : `whole-${option.table!.id}`}
                         variant="outline"
                         onClick={() => {
                           if (option.type === 'section') {
@@ -1041,7 +1111,7 @@ const TableAllocation = ({
                           } else {
                             // For whole table moves, we'd need to implement this differently
                             // For now, just use the first available section
-                            const firstAvailable = option.table.sections.find(s => s.status === 'AVAILABLE');
+                            const firstAvailable = option.table!.sections.find(s => s.status === 'AVAILABLE');
                             if (firstAvailable) {
                               moveGuestToSection(firstAvailable.id);
                             }
