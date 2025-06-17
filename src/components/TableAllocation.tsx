@@ -134,8 +134,10 @@ const TableAllocation = ({
       [1, 4], [2, 5], [3, 6], // Front to Row 2
       [4, 7], [5, 8], [6, 9], // Row 2 to Row 3
       [7, 10], [8, 11], [9, 12], // Row 3 to Back (some alignment)
-      // Cross-row combinations for larger groups
+      // New vertical adjacencies for larger groups
       [6, 9], // T6 & T9 (vertically adjacent)
+      [4, 7], // T4 & T7 (vertically adjacent)
+      // Cross-row combinations for larger groups
       [4, 5, 7, 8], // 4-table combination
     ];
 
@@ -605,7 +607,7 @@ const TableAllocation = ({
                           <div className="text-center">
                             <div className="font-bold">T1 & T2 (Adjacent)</div>
                             <div className="text-sm text-gray-600">
-                              Combined capacity: {tables.find(t => t.id === 1)?.capacity + tables.find(t => t.id === 2)?.capacity} seats
+                              Combined capacity: {(tables.find(t => t.id === 1)?.capacity || 0) + (tables.find(t => t.id === 2)?.capacity || 0)} seats
                             </div>
                           </div>
                         </Button>
@@ -620,7 +622,7 @@ const TableAllocation = ({
                           <div className="text-center">
                             <div className="font-bold">T2 & T3 (Adjacent)</div>
                             <div className="text-sm text-gray-600">
-                              Combined capacity: {tables.find(t => t.id === 2)?.capacity + tables.find(t => t.id === 3)?.capacity} seats
+                              Combined capacity: {(tables.find(t => t.id === 2)?.capacity || 0) + (tables.find(t => t.id === 3)?.capacity || 0)} seats
                             </div>
                           </div>
                         </Button>
@@ -635,7 +637,7 @@ const TableAllocation = ({
                           <div className="text-center">
                             <div className="font-bold">T4 & T5 (Adjacent)</div>
                             <div className="text-sm text-gray-600">
-                              Combined capacity: {tables.find(t => t.id === 4)?.capacity + tables.find(t => t.id === 5)?.capacity} seats
+                              Combined capacity: {(tables.find(t => t.id === 4)?.capacity || 0) + (tables.find(t => t.id === 5)?.capacity || 0)} seats
                             </div>
                           </div>
                         </Button>
@@ -650,13 +652,74 @@ const TableAllocation = ({
                           <div className="text-center">
                             <div className="font-bold">T5 & T6 (Adjacent)</div>
                             <div className="text-sm text-gray-600">
-                              Combined capacity: {tables.find(t => t.id === 5)?.capacity + tables.find(t => t.id === 6)?.capacity} seats
+                              Combined capacity: {(tables.find(t => t.id === 5)?.capacity || 0) + (tables.find(t => t.id === 6)?.capacity || 0)} seats
                             </div>
                           </div>
                         </Button>
                       )}
 
-                      {/* Add more adjacent combinations as needed */}
+                      {canCombineTables([7, 8], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([7, 8])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T7 & T8 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 7)?.capacity || 0) + (tables.find(t => t.id === 8)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([8, 9], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([8, 9])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T8 & T9 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 8)?.capacity || 0) + (tables.find(t => t.id === 9)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {/* Vertical adjacent combinations for larger groups */}
+                      {canCombineTables([6, 9], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([6, 9])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T6 & T9 (Vertical Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 6)?.capacity || 0) + (tables.find(t => t.id === 9)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([4, 7], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([4, 7])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T4 & T7 (Vertical Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 4)?.capacity || 0) + (tables.find(t => t.id === 7)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {/* Add more combinations as needed */}
                     </div>
                   </div>
                 )}
