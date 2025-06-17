@@ -178,6 +178,17 @@ const TableAllocation = ({
     const selectedTables = tables.filter(t => tableIds.includes(t.id));
     const totalCapacity = selectedTables.reduce((sum, t) => sum + t.capacity, 0);
 
+    // Remove the capacity check - allow seating fewer guests than capacity
+    // if (selectedGuest.count > totalCapacity) {
+    //   toast({
+    //     title: "❌ Insufficient Capacity",
+    //     description: `Table(s) can only seat ${totalCapacity} guests, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
+    //     variant: "destructive"
+    //   });
+    //   return;
+    // }
+
+    // Only check if guest count exceeds total capacity (not the other way around)
     if (selectedGuest.count > totalCapacity) {
       toast({
         title: "❌ Insufficient Capacity",
@@ -236,6 +247,7 @@ const TableAllocation = ({
     const newTables = tables.filter(t => newTableIds.includes(t.id));
     const totalCapacity = newTables.reduce((sum, t) => sum + t.capacity, 0);
 
+    // Only check if guest count exceeds total capacity
     if (guestToMove.count > totalCapacity) {
       toast({
         title: "❌ Insufficient Capacity",
@@ -631,7 +643,7 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Assignment Dialog - Updated with additional adjacent table options */}
+      {/* Table Assignment Dialog - Updated to show all available tables */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -664,10 +676,10 @@ const TableAllocation = ({
               <div className="space-y-4">
                 <h4 className="font-medium">Available Tables:</h4>
                 
-                {/* Single Tables */}
+                {/* Single Tables - Show ALL available tables, not just ones with sufficient capacity */}
                 <div className="grid grid-cols-4 gap-3">
                   {tables
-                    .filter(table => table.status === 'AVAILABLE' && table.capacity >= selectedGuest.count)
+                    .filter(table => table.status === 'AVAILABLE')
                     .map((table) => (
                       <Button
                         key={table.id}
@@ -679,6 +691,11 @@ const TableAllocation = ({
                         <span className="text-sm text-gray-600">
                           {table.capacity} seats
                         </span>
+                        {table.capacity > selectedGuest.count && (
+                          <span className="text-xs text-blue-600">
+                            ({selectedGuest.count}/{table.capacity} used)
+                          </span>
+                        )}
                       </Button>
                     ))}
                 </div>
@@ -846,9 +863,9 @@ const TableAllocation = ({
                   </div>
                 )}
 
-                {tables.filter(table => table.status === 'AVAILABLE' && canCombineTables([table.id], selectedGuest.count)).length === 0 && (
+                {tables.filter(table => table.status === 'AVAILABLE').length === 0 && (
                   <p className="text-red-600 text-center py-4">
-                    No suitable tables or combinations available for {selectedGuest.count} guests
+                    No available tables
                   </p>
                 )}
               </div>
@@ -857,7 +874,7 @@ const TableAllocation = ({
         </DialogContent>
       </Dialog>
 
-      {/* Move Guest Dialog */}
+      {/* Move Guest Dialog - Updated to show all available tables */}
       <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -890,10 +907,10 @@ const TableAllocation = ({
               <div className="space-y-4">
                 <h4 className="font-medium">Available Tables:</h4>
                 
-                {/* Single Tables */}
+                {/* Single Tables - Show ALL available tables */}
                 <div className="grid grid-cols-4 gap-3">
                   {tables
-                    .filter(table => table.status === 'AVAILABLE' && table.capacity >= guestToMove.count)
+                    .filter(table => table.status === 'AVAILABLE')
                     .map((table) => (
                       <Button
                         key={table.id}
@@ -905,6 +922,11 @@ const TableAllocation = ({
                         <span className="text-sm text-gray-600">
                           {table.capacity} seats
                         </span>
+                        {table.capacity > guestToMove.count && (
+                          <span className="text-xs text-blue-600">
+                            ({guestToMove.count}/{table.capacity} used)
+                          </span>
+                        )}
                       </Button>
                     ))}
                 </div>
@@ -963,9 +985,9 @@ const TableAllocation = ({
                   </div>
                 )}
 
-                {tables.filter(table => table.status === 'AVAILABLE' && canCombineTables([table.id], guestToMove.count)).length === 0 && (
+                {tables.filter(table => table.status === 'AVAILABLE').length === 0 && (
                   <p className="text-red-600 text-center py-4">
-                    No suitable tables or combinations available for {guestToMove.count} guests
+                    No available tables
                   </p>
                 )}
               </div>
