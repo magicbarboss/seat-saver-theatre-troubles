@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,22 +43,23 @@ const TableAllocation = ({
   onTableAllocated 
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
+    // Row 1 (Front) - T1, T2, T3 - 2 seats each, facing stage
     { id: 1, name: 'T1', capacity: 2, status: 'AVAILABLE' },
     { id: 2, name: 'T2', capacity: 2, status: 'AVAILABLE' },
-    { id: 3, name: 'T3', capacity: 4, status: 'AVAILABLE' },
+    { id: 3, name: 'T3', capacity: 2, status: 'AVAILABLE' },
+    // Row 2 - T4, T5, T6 - 4 seats each
     { id: 4, name: 'T4', capacity: 4, status: 'AVAILABLE' },
     { id: 5, name: 'T5', capacity: 4, status: 'AVAILABLE' },
     { id: 6, name: 'T6', capacity: 4, status: 'AVAILABLE' },
-    { id: 7, name: 'T7', capacity: 2, status: 'AVAILABLE' },
-    { id: 8, name: 'T8', capacity: 2, status: 'AVAILABLE' },
+    // Row 3 - T7, T8, T9 - 4 seats each
+    { id: 7, name: 'T7', capacity: 4, status: 'AVAILABLE' },
+    { id: 8, name: 'T8', capacity: 4, status: 'AVAILABLE' },
     { id: 9, name: 'T9', capacity: 4, status: 'AVAILABLE' },
-    { id: 10, name: 'T10', capacity: 4, status: 'AVAILABLE' },
-    { id: 11, name: 'T11', capacity: 4, status: 'AVAILABLE' },
-    { id: 12, name: 'T12', capacity: 4, status: 'AVAILABLE' },
-    { id: 13, name: 'T13', capacity: 6, status: 'AVAILABLE' },
-    { id: 14, name: 'T14', capacity: 6, status: 'AVAILABLE' },
-    { id: 15, name: 'T15', capacity: 6, status: 'AVAILABLE' },
-    { id: 16, name: 'T16', capacity: 6, status: 'AVAILABLE' },
+    // Row 4 (Back) - T10, T11, T12, T13 - 2 seats each, facing stage
+    { id: 10, name: 'T10', capacity: 2, status: 'AVAILABLE' },
+    { id: 11, name: 'T11', capacity: 2, status: 'AVAILABLE' },
+    { id: 12, name: 'T12', capacity: 2, status: 'AVAILABLE' },
+    { id: 13, name: 'T13', capacity: 2, status: 'AVAILABLE' },
   ]);
 
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
@@ -256,6 +256,26 @@ const TableAllocation = ({
     );
   };
 
+  const addSeatsToTable = (tableId: number, additionalSeats: number) => {
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (table.id === tableId) {
+          const newCapacity = table.capacity + additionalSeats;
+          return { ...table, capacity: newCapacity };
+        }
+        return table;
+      })
+    );
+
+    const table = tables.find(t => t.id === tableId);
+    if (table) {
+      toast({
+        title: "🪑 Seats Added",
+        description: `Added ${additionalSeats} seat(s) to ${table.name}. New capacity: ${table.capacity + additionalSeats}`,
+      });
+    }
+  };
+
   const getTableColor = (status: string) => {
     switch (status) {
       case 'AVAILABLE': return 'bg-green-100 border-green-300 hover:bg-green-150';
@@ -274,18 +294,18 @@ const TableAllocation = ({
     }
   };
 
-  // Organize tables for seating from front to back
-  const organizeTablesForSeating = () => {
-    // Front row (closest to stage): T13, T14, T15, T16 (6-seaters)
-    const frontRow = tables.filter(t => [13, 14, 15, 16].includes(t.id));
-    // Second row: T9, T10, T11, T12 (4-seaters)
-    const secondRow = tables.filter(t => [9, 10, 11, 12].includes(t.id));
-    // Third row: T5, T6, T7, T8 (mix of 4 and 2-seaters)
-    const thirdRow = tables.filter(t => [5, 6, 7, 8].includes(t.id));
-    // Back row: T1, T2, T3, T4 (mix of 2 and 4-seaters)
-    const backRow = tables.filter(t => [1, 2, 3, 4].includes(t.id));
+  // Organize tables by the new layout
+  const organizeTablesByRows = () => {
+    // Row 1 (Front): T1, T2, T3 - facing stage
+    const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
+    // Row 2: T4, T5, T6 - back row access
+    const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
+    // Row 3: T7, T8, T9 - same as row 2
+    const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
+    // Row 4 (Back): T10, T11, T12, T13 - facing stage
+    const row4 = tables.filter(t => [10, 11, 12, 13].includes(t.id));
 
-    return { frontRow, secondRow, thirdRow, backRow };
+    return { row1, row2, row3, row4 };
   };
 
   return (
@@ -336,12 +356,12 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Layout - Organized by Seating Preference */}
+      {/* Table Layout - New Organization */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Utensils className="h-5 w-5" />
-            <span>Table Layout (Front to Back Seating)</span>
+            <span>Table Layout (Custom Venue Setup)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -351,13 +371,16 @@ const TableAllocation = ({
               <span className="text-lg font-bold text-purple-700">🎭 STAGE 🎭</span>
             </div>
 
-            {/* Render tables organized by rows */}
-            {Object.entries(organizeTablesForSeating()).map(([rowName, rowTables]) => (
+            {/* Render tables by rows */}
+            {Object.entries(organizeTablesByRows()).map(([rowName, rowTables]) => (
               <div key={rowName} className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-600 capitalize">
-                  {rowName.replace('Row', ' Row')}
+                <h4 className="text-sm font-medium text-gray-600">
+                  {rowName === 'row1' && 'Row 1 (Front) - Facing Stage'}
+                  {rowName === 'row2' && 'Row 2 - Back Row Access'}
+                  {rowName === 'row3' && 'Row 3 - Back Row Access'}
+                  {rowName === 'row4' && 'Row 4 (Back) - Facing Stage'}
                 </h4>
-                <div className="grid grid-cols-4 gap-4">
+                <div className={`grid gap-4 ${rowName === 'row1' || rowName === 'row4' ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {rowTables.map((table) => (
                     <div
                       key={table.id}
@@ -368,9 +391,21 @@ const TableAllocation = ({
                         {getStatusBadge(table.status)}
                       </div>
                       
-                      <p className="text-sm text-gray-600 mb-2">
-                        Capacity: {table.capacity} guests
-                      </p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm text-gray-600">
+                          Capacity: {table.capacity} guests
+                        </p>
+                        {/* Add seats button */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addSeatsToTable(table.id, 1)}
+                          className="h-6 w-6 p-0"
+                          title="Add seat"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
 
                       {table.allocatedTo && (
                         <div className="mb-3">
