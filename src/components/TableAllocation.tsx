@@ -474,6 +474,16 @@ const TableAllocation = ({
     }> = [];
 
     tables.forEach(table => {
+      // For tables with sections (4-9), add whole table option if all sections are available
+      if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
+        options.push({
+          type: 'whole-table',
+          table,
+          totalCapacity: table.totalCapacity,
+          display: `${table.name} Whole Table (${table.totalCapacity} seats)`
+        });
+      }
+
       // Add individual available sections
       table.sections.forEach(section => {
         if (section.status === 'AVAILABLE') {
@@ -487,16 +497,6 @@ const TableAllocation = ({
           });
         }
       });
-
-      // For tables with sections, add whole table option if all sections are available
-      if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
-        options.push({
-          type: 'whole-table',
-          table,
-          totalCapacity: table.totalCapacity,
-          display: `${table.name} Whole Table (${table.totalCapacity} seats)`
-        });
-      }
     });
 
     return options.sort((a, b) => a.totalCapacity - b.totalCapacity);
