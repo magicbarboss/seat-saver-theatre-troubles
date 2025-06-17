@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, MapPin, Utensils, Radio, CheckCircle, Plus, Minus } from 'lucide-react';
+import { Users, MapPin, Utensils, Radio, CheckCircle, Plus, Minus, ArrowRightLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface CheckedInGuest {
@@ -14,6 +14,7 @@ interface CheckedInGuest {
   pagerNumber?: number;
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
+  notes?: string;
 }
 
 interface TableAllocationProps {
@@ -64,6 +65,9 @@ const TableAllocation = ({
 
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [guestToMove, setGuestToMove] = useState<CheckedInGuest | null>(null);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [currentTableIds, setCurrentTableIds] = useState<number[]>([]);
 
   // Load table state from localStorage on mount
   useEffect(() => {
@@ -117,6 +121,12 @@ const TableAllocation = ({
   const handleGuestSelect = (guest: CheckedInGuest) => {
     setSelectedGuest(guest);
     setShowAssignDialog(true);
+  };
+
+  const handleMoveGuest = (guest: CheckedInGuest, tableIds: number[]) => {
+    setGuestToMove(guest);
+    setCurrentTableIds(tableIds);
+    setShowMoveDialog(true);
   };
 
   // Get adjacent tables for larger groups
@@ -220,6 +230,77 @@ const TableAllocation = ({
     setSelectedGuest(null);
   };
 
+  const moveGuestToTable = (newTableIds: number[]) => {
+    if (!guestToMove) return;
+
+    const newTables = tables.filter(t => newTableIds.includes(t.id));
+    const totalCapacity = newTables.reduce((sum, t) => sum + t.capacity, 0);
+
+    if (guestToMove.count > totalCapacity) {
+      toast({
+        title: "❌ Insufficient Capacity",
+        description: `Table(s) can only seat ${totalCapacity} guests, but ${guestToMove.name} has ${guestToMove.count} guests.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if new tables are available
+    const allAvailable = newTables.every(t => t.status === 'AVAILABLE');
+    if (!allAvailable) {
+      toast({
+        title: "❌ Table Unavailable",
+        description: "One or more selected tables are not available.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Free current tables
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (currentTableIds.includes(table.id)) {
+          return {
+            id: table.id,
+            name: table.name,
+            capacity: table.capacity,
+            status: 'AVAILABLE' as const
+          };
+        }
+        return table;
+      })
+    );
+
+    // Allocate new tables
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (newTableIds.includes(table.id)) {
+          return {
+            ...table,
+            status: 'ALLOCATED' as const,
+            allocatedTo: guestToMove.name,
+            allocatedGuest: guestToMove,
+            allocatedCount: guestToMove.count,
+            splitWith: newTableIds.length > 1 ? newTableIds.filter(id => id !== table.id) : undefined
+          };
+        }
+        return table;
+      })
+    );
+
+    const oldTableNames = tables.filter(t => currentTableIds.includes(t.id)).map(t => t.name).join(' & ');
+    const newTableNames = newTables.map(t => t.name).join(' & ');
+
+    toast({
+      title: "🔄 Guest Moved",
+      description: `${guestToMove.name} moved from ${oldTableNames} to ${newTableNames}`,
+    });
+
+    setShowMoveDialog(false);
+    setGuestToMove(null);
+    setCurrentTableIds([]);
+  };
+
   const markGuestSeated = (table: Table) => {
     if (!table.allocatedGuest) return;
 
@@ -281,26 +362,6 @@ const TableAllocation = ({
         return table;
       })
     );
-  };
-
-  const addSeatsToTable = (tableId: number, additionalSeats: number) => {
-    setTables(prevTables =>
-      prevTables.map(table => {
-        if (table.id === tableId) {
-          const newCapacity = table.capacity + additionalSeats;
-          return { ...table, capacity: newCapacity };
-        }
-        return table;
-      })
-    );
-
-    const table = tables.find(t => t.id === tableId);
-    if (table) {
-      toast({
-        title: "🪑 Seats Added",
-        description: `Added ${additionalSeats} seat(s) to ${table.name}. New capacity: ${table.capacity + additionalSeats}`,
-      });
-    }
   };
 
   const adjustTableCapacity = (tableId: number, change: number) => {
@@ -395,6 +456,9 @@ const TableAllocation = ({
                       </Badge>
                     )}
                   </div>
+                  {guest.notes && (
+                    <p className="text-xs text-gray-600 mt-2 italic">"{guest.notes}"</p>
+                  )}
                   <Button className="w-full mt-3" size="sm">
                     Assign Table
                   </Button>
@@ -472,14 +536,19 @@ const TableAllocation = ({
                         <div className="mb-3">
                           <p className="font-medium text-sm text-gray-800">{table.allocatedTo}</p>
                           {table.allocatedGuest && (
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className="text-xs text-gray-600">
-                                {table.allocatedCount || table.allocatedGuest.count} guests
-                              </span>
-                              {table.allocatedGuest.pagerNumber && (
-                                <Badge className="bg-purple-100 text-purple-800 text-xs">
-                                  #{table.allocatedGuest.pagerNumber}
-                                </Badge>
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-600">
+                                  {table.allocatedCount || table.allocatedGuest.count} guests
+                                </span>
+                                {table.allocatedGuest.pagerNumber && (
+                                  <Badge className="bg-purple-100 text-purple-800 text-xs">
+                                    #{table.allocatedGuest.pagerNumber}
+                                  </Badge>
+                                )}
+                              </div>
+                              {table.allocatedGuest.notes && (
+                                <p className="text-xs text-gray-600 italic">"{table.allocatedGuest.notes}"</p>
                               )}
                             </div>
                           )}
@@ -518,14 +587,28 @@ const TableAllocation = ({
                             </Button>
                           </div>
                           
-                          <Button
-                            size="sm"
-                            onClick={() => markGuestSeated(table)}
-                            className="w-full bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Mark Seated
-                          </Button>
+                          <div className="flex space-x-1">
+                            <Button
+                              size="sm"
+                              onClick={() => markGuestSeated(table)}
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Seat
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMoveGuest(
+                                table.allocatedGuest!, 
+                                [table.id, ...(table.splitWith || [])]
+                              )}
+                              className="flex-1"
+                            >
+                              <ArrowRightLeft className="h-4 w-4 mr-1" />
+                              Move
+                            </Button>
+                          </div>
                         </div>
                       )}
 
@@ -571,6 +654,12 @@ const TableAllocation = ({
                   </Badge>
                 )}
               </div>
+              
+              {selectedGuest.notes && (
+                <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                  <p className="text-sm text-blue-800"><strong>Notes:</strong> "{selectedGuest.notes}"</p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <h4 className="font-medium">Available Tables:</h4>
@@ -760,6 +849,123 @@ const TableAllocation = ({
                 {tables.filter(table => table.status === 'AVAILABLE' && canCombineTables([table.id], selectedGuest.count)).length === 0 && (
                   <p className="text-red-600 text-center py-4">
                     No suitable tables or combinations available for {selectedGuest.count} guests
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Move Guest Dialog */}
+      <Dialog open={showMoveDialog} onOpenChange={setShowMoveDialog}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              Move {guestToMove?.name} ({guestToMove?.count} guests) to New Table
+            </DialogTitle>
+          </DialogHeader>
+          
+          {guestToMove && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded">
+                <div>
+                  <span className="font-medium">{guestToMove.name}</span>
+                  <span className="text-gray-600 ml-2">({guestToMove.count} guests)</span>
+                </div>
+                <Badge variant="outline">{guestToMove.showTime}</Badge>
+                {guestToMove.pagerNumber && (
+                  <Badge className="bg-purple-100 text-purple-800">
+                    Pager #{guestToMove.pagerNumber}
+                  </Badge>
+                )}
+              </div>
+              
+              {guestToMove.notes && (
+                <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                  <p className="text-sm text-blue-800"><strong>Notes:</strong> "{guestToMove.notes}"</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <h4 className="font-medium">Available Tables:</h4>
+                
+                {/* Single Tables */}
+                <div className="grid grid-cols-4 gap-3">
+                  {tables
+                    .filter(table => table.status === 'AVAILABLE' && table.capacity >= guestToMove.count)
+                    .map((table) => (
+                      <Button
+                        key={table.id}
+                        variant="outline"
+                        onClick={() => moveGuestToTable([table.id])}
+                        className="p-4 h-auto flex flex-col"
+                      >
+                        <span className="font-bold">{table.name}</span>
+                        <span className="text-sm text-gray-600">
+                          {table.capacity} seats
+                        </span>
+                      </Button>
+                    ))}
+                </div>
+
+                {/* Adjacent Table Combinations for larger groups */}
+                {guestToMove.count > Math.max(...tables.filter(t => t.status === 'AVAILABLE').map(t => t.capacity)) && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Adjacent Table Combinations:</h4>
+                    <div className="space-y-2">
+                      {/* Similar combination buttons as above but calling moveGuestToTable */}
+                      {canCombineTables([1, 2], guestToMove.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => moveGuestToTable([1, 2])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T1 & T2 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 1)?.capacity || 0) + (tables.find(t => t.id === 2)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+                      
+                      {canCombineTables([4, 5], guestToMove.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => moveGuestToTable([4, 5])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T4 & T5 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 4)?.capacity || 0) + (tables.find(t => t.id === 5)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([6, 9], guestToMove.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => moveGuestToTable([6, 9])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T6 & T9 (Vertical Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 6)?.capacity || 0) + (tables.find(t => t.id === 9)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {tables.filter(table => table.status === 'AVAILABLE' && canCombineTables([table.id], guestToMove.count)).length === 0 && (
+                  <p className="text-red-600 text-center py-4">
+                    No suitable tables or combinations available for {guestToMove.count} guests
                   </p>
                 )}
               </div>
