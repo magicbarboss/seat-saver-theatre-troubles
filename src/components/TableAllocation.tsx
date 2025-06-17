@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -291,10 +290,10 @@ const TableAllocation = ({
     }> = [];
 
     tables.forEach(table => {
-      // Check if this table has any allocated sections
-      const hasAllocatedSections = table.sections.some(s => s.status === 'ALLOCATED');
+      // Check if this table has any allocated OR occupied sections (existing groups)
+      const hasExistingGroup = table.sections.some(s => s.status === 'ALLOCATED' || s.status === 'OCCUPIED');
       
-      if (hasAllocatedSections) {
+      if (hasExistingGroup) {
         // Find adjacent tables that are completely available
         const adjacentTableIds = getAdjacentTables(table.id);
         
@@ -569,7 +568,7 @@ const TableAllocation = ({
     }
   };
 
-  // Get all available sections and whole table options for assignment
+  // Get all available sections and whole table options for assignment - FIXED TO HANDLE PARTIAL OCCUPANCY
   const getAvailableOptions = () => {
     const options: Array<{
       type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent';
@@ -583,7 +582,7 @@ const TableAllocation = ({
     }> = [];
 
     tables.forEach(table => {
-      // For tables with sections (4-9), add whole table option if all sections are available
+      // For tables with sections, add whole table option ONLY if ALL sections are available
       if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
         options.push({
           type: 'whole-table',
@@ -594,7 +593,7 @@ const TableAllocation = ({
         });
       }
 
-      // Add individual available sections
+      // Add ALL available sections (including those on partially occupied tables)
       table.sections.forEach(section => {
         if (section.status === 'AVAILABLE') {
           const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
@@ -610,7 +609,7 @@ const TableAllocation = ({
       });
     });
 
-    // Add expansion options for single guests
+    // Add expansion options for single guests - UPDATED TO WORK WITH PARTIAL OCCUPANCY
     if (selectedGuest && selectedGuest.count === 1) {
       const expandableOptions = getExpandableTablesForSingleGuest();
       expandableOptions.forEach(option => {
@@ -624,9 +623,9 @@ const TableAllocation = ({
       });
     }
 
-    // Add multi-table combinations for large parties (ONLY ADJACENT TABLES)
+    // Add multi-table combinations for large parties (ONLY ADJACENT TABLES AND ONLY FULLY AVAILABLE TABLES)
     if (selectedGuest && selectedGuest.count > 4) {
-      // Get all available whole tables (2-seat and 4-seat)
+      // Get all available whole tables (2-seat and 4-seat) - must be completely available
       const availableWholeTables = tables.filter(table => 
         table.sections.every(s => s.status === 'AVAILABLE')
       );
@@ -910,7 +909,7 @@ const TableAllocation = ({
           {table.name} ({table.totalCapacity} seats)
         </h3>
         
-        {/* Whole table option */}
+        {/* Whole table option - ONLY show if ALL sections are available */}
         {allSectionsAvailable && (
           <Button
             variant="outline"
@@ -923,7 +922,7 @@ const TableAllocation = ({
           </Button>
         )}
 
-        {/* Individual sections */}
+        {/* Individual sections - SHOW ALL AVAILABLE SECTIONS regardless of other section status */}
         {table.sections.map(section => {
           const sectionAvailable = section.status === 'AVAILABLE';
           const sectionCanFit = selectedGuest.count <= section.capacity;
@@ -943,7 +942,7 @@ const TableAllocation = ({
             >
               <span>{sectionDisplay} ({section.capacity})</span>
               {sectionAvailable && !sectionCanFit && <span className="ml-1 text-red-600">(Too small)</span>}
-              {!sectionAvailable && <span className="ml-1 text-gray-600">(Occupied)</span>}
+              {!sectionAvailable && <span className="ml-1 text-gray-600">(Unavailable)</span>}
             </Button>
           );
         })}
