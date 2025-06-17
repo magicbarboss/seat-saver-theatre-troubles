@@ -172,6 +172,7 @@ const TableAllocation = ({
   const [guestToMove, setGuestToMove] = useState<CheckedInGuest | null>(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string>('');
+  const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
 
   // Load table state from localStorage on mount
   useEffect(() => {
@@ -465,11 +466,13 @@ const TableAllocation = ({
   // Get all available sections and whole table options for assignment
   const getAvailableOptions = () => {
     const options: Array<{
-      type: 'section' | 'whole-table';
+      type: 'section' | 'whole-table' | 'multi-table';
       section?: TableSection;
-      table: Table;
+      table?: Table;
+      tables?: Table[];
       totalCapacity: number;
       display: string;
+      tableIds: number[];
     }> = [];
 
     tables.forEach(table => {
@@ -479,24 +482,80 @@ const TableAllocation = ({
           type: 'whole-table',
           table,
           totalCapacity: table.totalCapacity,
-          display: `${table.name} Whole Table (${table.totalCapacity} seats)`
+          display: `${table.name} Whole Table`,
+          tableIds: [table.id]
         });
       }
 
       // Add individual available sections
       table.sections.forEach(section => {
         if (section.status === 'AVAILABLE') {
-          const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section} section`;
+          const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
           options.push({
             type: 'section',
             section,
             table,
             totalCapacity: section.capacity,
-            display: `${table.name} ${sectionDisplay} (${section.capacity} seats)`
+            display: `${table.name} ${sectionDisplay}`,
+            tableIds: [table.id]
           });
         }
       });
     });
+
+    // Add multi-table combinations for large parties
+    if (selectedGuest && selectedGuest.count > 4) {
+      // Get all available whole tables (2-seat and 4-seat)
+      const availableWholeTables = tables.filter(table => 
+        table.sections.every(s => s.status === 'AVAILABLE')
+      );
+
+      // Generate combinations that can seat the guest count
+      const generateCombinations = (tables: Table[], targetCapacity: number, maxTables: number = 3) => {
+        const combinations: Array<{tables: Table[], totalCapacity: number}> = [];
+        
+        // Try combinations of 2 tables
+        for (let i = 0; i < tables.length; i++) {
+          for (let j = i + 1; j < tables.length; j++) {
+            const combo = [tables[i], tables[j]];
+            const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: combo, totalCapacity: capacity });
+            }
+          }
+        }
+
+        // Try combinations of 3 tables if needed
+        if (targetCapacity > 8) {
+          for (let i = 0; i < tables.length; i++) {
+            for (let j = i + 1; j < tables.length; j++) {
+              for (let k = j + 1; k < tables.length; k++) {
+                const combo = [tables[i], tables[j], tables[k]];
+                const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+                if (capacity >= targetCapacity) {
+                  combinations.push({ tables: combo, totalCapacity: capacity });
+                }
+              }
+            }
+          }
+        }
+
+        return combinations;
+      };
+
+      const combinations = generateCombinations(availableWholeTables, selectedGuest.count);
+      
+      combinations.forEach(combo => {
+        const tableNames = combo.tables.map(t => t.name).join(' + ');
+        options.push({
+          type: 'multi-table',
+          tables: combo.tables,
+          totalCapacity: combo.totalCapacity,
+          display: `${tableNames} Combined`,
+          tableIds: combo.tables.map(t => t.id)
+        });
+      });
+    }
 
     return options.sort((a, b) => a.totalCapacity - b.totalCapacity);
   };
@@ -560,6 +619,70 @@ const TableAllocation = ({
     setSelectedGuest(null);
   };
 
+  // Handle multi-table assignment
+  const assignMultipleTables = (tablesToAssign: Table[]) => {
+    if (!selectedGuest) return;
+
+    const totalCapacity = tablesToAssign.reduce((sum, t) => sum + t.totalCapacity, 0);
+    
+    if (selectedGuest.count > totalCapacity) {
+      toast({
+        title: "❌ Insufficient Capacity",
+        description: `Combined tables can only seat ${totalCapacity} guests, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if all tables are fully available
+    const allTablesAvailable = tablesToAssign.every(table => 
+      table.sections.every(s => s.status === 'AVAILABLE')
+    );
+
+    if (!allTablesAvailable) {
+      toast({
+        title: "❌ Tables Not Available",
+        description: `Some of the selected tables are not fully available.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Allocate all sections of all tables
+    setTables(prevTables =>
+      prevTables.map(t => {
+        if (tablesToAssign.some(assignTable => assignTable.id === t.id)) {
+          return {
+            ...t,
+            sections: t.sections.map(s => ({
+              ...s,
+              status: 'ALLOCATED' as const,
+              allocatedTo: selectedGuest.name,
+              allocatedGuest: selectedGuest,
+              allocatedCount: selectedGuest.count,
+            }))
+          };
+        }
+        return t;
+      })
+    );
+
+    // Call the parent callback to track allocation
+    onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
+
+    // Call onTableAssign for the first table (for compatibility)
+    onTableAssign(tablesToAssign[0].id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+
+    const tableNames = tablesToAssign.map(t => t.name).join(' + ');
+    toast({
+      title: "📍 Multiple Tables Allocated",
+      description: `${selectedGuest.name} (${selectedGuest.count} guests) allocated to ${tableNames}. Page when ready!`,
+    });
+
+    setShowAssignDialog(false);
+    setSelectedGuest(null);
+  };
+
   // Organize tables by the layout
   const organizeTablesByRows = () => {
     const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
@@ -568,6 +691,131 @@ const TableAllocation = ({
     const row4 = tables.filter(t => [10, 11, 12, 13].includes(t.id));
 
     return { row1, row2, row3, row4 };
+  };
+
+  const renderTableOption = (table: Table) => {
+    if (!selectedGuest) return null;
+
+    const allSectionsAvailable = table.sections.every(s => s.status === 'AVAILABLE');
+    const wholeTableCapacity = table.totalCapacity;
+    const canFitGuest = selectedGuest.count <= wholeTableCapacity;
+
+    return (
+      <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
+        <h3 className="font-bold text-center mb-2 text-sm">
+          {table.name} ({table.totalCapacity} seats)
+        </h3>
+        
+        {/* Whole table option */}
+        {allSectionsAvailable && (
+          <Button
+            variant="outline"
+            onClick={() => assignWholeTable(table)}
+            className={`w-full mb-2 text-xs py-1 ${canFitGuest ? 'border-green-500 bg-green-50 hover:bg-green-100' : 'border-gray-300 opacity-50'}`}
+            disabled={!canFitGuest}
+          >
+            <span className="font-medium">Whole Table</span>
+            {!canFitGuest && <span className="ml-1 text-red-600">(Too small)</span>}
+          </Button>
+        )}
+
+        {/* Individual sections */}
+        {table.sections.map(section => {
+          const sectionAvailable = section.status === 'AVAILABLE';
+          const sectionCanFit = selectedGuest.count <= section.capacity;
+          const sectionDisplay = section.section === 'whole' ? 'Table' : section.section;
+
+          return (
+            <Button
+              key={section.id}
+              variant="outline"
+              onClick={() => assignTableSection(section.id)}
+              className={`w-full mb-1 text-xs py-1 ${
+                sectionAvailable && sectionCanFit 
+                  ? 'border-blue-500 bg-blue-50 hover:bg-blue-100' 
+                  : 'border-gray-300 opacity-50'
+              }`}
+              disabled={!sectionAvailable || !sectionCanFit}
+            >
+              <span>{sectionDisplay} ({section.capacity})</span>
+              {sectionAvailable && !sectionCanFit && <span className="ml-1 text-red-600">(Too small)</span>}
+              {!sectionAvailable && <span className="ml-1 text-gray-600">(Occupied)</span>}
+            </Button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderAssignmentLayout = () => {
+    const { row1, row2, row3, row4 } = organizeTablesByRows();
+    
+    return (
+      <div className="space-y-6">
+        {/* Stage indicator */}
+        <div className="text-center py-2 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg border-2 border-dashed border-purple-300">
+          <span className="text-sm font-bold text-purple-700">🎭 STAGE 🎭</span>
+        </div>
+
+        {/* Row 1 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 1 (Front) - 2-seat tables</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row1.map(table => renderTableOption(table))}
+          </div>
+        </div>
+
+        {/* Row 2 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 2 - 4-seat tables (front & back sections)</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row2.map(table => renderTableOption(table))}
+          </div>
+        </div>
+
+        {/* Row 3 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 3 - 4-seat tables (front & back sections)</h4>
+          <div className="grid grid-cols-3 gap-2">
+            {row3.map(table => renderTableOption(table))}
+          </div>
+        </div>
+
+        {/* Row 4 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 4 (Back) - 2-seat tables</h4>
+          <div className="grid grid-cols-4 gap-2">
+            {row4.map(table => renderTableOption(table))}
+          </div>
+        </div>
+
+        {/* Multi-table combinations for large parties */}
+        {selectedGuest && selectedGuest.count > 4 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium text-gray-600">Table Combinations for Large Parties</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {getAvailableOptions()
+                .filter(option => option.type === 'multi-table')
+                .map(option => (
+                  <Button
+                    key={option.tableIds.join('-')}
+                    variant="outline"
+                    onClick={() => assignMultipleTables(option.tables!)}
+                    className="p-3 h-auto flex flex-col border-2 border-blue-300 bg-blue-50 hover:bg-blue-100"
+                    disabled={selectedGuest.count > option.totalCapacity}
+                  >
+                    <span className="font-bold text-center text-sm">{option.display}</span>
+                    <span className="text-xs text-gray-600">{option.totalCapacity} total seats</span>
+                    {selectedGuest.count > option.totalCapacity && (
+                      <span className="text-xs text-red-600">Too small</span>
+                    )}
+                  </Button>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderSection = (section: TableSection, table: Table) => (
@@ -711,41 +959,15 @@ const TableAllocation = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* Stage indicator */}
-            <div className="text-center py-2 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg border-2 border-dashed border-purple-300">
-              <span className="text-lg font-bold text-purple-700">🎭 STAGE 🎭</span>
-            </div>
-
-            {/* Render tables by rows */}
-            {Object.entries(organizeTablesByRows()).map(([rowName, rowTables]) => (
-              <div key={rowName} className="space-y-2">
-                <h4 className="text-sm font-medium text-gray-600">
-                  {rowName === 'row1' && 'Row 1 (Front) - 2-seat tables'}
-                  {rowName === 'row2' && 'Row 2 - 4-seat tables (front & back sections)'}
-                  {rowName === 'row3' && 'Row 3 - 4-seat tables (front & back sections)'}
-                  {rowName === 'row4' && 'Row 4 (Back) - 2-seat tables'}
-                </h4>
-                <div className={`grid gap-4 ${rowName === 'row4' ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                  {rowTables.map((table) => (
-                    <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
-                      <h3 className="font-bold text-center mb-2">
-                        {table.name} ({table.totalCapacity} seats)
-                      </h3>
-                      
-                      {/* Render sections */}
-                      {table.sections.map(section => renderSection(section, table))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {/* Render assignment options in the same layout as main table layout */}
+            {renderAssignmentLayout()}
           </div>
         </CardContent>
       </Card>
 
       {/* Table Assignment Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Assign Table for {selectedGuest?.name} ({selectedGuest?.count} guests)
@@ -773,44 +995,7 @@ const TableAllocation = ({
                 </div>
               )}
 
-              <div className="space-y-4">
-                <h4 className="font-medium">Available Tables & Sections:</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {getAvailableOptions().map((option) => {
-                    const isDisabled = selectedGuest.count > option.totalCapacity;
-                    console.log('Option:', option.display, 'capacity:', option.totalCapacity, 'guest count:', selectedGuest.count, 'disabled:', isDisabled);
-                    
-                    return (
-                      <Button
-                        key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
-                        variant="outline"
-                        onClick={() => {
-                          console.log('Button clicked for option:', option.type, option.display);
-                          if (option.type === 'section') {
-                            assignTableSection(option.section!.id);
-                          } else {
-                            assignWholeTable(option.table);
-                          }
-                        }}
-                        className="p-4 h-auto flex flex-col"
-                        disabled={isDisabled}
-                      >
-                        <span className="font-bold text-center">{option.display}</span>
-                        {isDisabled && (
-                          <span className="text-xs text-red-600">Too small</span>
-                        )}
-                      </Button>
-                    );
-                  })}
-                </div>
-
-                {getAvailableOptions().length === 0 && (
-                  <p className="text-red-600 text-center py-4">
-                    No available tables or sections
-                  </p>
-                )}
-              </div>
+              {renderAssignmentLayout()}
             </div>
           )}
         </DialogContent>
@@ -844,33 +1029,33 @@ const TableAllocation = ({
                 <h4 className="font-medium">Available Tables & Sections:</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {getAvailableOptions().filter(option => 
-                    option.type !== 'section' || option.section!.id !== currentSectionId
-                  ).map((option) => (
-                    <Button
-                      key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
-                      variant="outline"
-                      onClick={() => {
-                        if (option.type === 'section') {
-                          moveGuestToSection(option.section!.id);
-                        } else {
-                          // For whole table moves, we'd need to implement this differently
-                          // For now, just use the first available section
-                          const firstAvailable = option.table.sections.find(s => s.status === 'AVAILABLE');
-                          if (firstAvailable) {
-                            moveGuestToSection(firstAvailable.id);
+                  {getAvailableOptions()
+                    .filter(option => option.type !== 'section' || option.section!.id !== currentSectionId)
+                    .map((option) => (
+                      <Button
+                        key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
+                        variant="outline"
+                        onClick={() => {
+                          if (option.type === 'section') {
+                            moveGuestToSection(option.section!.id);
+                          } else {
+                            // For whole table moves, we'd need to implement this differently
+                            // For now, just use the first available section
+                            const firstAvailable = option.table.sections.find(s => s.status === 'AVAILABLE');
+                            if (firstAvailable) {
+                              moveGuestToSection(firstAvailable.id);
+                            }
                           }
-                        }
-                      }}
-                      className="p-4 h-auto flex flex-col"
-                      disabled={guestToMove.count > option.totalCapacity}
-                    >
-                      <span className="font-bold text-center">{option.display}</span>
-                      {guestToMove.count > option.totalCapacity && (
-                        <span className="text-xs text-red-600">Too small</span>
-                      )}
-                    </Button>
-                  ))}
+                        }}
+                        className="p-4 h-auto flex flex-col"
+                        disabled={guestToMove.count > option.totalCapacity}
+                      >
+                        <span className="font-bold text-center">{option.display}</span>
+                        {guestToMove.count > option.totalCapacity && (
+                          <span className="text-xs text-red-600">Too small</span>
+                        )}
+                      </Button>
+                    ))}
                 </div>
 
                 {getAvailableOptions().length === 0 && (
