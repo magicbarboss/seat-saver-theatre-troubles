@@ -47,11 +47,11 @@ const TableAllocation = ({
     { id: 1, name: 'T1', capacity: 2, status: 'AVAILABLE' },
     { id: 2, name: 'T2', capacity: 2, status: 'AVAILABLE' },
     { id: 3, name: 'T3', capacity: 2, status: 'AVAILABLE' },
-    // Row 2 - T4, T5, T6 - 4 seats each
+    // Row 2 - T4, T5, T6 - 4 seats each, back row access
     { id: 4, name: 'T4', capacity: 4, status: 'AVAILABLE' },
     { id: 5, name: 'T5', capacity: 4, status: 'AVAILABLE' },
     { id: 6, name: 'T6', capacity: 4, status: 'AVAILABLE' },
-    // Row 3 - T7, T8, T9 - 4 seats each
+    // Row 3 - T7, T8, T9 - 4 seats each, back row access
     { id: 7, name: 'T7', capacity: 4, status: 'AVAILABLE' },
     { id: 8, name: 'T8', capacity: 4, status: 'AVAILABLE' },
     { id: 9, name: 'T9', capacity: 4, status: 'AVAILABLE' },
@@ -119,7 +119,32 @@ const TableAllocation = ({
     setShowAssignDialog(true);
   };
 
-  const canSplitTables = (tableIds: number[], guestCount: number) => {
+  // Get adjacent tables for larger groups
+  const getAdjacentTables = (tableIds: number[]) => {
+    const adjacentCombinations = [
+      // Row 1 adjacent pairs
+      [1, 2], [2, 3], [1, 2, 3],
+      // Row 2 adjacent pairs
+      [4, 5], [5, 6], [4, 5, 6],
+      // Row 3 adjacent pairs
+      [7, 8], [8, 9], [7, 8, 9],
+      // Row 4 adjacent pairs
+      [10, 11], [11, 12], [12, 13], [10, 11, 12], [11, 12, 13], [10, 11, 12, 13],
+      // Vertical adjacent (same position in different rows)
+      [1, 4], [2, 5], [3, 6], // Front to Row 2
+      [4, 7], [5, 8], [6, 9], // Row 2 to Row 3
+      [7, 10], [8, 11], [9, 12], // Row 3 to Back (some alignment)
+      // Cross-row combinations for larger groups
+      [6, 9], // T6 & T9 (vertically adjacent)
+      [4, 5, 7, 8], // 4-table combination
+    ];
+
+    return adjacentCombinations.filter(combo => 
+      combo.every(id => tableIds.includes(id)) && combo.length === tableIds.length
+    );
+  };
+
+  const canCombineTables = (tableIds: number[], guestCount: number) => {
     const selectedTables = tables.filter(t => tableIds.includes(t.id));
     const totalCapacity = selectedTables.reduce((sum, t) => sum + t.capacity, 0);
     
@@ -127,12 +152,10 @@ const TableAllocation = ({
     const allAvailable = selectedTables.every(t => t.status === 'AVAILABLE');
     const hasCapacity = totalCapacity >= guestCount;
     
-    // Check if tables can be split (vertically adjacent for T6&T9)
-    const canSplit = tableIds.length === 2 && (
-      (tableIds.includes(6) && tableIds.includes(9)) // T6 and T9 are vertically adjacent
-    );
+    // Check if tables are adjacent
+    const isAdjacent = getAdjacentTables(tableIds).length > 0;
     
-    return allAvailable && hasCapacity && canSplit;
+    return allAvailable && hasCapacity && (tableIds.length === 1 || isAdjacent);
   };
 
   const assignTable = (tableIds: number[]) => {
@@ -276,6 +299,28 @@ const TableAllocation = ({
     }
   };
 
+  const adjustTableCapacity = (tableId: number, change: number) => {
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (table.id === tableId) {
+          const newCapacity = Math.max(1, table.capacity + change);
+          return { ...table, capacity: newCapacity };
+        }
+        return table;
+      })
+    );
+
+    const table = tables.find(t => t.id === tableId);
+    if (table) {
+      const action = change > 0 ? 'Added' : 'Removed';
+      const seats = Math.abs(change);
+      toast({
+        title: `🪑 Seats ${action}`,
+        description: `${action} ${seats} seat(s) ${change > 0 ? 'to' : 'from'} ${table.name}. New capacity: ${table.capacity + change}`,
+      });
+    }
+  };
+
   const getTableColor = (status: string) => {
     switch (status) {
       case 'AVAILABLE': return 'bg-green-100 border-green-300 hover:bg-green-150';
@@ -356,12 +401,12 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Layout - New Organization */}
+      {/* Table Layout - Updated with proper capacities and controls */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Utensils className="h-5 w-5" />
-            <span>Table Layout (Custom Venue Setup)</span>
+            <span>Table Layout (Venue Setup)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -375,12 +420,12 @@ const TableAllocation = ({
             {Object.entries(organizeTablesByRows()).map(([rowName, rowTables]) => (
               <div key={rowName} className="space-y-2">
                 <h4 className="text-sm font-medium text-gray-600">
-                  {rowName === 'row1' && 'Row 1 (Front) - Facing Stage'}
-                  {rowName === 'row2' && 'Row 2 - Back Row Access'}
-                  {rowName === 'row3' && 'Row 3 - Back Row Access'}
-                  {rowName === 'row4' && 'Row 4 (Back) - Facing Stage'}
+                  {rowName === 'row1' && 'Row 1 (Front) - 2 seats each, facing stage'}
+                  {rowName === 'row2' && 'Row 2 - 4 seats each, back row access, facing forward'}
+                  {rowName === 'row3' && 'Row 3 - 4 seats each, back row access, facing forward'}
+                  {rowName === 'row4' && 'Row 4 (Back) - 2 seats each, facing stage'}
                 </h4>
-                <div className={`grid gap-4 ${rowName === 'row1' || rowName === 'row4' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                <div className={`grid gap-4 ${rowName === 'row1' || rowName === 'row4' ? (rowName === 'row4' ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-3'}`}>
                   {rowTables.map((table) => (
                     <div
                       key={table.id}
@@ -395,16 +440,28 @@ const TableAllocation = ({
                         <p className="text-sm text-gray-600">
                           Capacity: {table.capacity} guests
                         </p>
-                        {/* Add seats button */}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addSeatsToTable(table.id, 1)}
-                          className="h-6 w-6 p-0"
-                          title="Add seat"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                        {/* Plus/Minus buttons for capacity */}
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => adjustTableCapacity(table.id, -1)}
+                            className="h-6 w-6 p-0"
+                            title="Remove seat"
+                            disabled={table.capacity <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => adjustTableCapacity(table.id, 1)}
+                            className="h-6 w-6 p-0"
+                            title="Add seat"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
 
                       {table.allocatedTo && (
@@ -487,7 +544,7 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Assignment Dialog */}
+      {/* Table Assignment Dialog - Updated with adjacent table options */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -533,33 +590,80 @@ const TableAllocation = ({
                     ))}
                 </div>
 
-                {/* Split Table Options */}
-                {selectedGuest.count > 4 && (
+                {/* Adjacent Table Combinations for larger groups */}
+                {selectedGuest.count > Math.max(...tables.filter(t => t.status === 'AVAILABLE').map(t => t.capacity)) && (
                   <div className="space-y-2">
-                    <h4 className="font-medium">Split Table Options:</h4>
+                    <h4 className="font-medium">Adjacent Table Combinations:</h4>
                     <div className="space-y-2">
-                      {canSplitTables([6, 9], selectedGuest.count) && (
+                      {/* Row combinations */}
+                      {canCombineTables([1, 2], selectedGuest.count) && (
                         <Button
                           variant="outline"
-                          onClick={() => assignTable([6, 9])}
+                          onClick={() => assignTable([1, 2])}
                           className="w-full p-4 h-auto"
                         >
                           <div className="text-center">
-                            <div className="font-bold">T6 & T9 (Split Tables)</div>
+                            <div className="font-bold">T1 & T2 (Adjacent)</div>
                             <div className="text-sm text-gray-600">
-                              Combined capacity: 8 seats (vertically adjacent)
+                              Combined capacity: {tables.find(t => t.id === 1)?.capacity + tables.find(t => t.id === 2)?.capacity} seats
                             </div>
                           </div>
                         </Button>
                       )}
+                      
+                      {canCombineTables([2, 3], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([2, 3])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T2 & T3 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {tables.find(t => t.id === 2)?.capacity + tables.find(t => t.id === 3)?.capacity} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([4, 5], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([4, 5])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T4 & T5 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {tables.find(t => t.id === 4)?.capacity + tables.find(t => t.id === 5)?.capacity} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([5, 6], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([5, 6])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T5 & T6 (Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {tables.find(t => t.id === 5)?.capacity + tables.find(t => t.id === 6)?.capacity} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {/* Add more adjacent combinations as needed */}
                     </div>
                   </div>
                 )}
 
-                {tables.filter(table => table.status === 'AVAILABLE' && table.capacity >= selectedGuest.count).length === 0 && 
-                 !canSplitTables([6, 9], selectedGuest.count) && (
+                {tables.filter(table => table.status === 'AVAILABLE' && canCombineTables([table.id], selectedGuest.count)).length === 0 && (
                   <p className="text-red-600 text-center py-4">
-                    No suitable tables available for {selectedGuest.count} guests
+                    No suitable tables or combinations available for {selectedGuest.count} guests
                   </p>
                 )}
               </div>
