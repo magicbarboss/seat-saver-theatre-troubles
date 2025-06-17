@@ -284,7 +284,7 @@ const TableAllocation = ({
       return section.capacity;
     }
     if (section.status === 'ALLOCATED' && section.allocatedCount !== undefined) {
-      return section.capacity - section.allocatedCount;
+      return Math.max(0, section.capacity - section.allocatedCount);
     }
     return 0; // OCCUPIED sections have no available capacity
   };
@@ -292,6 +292,7 @@ const TableAllocation = ({
   // Check if a section can accommodate additional guests - FIXED FUNCTION
   const canSectionAccommodateGuests = (section: TableSection, guestCount: number): boolean => {
     const availableCapacity = getSectionAvailableCapacity(section);
+    console.log(`Section ${section.id}: status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, availableCapacity=${availableCapacity}, requestedGuests=${guestCount}`);
     return availableCapacity >= guestCount;
   };
 
@@ -361,7 +362,8 @@ const TableAllocation = ({
       return;
     }
 
-    console.log(`Assigning ${selectedGuest.count} guests to section ${sectionId} with ${getSectionAvailableCapacity(section)} available capacity`);
+    console.log(`BEFORE: Section ${sectionId} has allocatedCount: ${section.allocatedCount || 0}, capacity: ${section.capacity}`);
+    console.log(`ASSIGNING: ${selectedGuest.count} guests from ${selectedGuest.name}`);
 
     // Update section - handle both new allocation and adding to existing allocation
     setTables(prevTables =>
@@ -371,13 +373,14 @@ const TableAllocation = ({
             ...t,
             sections: t.sections.map(s => {
               if (s.id === sectionId) {
-                const newAllocatedCount = (s.allocatedCount || 0) + selectedGuest.count;
+                const currentAllocatedCount = s.allocatedCount || 0;
+                const newAllocatedCount = currentAllocatedCount + selectedGuest.count;
                 const newStatus = newAllocatedCount >= s.capacity ? 'ALLOCATED' : 'ALLOCATED';
                 
                 // For display purposes, concatenate guest names when adding to existing allocation
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                console.log(`Section ${sectionId}: Previous count: ${s.allocatedCount || 0}, Adding: ${selectedGuest.count}, New total: ${newAllocatedCount}`);
+                console.log(`AFTER: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
                 return {
                   ...s,
@@ -614,12 +617,14 @@ const TableAllocation = ({
       // Add individual sections that have available capacity (including partially allocated ones)
       table.sections.forEach(section => {
         const availableCapacity = getSectionAvailableCapacity(section);
+        console.log(`Checking section ${section.id}: status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, availableCapacity=${availableCapacity}`);
+        
         if (availableCapacity > 0) {
           const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
           let capacityDisplay = '';
           
           if (section.status === 'ALLOCATED' && section.allocatedCount && section.allocatedCount > 0) {
-            capacityDisplay = `${availableCapacity} seats left`;
+            capacityDisplay = `${availableCapacity} seats left (${section.allocatedCount} used)`;
           } else {
             capacityDisplay = `${section.capacity} seats`;
           }
