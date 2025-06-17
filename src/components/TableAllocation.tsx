@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, MapPin, Utensils, Radio, CheckCircle } from 'lucide-react';
+import { Users, MapPin, Utensils, Radio, CheckCircle, Plus, Minus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface CheckedInGuest {
@@ -32,6 +33,7 @@ interface Table {
   allocatedTo?: string;
   allocatedGuest?: CheckedInGuest;
   splitWith?: number[];
+  allocatedCount?: number;
 }
 
 const TableAllocation = ({ 
@@ -168,6 +170,7 @@ const TableAllocation = ({
             status: 'ALLOCATED' as const,
             allocatedTo: selectedGuest.name,
             allocatedGuest: selectedGuest,
+            allocatedCount: selectedGuest.count,
             splitWith: tableIds.length > 1 ? tableIds.filter(id => id !== table.id) : undefined
           };
         }
@@ -241,6 +244,18 @@ const TableAllocation = ({
     });
   };
 
+  const adjustAllocation = (tableId: number, change: number) => {
+    setTables(prevTables =>
+      prevTables.map(table => {
+        if (table.id === tableId && table.allocatedCount) {
+          const newCount = Math.max(1, Math.min(table.capacity, table.allocatedCount + change));
+          return { ...table, allocatedCount: newCount };
+        }
+        return table;
+      })
+    );
+  };
+
   const getTableColor = (status: string) => {
     switch (status) {
       case 'AVAILABLE': return 'bg-green-100 border-green-300 hover:bg-green-150';
@@ -257,6 +272,20 @@ const TableAllocation = ({
       case 'OCCUPIED': return <Badge className="bg-red-600">Occupied</Badge>;
       default: return <Badge variant="secondary">Unknown</Badge>;
     }
+  };
+
+  // Organize tables for seating from front to back
+  const organizeTablesForSeating = () => {
+    // Front row (closest to stage): T13, T14, T15, T16 (6-seaters)
+    const frontRow = tables.filter(t => [13, 14, 15, 16].includes(t.id));
+    // Second row: T9, T10, T11, T12 (4-seaters)
+    const secondRow = tables.filter(t => [9, 10, 11, 12].includes(t.id));
+    // Third row: T5, T6, T7, T8 (mix of 4 and 2-seaters)
+    const thirdRow = tables.filter(t => [5, 6, 7, 8].includes(t.id));
+    // Back row: T1, T2, T3, T4 (mix of 2 and 4-seaters)
+    const backRow = tables.filter(t => [1, 2, 3, 4].includes(t.id));
+
+    return { frontRow, secondRow, thirdRow, backRow };
   };
 
   return (
@@ -307,76 +336,116 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Layout - Original 4x4 Grid */}
+      {/* Table Layout - Organized by Seating Preference */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Utensils className="h-5 w-5" />
-            <span>Table Layout</span>
+            <span>Table Layout (Front to Back Seating)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4">
-            {tables.map((table) => (
-              <div
-                key={table.id}
-                className={`p-4 border-2 rounded-lg transition-all ${getTableColor(table.status)}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-lg">{table.name}</h3>
-                  {getStatusBadge(table.status)}
-                </div>
-                
-                <p className="text-sm text-gray-600 mb-2">
-                  Capacity: {table.capacity} guests
-                </p>
+          <div className="space-y-6">
+            {/* Stage indicator */}
+            <div className="text-center py-2 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg border-2 border-dashed border-purple-300">
+              <span className="text-lg font-bold text-purple-700">🎭 STAGE 🎭</span>
+            </div>
 
-                {table.allocatedTo && (
-                  <div className="mb-3">
-                    <p className="font-medium text-sm text-gray-800">{table.allocatedTo}</p>
-                    {table.allocatedGuest && (
-                      <div className="flex items-center space-x-2 mt-1">
-                        <span className="text-xs text-gray-600">
-                          {table.allocatedGuest.count} guests
-                        </span>
-                        {table.allocatedGuest.pagerNumber && (
-                          <Badge className="bg-purple-100 text-purple-800 text-xs">
-                            #{table.allocatedGuest.pagerNumber}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                    {table.splitWith && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Split with T{table.splitWith.join(' & T')}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {table.status === 'ALLOCATED' && table.allocatedGuest && (
-                  <div className="space-y-2">
-                    <Button
-                      size="sm"
-                      onClick={() => markGuestSeated(table)}
-                      className="w-full bg-green-600 hover:bg-green-700"
+            {/* Render tables organized by rows */}
+            {Object.entries(organizeTablesForSeating()).map(([rowName, rowTables]) => (
+              <div key={rowName} className="space-y-2">
+                <h4 className="text-sm font-medium text-gray-600 capitalize">
+                  {rowName.replace('Row', ' Row')}
+                </h4>
+                <div className="grid grid-cols-4 gap-4">
+                  {rowTables.map((table) => (
+                    <div
+                      key={table.id}
+                      className={`p-4 border-2 rounded-lg transition-all ${getTableColor(table.status)}`}
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Mark Seated
-                    </Button>
-                  </div>
-                )}
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-lg">{table.name}</h3>
+                        {getStatusBadge(table.status)}
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-2">
+                        Capacity: {table.capacity} guests
+                      </p>
 
-                {table.status === 'OCCUPIED' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => freeTable(table.id)}
-                    className="w-full"
-                  >
-                    Free Table
-                  </Button>
-                )}
+                      {table.allocatedTo && (
+                        <div className="mb-3">
+                          <p className="font-medium text-sm text-gray-800">{table.allocatedTo}</p>
+                          {table.allocatedGuest && (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="text-xs text-gray-600">
+                                {table.allocatedCount || table.allocatedGuest.count} guests
+                              </span>
+                              {table.allocatedGuest.pagerNumber && (
+                                <Badge className="bg-purple-100 text-purple-800 text-xs">
+                                  #{table.allocatedGuest.pagerNumber}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          {table.splitWith && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Split with T{table.splitWith.join(' & T')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {table.status === 'ALLOCATED' && table.allocatedGuest && (
+                        <div className="space-y-2">
+                          {/* +/- buttons for adjusting allocation */}
+                          <div className="flex items-center justify-center space-x-2 mb-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => adjustAllocation(table.id, -1)}
+                              className="h-6 w-6 p-0"
+                              disabled={(table.allocatedCount || table.allocatedGuest.count) <= 1}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="text-sm font-bold min-w-8 text-center">
+                              {table.allocatedCount || table.allocatedGuest.count}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => adjustAllocation(table.id, 1)}
+                              className="h-6 w-6 p-0"
+                              disabled={(table.allocatedCount || table.allocatedGuest.count) >= table.capacity}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            onClick={() => markGuestSeated(table)}
+                            className="w-full bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Mark Seated
+                          </Button>
+                        </div>
+                      )}
+
+                      {table.status === 'OCCUPIED' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => freeTable(table.id)}
+                          className="w-full"
+                        >
+                          Free Table
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
