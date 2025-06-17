@@ -374,10 +374,15 @@ const TableAllocation = ({
                 const newAllocatedCount = (s.allocatedCount || 0) + selectedGuest.count;
                 const newStatus = newAllocatedCount >= s.capacity ? 'ALLOCATED' : 'ALLOCATED';
                 
+                // For display purposes, concatenate guest names when adding to existing allocation
+                const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
+                
+                console.log(`Section ${sectionId}: Previous count: ${s.allocatedCount || 0}, Adding: ${selectedGuest.count}, New total: ${newAllocatedCount}`);
+                
                 return {
                   ...s,
                   status: newStatus,
-                  allocatedTo: s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name,
+                  allocatedTo: newAllocatedTo,
                   allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
                   allocatedCount: newAllocatedCount,
                 };
