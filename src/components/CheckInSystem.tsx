@@ -46,23 +46,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Auto-save functionality - save state every 30 seconds
+  // Load state on component mount (only once)
   useEffect(() => {
-    const saveState = () => {
-      const state = {
-        checkedInGuests: Array.from(checkedInGuests),
-        pagerAssignments: Array.from(pagerAssignments.entries()),
-        seatedGuests: Array.from(seatedGuests),
-        allocatedGuests: Array.from(allocatedGuests),
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem('checkin-system-state', JSON.stringify(state));
-      setLastSaved(new Date());
-      console.log('Auto-saved state at', new Date().toLocaleTimeString());
-    };
-
-    // Load state on component mount
     const loadState = () => {
       try {
         const savedState = localStorage.getItem('checkin-system-state');
@@ -82,10 +69,28 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       } catch (error) {
         console.error('Failed to load saved state:', error);
       }
+      setIsInitialized(true);
     };
 
-    // Load state on mount
     loadState();
+  }, []); // Empty dependency array - only run once on mount
+
+  // Auto-save functionality - separate effect that only runs after initialization
+  useEffect(() => {
+    if (!isInitialized) return; // Don't save until we've loaded the initial state
+
+    const saveState = () => {
+      const state = {
+        checkedInGuests: Array.from(checkedInGuests),
+        pagerAssignments: Array.from(pagerAssignments.entries()),
+        seatedGuests: Array.from(seatedGuests),
+        allocatedGuests: Array.from(allocatedGuests),
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('checkin-system-state', JSON.stringify(state));
+      setLastSaved(new Date());
+      console.log('Auto-saved state at', new Date().toLocaleTimeString());
+    };
 
     // Set up auto-save interval
     const interval = setInterval(saveState, 30000); // Save every 30 seconds
@@ -95,7 +100,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
