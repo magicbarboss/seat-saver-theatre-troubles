@@ -43,6 +43,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
   const [seatedGuests, setSeatedGuests] = useState<Set<number>>(new Set()); // Track seated guests
   const [allocatedGuests, setAllocatedGuests] = useState<Set<number>>(new Set()); // Track guests with allocated tables
+  const [guestTableAllocations, setGuestTableAllocations] = useState<Map<number, number[]>>(new Map()); // guestIndex -> tableIds
   const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
@@ -59,6 +60,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           setPagerAssignments(new Map(state.pagerAssignments || []));
           setSeatedGuests(new Set(state.seatedGuests || []));
           setAllocatedGuests(new Set(state.allocatedGuests || []));
+          setGuestTableAllocations(new Map(state.guestTableAllocations || []));
           console.log('Loaded saved state from', state.timestamp);
           
           toast({
@@ -85,6 +87,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         pagerAssignments: Array.from(pagerAssignments.entries()),
         seatedGuests: Array.from(seatedGuests),
         allocatedGuests: Array.from(allocatedGuests),
+        guestTableAllocations: Array.from(guestTableAllocations.entries()),
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('checkin-system-state', JSON.stringify(state));
@@ -100,7 +103,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -322,6 +325,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const newAllocatedGuests = new Set(allocatedGuests);
       newAllocatedGuests.delete(mainIndex);
       setAllocatedGuests(newAllocatedGuests);
+
+      const newGuestTableAllocations = new Map(guestTableAllocations);
+      newGuestTableAllocations.delete(mainIndex);
+      setGuestTableAllocations(newGuestTableAllocations);
       
       toast({
         title: "✅ Checked Out",
@@ -375,6 +382,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.add(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
+    
+    // Store the table allocation for this guest
+    const newGuestTableAllocations = new Map(guestTableAllocations);
+    newGuestTableAllocations.set(guestIndex, tableIds);
+    setGuestTableAllocations(newGuestTableAllocations);
     
     const guest = guests[guestIndex];
     const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
@@ -600,6 +612,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
                   <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
@@ -611,6 +624,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const isSeated = seatedGuests.has(booking.originalIndex);
                   const isAllocated = allocatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
+                  const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   
                   const bookingCode = bookingCodeIndex >= 0 ? booking.mainBooking[bookingCodeIndex] || '' : '';
                   const booker = extractGuestName(bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '');
@@ -679,6 +693,21 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                             </div>
                           ) : isCheckedIn ? (
                             <div className="text-gray-500 text-sm">Bypassed</div>
+                          ) : (
+                            <div className="text-gray-400 text-sm">-</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-center">
+                          {allocatedTables.length > 0 ? (
+                            <div className="space-y-1">
+                              {allocatedTables.map((tableId, idx) => (
+                                <div key={idx} className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">
+                                  T{tableId}
+                                </div>
+                              ))}
+                            </div>
                           ) : (
                             <div className="text-gray-400 text-sm">-</div>
                           )}
