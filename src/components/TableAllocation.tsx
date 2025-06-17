@@ -34,6 +34,7 @@ interface Table {
   allocatedGuest?: CheckedInGuest;
   splitWith?: number[];
   allocatedCount?: number;
+  occupiedSeats?: number;
 }
 
 const TableAllocation = ({ 
