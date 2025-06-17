@@ -243,6 +243,77 @@ const TableAllocation = ({
     !guest.hasBeenSeated && !guest.hasTableAllocated
   );
 
+  // Define adjacent table relationships based on physical layout
+  const getAdjacentTables = (tableId: number): number[] => {
+    const adjacencyMap: Record<number, number[]> = {
+      // Row 1 (Front): T1, T2, T3
+      1: [2],
+      2: [1, 3],
+      3: [2],
+      // Row 2: T4, T5, T6
+      4: [5],
+      5: [4, 6],
+      6: [5],
+      // Row 3: T7, T8, T9
+      7: [8],
+      8: [7, 9],
+      9: [8],
+      // Row 4 (Back): T10, T11, T12, T13
+      10: [11],
+      11: [10, 12],
+      12: [11, 13],
+      13: [12],
+    };
+    return adjacencyMap[tableId] || [];
+  };
+
+  // Check if tables are adjacent (for combination validation)
+  const areTablesAdjacent = (tableIds: number[]): boolean => {
+    if (tableIds.length <= 1) return true;
+    
+    // For each table, check if it's adjacent to at least one other table in the group
+    return tableIds.every(tableId => {
+      const adjacent = getAdjacentTables(tableId);
+      return tableIds.some(otherId => otherId !== tableId && adjacent.includes(otherId));
+    });
+  };
+
+  // Get tables that can be expanded for single guests
+  const getExpandableTablesForSingleGuest = () => {
+    if (!selectedGuest || selectedGuest.count !== 1) return [];
+    
+    const expandableOptions: Array<{
+      table: Table;
+      adjacentTable: Table;
+      totalCapacity: number;
+      display: string;
+    }> = [];
+
+    tables.forEach(table => {
+      // Check if this table has any allocated sections
+      const hasAllocatedSections = table.sections.some(s => s.status === 'ALLOCATED');
+      
+      if (hasAllocatedSections) {
+        // Find adjacent tables that are completely available
+        const adjacentTableIds = getAdjacentTables(table.id);
+        
+        adjacentTableIds.forEach(adjId => {
+          const adjacentTable = tables.find(t => t.id === adjId);
+          if (adjacentTable && adjacentTable.sections.every(s => s.status === 'AVAILABLE')) {
+            expandableOptions.push({
+              table,
+              adjacentTable,
+              totalCapacity: table.totalCapacity + adjacentTable.totalCapacity,
+              display: `Expand ${table.name} with ${adjacentTable.name} (join existing group)`
+            });
+          }
+        });
+      }
+    });
+
+    return expandableOptions;
+  };
+
   const handleGuestSelect = (guest: CheckedInGuest) => {
     setSelectedGuest(guest);
     setShowAssignDialog(true);
@@ -500,10 +571,11 @@ const TableAllocation = ({
   // Get all available sections and whole table options for assignment
   const getAvailableOptions = () => {
     const options: Array<{
-      type: 'section' | 'whole-table' | 'multi-table';
+      type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent';
       section?: TableSection;
       table?: Table;
       tables?: Table[];
+      expandOption?: { table: Table; adjacentTable: Table };
       totalCapacity: number;
       display: string;
       tableIds: number[];
@@ -537,36 +609,47 @@ const TableAllocation = ({
       });
     });
 
-    // Add multi-table combinations for large parties
+    // Add expansion options for single guests
+    if (selectedGuest && selectedGuest.count === 1) {
+      const expandableOptions = getExpandableTablesForSingleGuest();
+      expandableOptions.forEach(option => {
+        options.push({
+          type: 'expand-adjacent',
+          expandOption: option,
+          totalCapacity: option.totalCapacity,
+          display: option.display,
+          tableIds: [option.table.id, option.adjacentTable.id]
+        });
+      });
+    }
+
+    // Add multi-table combinations for large parties (ONLY ADJACENT TABLES)
     if (selectedGuest && selectedGuest.count > 4) {
       // Get all available whole tables (2-seat and 4-seat)
       const availableWholeTables = tables.filter(table => 
         table.sections.every(s => s.status === 'AVAILABLE')
       );
 
-      // Generate combinations that can seat the guest count
-      const generateCombinations = (tables: Table[], targetCapacity: number, maxTables: number = 3) => {
+      // Generate ONLY adjacent combinations
+      const generateAdjacentCombinations = (tables: Table[], targetCapacity: number) => {
         const combinations: Array<{tables: Table[], totalCapacity: number}> = [];
         
-        // Try combinations of 2 tables
+        // Try combinations of 2 adjacent tables
         for (let i = 0; i < tables.length; i++) {
-          for (let j = i + 1; j < tables.length; j++) {
-            const combo = [tables[i], tables[j]];
-            const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: combo, totalCapacity: capacity });
-            }
-          }
-        }
-
-        // Try combinations of 3 tables if needed
-        if (targetCapacity > 8) {
-          for (let i = 0; i < tables.length; i++) {
-            for (let j = i + 1; j < tables.length; j++) {
-              for (let k = j + 1; k < tables.length; k++) {
-                const combo = [tables[i], tables[j], tables[k]];
-                const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
-                if (capacity >= targetCapacity) {
+          const adjacentIds = getAdjacentTables(tables[i].id);
+          
+          for (let j = 0; j < tables.length; j++) {
+            if (i !== j && adjacentIds.includes(tables[j].id)) {
+              const combo = [tables[i], tables[j]];
+              const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+              if (capacity >= targetCapacity) {
+                // Check if we already have this combination (in reverse order)
+                const exists = combinations.some(c => 
+                  c.tables.length === 2 && 
+                  ((c.tables[0].id === tables[i].id && c.tables[1].id === tables[j].id) ||
+                   (c.tables[0].id === tables[j].id && c.tables[1].id === tables[i].id))
+                );
+                if (!exists) {
                   combinations.push({ tables: combo, totalCapacity: capacity });
                 }
               }
@@ -574,10 +657,57 @@ const TableAllocation = ({
           }
         }
 
+        // Try combinations of 3 adjacent tables (only in same row)
+        if (targetCapacity > 8) {
+          // Row 1: T1, T2, T3
+          const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
+          if (row1.length === 3) {
+            const capacity = row1.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: row1, totalCapacity: capacity });
+            }
+          }
+
+          // Row 2: T4, T5, T6
+          const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
+          if (row2.length === 3) {
+            const capacity = row2.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: row2, totalCapacity: capacity });
+            }
+          }
+
+          // Row 3: T7, T8, T9
+          const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
+          if (row3.length === 3) {
+            const capacity = row3.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: row3, totalCapacity: capacity });
+            }
+          }
+
+          // Row 4 partial combinations: T10+T11+T12, T11+T12+T13
+          const row4_123 = tables.filter(t => [10, 11, 12].includes(t.id));
+          if (row4_123.length === 3) {
+            const capacity = row4_123.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: row4_123, totalCapacity: capacity });
+            }
+          }
+
+          const row4_234 = tables.filter(t => [11, 12, 13].includes(t.id));
+          if (row4_234.length === 3) {
+            const capacity = row4_234.reduce((sum, t) => sum + t.totalCapacity, 0);
+            if (capacity >= targetCapacity) {
+              combinations.push({ tables: row4_234, totalCapacity: capacity });
+            }
+          }
+        }
+
         return combinations;
       };
 
-      const combinations = generateCombinations(availableWholeTables, selectedGuest.count);
+      const combinations = generateAdjacentCombinations(availableWholeTables, selectedGuest.count);
       
       combinations.forEach(combo => {
         const tableNames = combo.tables.map(t => t.name).join(' + ');
@@ -585,13 +715,52 @@ const TableAllocation = ({
           type: 'multi-table',
           tables: combo.tables,
           totalCapacity: combo.totalCapacity,
-          display: `${tableNames} Combined`,
+          display: `${tableNames} Combined (Adjacent)`,
           tableIds: combo.tables.map(t => t.id)
         });
       });
     }
 
     return options.sort((a, b) => a.totalCapacity - b.totalCapacity);
+  };
+
+  // Handle expansion for single guests joining existing groups
+  const handleExpandAdjacent = (expandOption: { table: Table; adjacentTable: Table }) => {
+    if (!selectedGuest || selectedGuest.count !== 1) return;
+
+    console.log(`Expanding ${expandOption.table.name} with adjacent ${expandOption.adjacentTable.name} for single guest ${selectedGuest.name}`);
+
+    // Allocate the adjacent table to the same guest group
+    setTables(prevTables =>
+      prevTables.map(t => {
+        if (t.id === expandOption.adjacentTable.id) {
+          return {
+            ...t,
+            sections: t.sections.map(s => ({
+              ...s,
+              status: 'ALLOCATED' as const,
+              allocatedTo: selectedGuest.name,
+              allocatedGuest: selectedGuest,
+              allocatedCount: selectedGuest.count,
+            }))
+          };
+        }
+        return t;
+      })
+    );
+
+    // Call the parent callback to track allocation
+    onTableAllocated(selectedGuest.originalIndex, [expandOption.adjacentTable.id]);
+
+    onTableAssign(expandOption.adjacentTable.id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+
+    toast({
+      title: "📍 Table Expanded for Group",
+      description: `${selectedGuest.name} allocated to ${expandOption.adjacentTable.name} (adjacent to existing group at ${expandOption.table.name})`,
+    });
+
+    setShowAssignDialog(false);
+    setSelectedGuest(null);
   };
 
   // Handle assignment to whole table (allocate all sections)
@@ -791,6 +960,26 @@ const TableAllocation = ({
           <span className="text-sm font-bold text-purple-700">🎭 STAGE 🎭</span>
         </div>
 
+        {/* Expansion options for single guests */}
+        {selectedGuest && selectedGuest.count === 1 && getExpandableTablesForSingleGuest().length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium text-gray-600">Join Existing Groups (Single Guest)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {getExpandableTablesForSingleGuest().map(option => (
+                <Button
+                  key={`expand-${option.table.id}-${option.adjacentTable.id}`}
+                  variant="outline"
+                  onClick={() => handleExpandAdjacent(option)}
+                  className="p-3 h-auto flex flex-col border-2 border-orange-300 bg-orange-50 hover:bg-orange-100"
+                >
+                  <span className="font-bold text-center text-sm">{option.display}</span>
+                  <span className="text-xs text-gray-600">{option.totalCapacity} total seats</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Row 1 */}
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-gray-600">Row 1 (Front) - 2-seat tables</h4>
@@ -823,10 +1012,10 @@ const TableAllocation = ({
           </div>
         </div>
 
-        {/* Multi-table combinations for large parties */}
+        {/* Multi-table combinations for large parties (ONLY ADJACENT) */}
         {selectedGuest && selectedGuest.count > 4 && (
           <div className="space-y-2">
-            <h4 className="text-xs font-medium text-gray-600">Table Combinations for Large Parties</h4>
+            <h4 className="text-xs font-medium text-gray-600">Adjacent Table Combinations for Large Parties</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {getAvailableOptions()
                 .filter(option => option.type === 'multi-table')
