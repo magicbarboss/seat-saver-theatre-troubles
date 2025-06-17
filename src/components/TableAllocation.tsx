@@ -193,21 +193,47 @@ const TableAllocation = ({
     localStorage.setItem('table-allocation-state-v3', JSON.stringify(tables));
   }, [tables]);
 
-  // Update table statuses based on current guest states
+  // Update table statuses based on current guest states - FIXED TO PROPERLY SYNC
   useEffect(() => {
+    console.log('Syncing table state with guest state');
     setTables(prevTables => 
       prevTables.map(table => ({
         ...table,
-        sections: table.sections.map(section => 
-          section.allocatedGuest ? {
-            ...section,
-            status: checkedInGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex)?.hasBeenSeated 
-              ? 'OCCUPIED' as const 
-              : !checkedInGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex)
-              ? 'AVAILABLE' as const
-              : section.status
-          } : section
-        )
+        sections: table.sections.map(section => {
+          if (section.allocatedGuest) {
+            const currentGuest = checkedInGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
+            
+            // If guest no longer exists, clear the allocation
+            if (!currentGuest) {
+              console.log(`Guest no longer exists, clearing section ${section.id}`);
+              return {
+                ...section,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+              };
+            }
+            
+            // Update status based on guest state
+            if (currentGuest.hasBeenSeated) {
+              return { ...section, status: 'OCCUPIED' as const };
+            } else if (!currentGuest.hasTableAllocated) {
+              // Guest lost table allocation, clear it
+              console.log(`Guest ${currentGuest.name} lost table allocation, clearing section ${section.id}`);
+              return {
+                ...section,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+              };
+            }
+            
+            return section;
+          }
+          return section;
+        })
       }))
     );
   }, [checkedInGuests]);
@@ -316,12 +342,16 @@ const TableAllocation = ({
       return;
     }
 
-    // Free current section and allocate new section
+    console.log(`Moving guest ${guestToMove.name} from section ${currentSectionId} to section ${newSectionId}`);
+
+    // FIXED: Clear ALL sections that have this guest allocated, then allocate to new section
     setTables(prevTables =>
       prevTables.map(t => ({
         ...t,
         sections: t.sections.map(s => {
-          if (s.id === currentSectionId) {
+          // Clear any section that has this guest allocated
+          if (s.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+            console.log(`Clearing section ${s.id} for guest ${guestToMove.name}`);
             return {
               ...s,
               status: 'AVAILABLE' as const,
@@ -330,7 +360,9 @@ const TableAllocation = ({
               allocatedCount: undefined,
             };
           }
+          // Allocate to new section
           if (s.id === newSectionId) {
+            console.log(`Allocating section ${s.id} to guest ${guestToMove.name}`);
             return {
               ...s,
               status: 'ALLOCATED' as const,
@@ -391,6 +423,8 @@ const TableAllocation = ({
     const section = table?.sections.find(s => s.id === sectionId);
     
     if (!table || !section) return;
+
+    console.log(`Freeing section ${sectionId}`);
 
     setTables(prevTables =>
       prevTables.map(t => {
