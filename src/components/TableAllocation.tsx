@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -308,7 +307,7 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Layout */}
+      {/* Table Layout - Original 4x4 Grid */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
