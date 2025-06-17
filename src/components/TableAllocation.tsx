@@ -137,8 +137,10 @@ const TableAllocation = ({
       // New vertical adjacencies for larger groups
       [6, 9], // T6 & T9 (vertically adjacent)
       [4, 7], // T4 & T7 (vertically adjacent)
+      [5, 8], // T5 & T8 (vertically adjacent)
       // Cross-row combinations for larger groups
       [4, 5, 7, 8], // 4-table combination
+      [4, 7, 10], // 3-table vertical combination for maximum flexibility
     ];
 
     return adjacentCombinations.filter(combo => 
@@ -546,7 +548,7 @@ const TableAllocation = ({
         </CardContent>
       </Card>
 
-      {/* Table Assignment Dialog - Updated with adjacent table options */}
+      {/* Table Assignment Dialog - Updated with additional adjacent table options */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
@@ -714,6 +716,37 @@ const TableAllocation = ({
                             <div className="font-bold">T4 & T7 (Vertical Adjacent)</div>
                             <div className="text-sm text-gray-600">
                               Combined capacity: {(tables.find(t => t.id === 4)?.capacity || 0) + (tables.find(t => t.id === 7)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {canCombineTables([5, 8], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([5, 8])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T5 & T8 (Vertical Adjacent)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 5)?.capacity || 0) + (tables.find(t => t.id === 8)?.capacity || 0)} seats
+                            </div>
+                          </div>
+                        </Button>
+                      )}
+
+                      {/* 3-table combination for maximum flexibility */}
+                      {canCombineTables([4, 7, 10], selectedGuest.count) && (
+                        <Button
+                          variant="outline"
+                          onClick={() => assignTable([4, 7, 10])}
+                          className="w-full p-4 h-auto"
+                        >
+                          <div className="text-center">
+                            <div className="font-bold">T4 & T7 & T10 (Vertical Line)</div>
+                            <div className="text-sm text-gray-600">
+                              Combined capacity: {(tables.find(t => t.id === 4)?.capacity || 0) + (tables.find(t => t.id === 7)?.capacity || 0) + (tables.find(t => t.id === 10)?.capacity || 0)} seats
                             </div>
                           </div>
                         </Button>
