@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -506,10 +505,23 @@ const TableAllocation = ({
   const assignWholeTable = (table: Table) => {
     if (!selectedGuest) return;
 
+    console.log('Assigning whole table:', table.name, 'for guest:', selectedGuest.name, 'count:', selectedGuest.count, 'table capacity:', table.totalCapacity);
+
     if (selectedGuest.count > table.totalCapacity) {
       toast({
         title: "❌ Insufficient Capacity",
         description: `${table.name} can only seat ${table.totalCapacity} guests, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if all sections are available
+    const allSectionsAvailable = table.sections.every(s => s.status === 'AVAILABLE');
+    if (!allSectionsAvailable) {
+      toast({
+        title: "❌ Table Not Available",
+        description: `${table.name} is not fully available for whole table allocation.`,
         variant: "destructive"
       });
       return;
@@ -765,26 +777,32 @@ const TableAllocation = ({
                 <h4 className="font-medium">Available Tables & Sections:</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {getAvailableOptions().map((option) => (
-                    <Button
-                      key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
-                      variant="outline"
-                      onClick={() => {
-                        if (option.type === 'section') {
-                          assignTableSection(option.section!.id);
-                        } else {
-                          assignWholeTable(option.table);
-                        }
-                      }}
-                      className="p-4 h-auto flex flex-col"
-                      disabled={selectedGuest.count > option.totalCapacity}
-                    >
-                      <span className="font-bold text-center">{option.display}</span>
-                      {selectedGuest.count > option.totalCapacity && (
-                        <span className="text-xs text-red-600">Too small</span>
-                      )}
-                    </Button>
-                  ))}
+                  {getAvailableOptions().map((option) => {
+                    const isDisabled = selectedGuest.count > option.totalCapacity;
+                    console.log('Option:', option.display, 'capacity:', option.totalCapacity, 'guest count:', selectedGuest.count, 'disabled:', isDisabled);
+                    
+                    return (
+                      <Button
+                        key={option.type === 'section' ? option.section!.id : `whole-${option.table.id}`}
+                        variant="outline"
+                        onClick={() => {
+                          console.log('Button clicked for option:', option.type, option.display);
+                          if (option.type === 'section') {
+                            assignTableSection(option.section!.id);
+                          } else {
+                            assignWholeTable(option.table);
+                          }
+                        }}
+                        className="p-4 h-auto flex flex-col"
+                        disabled={isDisabled}
+                      >
+                        <span className="font-bold text-center">{option.display}</span>
+                        {isDisabled && (
+                          <span className="text-xs text-red-600">Too small</span>
+                        )}
+                      </Button>
+                    );
+                  })}
                 </div>
 
                 {getAvailableOptions().length === 0 && (
