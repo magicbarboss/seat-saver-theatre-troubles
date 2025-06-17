@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -243,26 +244,26 @@ const TableAllocation = ({
     !guest.hasBeenSeated && !guest.hasTableAllocated
   );
 
-  // Define adjacent table relationships based on physical layout
+  // Define adjacent table relationships based on physical layout - UPDATED TO INCLUDE VERTICAL ADJACENCY
   const getAdjacentTables = (tableId: number): number[] => {
     const adjacencyMap: Record<number, number[]> = {
       // Row 1 (Front): T1, T2, T3
-      1: [2],
-      2: [1, 3],
-      3: [2],
+      1: [2, 4], // T1 adjacent to T2 (horizontal) and T4 (vertical)
+      2: [1, 3, 5], // T2 adjacent to T1, T3 (horizontal) and T5 (vertical)
+      3: [2, 6], // T3 adjacent to T2 (horizontal) and T6 (vertical)
       // Row 2: T4, T5, T6
-      4: [5],
-      5: [4, 6],
-      6: [5],
+      4: [1, 5, 7], // T4 adjacent to T5 (horizontal), T1 (vertical up), T7 (vertical down)
+      5: [2, 4, 6, 8], // T5 adjacent to T4, T6 (horizontal), T2 (vertical up), T8 (vertical down)
+      6: [3, 5, 9], // T6 adjacent to T5 (horizontal), T3 (vertical up), T9 (vertical down)
       // Row 3: T7, T8, T9
-      7: [8],
-      8: [7, 9],
-      9: [8],
+      7: [4, 8, 10], // T7 adjacent to T8 (horizontal), T4 (vertical up), T10 (vertical down)
+      8: [5, 7, 9, 11], // T8 adjacent to T7, T9 (horizontal), T5 (vertical up), T11 (vertical down)
+      9: [6, 8, 12], // T9 adjacent to T8 (horizontal), T6 (vertical up), T12 (vertical down)
       // Row 4 (Back): T10, T11, T12, T13
-      10: [11],
-      11: [10, 12],
-      12: [11, 13],
-      13: [12],
+      10: [7, 11], // T10 adjacent to T11 (horizontal) and T7 (vertical up)
+      11: [8, 10, 12], // T11 adjacent to T10, T12 (horizontal) and T8 (vertical up)
+      12: [9, 11, 13], // T12 adjacent to T11, T13 (horizontal) and T9 (vertical up)
+      13: [12], // T13 adjacent to T12 (horizontal)
     };
     return adjacencyMap[tableId] || [];
   };
