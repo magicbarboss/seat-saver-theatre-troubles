@@ -278,20 +278,21 @@ const TableAllocation = ({
     });
   };
 
-  // Get available capacity for each section - NEW FUNCTION
+  // Get available capacity for each section - FIXED FUNCTION
   const getSectionAvailableCapacity = (section: TableSection): number => {
     if (section.status === 'AVAILABLE') {
       return section.capacity;
     }
-    if (section.status === 'ALLOCATED' && section.allocatedCount) {
+    if (section.status === 'ALLOCATED' && section.allocatedCount !== undefined) {
       return section.capacity - section.allocatedCount;
     }
     return 0; // OCCUPIED sections have no available capacity
   };
 
-  // Check if a section can accommodate additional guests - NEW FUNCTION
+  // Check if a section can accommodate additional guests - FIXED FUNCTION
   const canSectionAccommodateGuests = (section: TableSection, guestCount: number): boolean => {
-    return getSectionAvailableCapacity(section) >= guestCount;
+    const availableCapacity = getSectionAvailableCapacity(section);
+    return availableCapacity >= guestCount;
   };
 
   // Get tables that can be expanded for single guests
@@ -591,7 +592,7 @@ const TableAllocation = ({
     }
   };
 
-  // Get all available sections and whole table options for assignment - UPDATED TO HANDLE PARTIAL CAPACITY
+  // Get all available sections and whole table options for assignment - FIXED TO PROPERLY HANDLE PARTIAL CAPACITY
   const getAvailableOptions = () => {
     const options: Array<{
       type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent';
@@ -616,21 +617,25 @@ const TableAllocation = ({
         });
       }
 
-      // Add ALL sections that have available capacity (including partially allocated ones)
+      // Add individual sections that have available capacity (including partially allocated ones)
       table.sections.forEach(section => {
         const availableCapacity = getSectionAvailableCapacity(section);
         if (availableCapacity > 0) {
           const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
-          const capacityDisplay = section.status === 'ALLOCATED' && section.allocatedCount 
-            ? `${availableCapacity} left of ${section.capacity}`
-            : `${section.capacity}`;
+          let capacityDisplay = '';
+          
+          if (section.status === 'ALLOCATED' && section.allocatedCount) {
+            capacityDisplay = `${availableCapacity} seats left (${section.allocatedCount}/${section.capacity} occupied)`;
+          } else {
+            capacityDisplay = `${section.capacity} seats`;
+          }
           
           options.push({
             type: 'section',
             section,
             table,
             totalCapacity: availableCapacity,
-            display: `${table.name} ${sectionDisplay} (${capacityDisplay})`,
+            display: `${table.name} ${sectionDisplay} - ${capacityDisplay}`,
             tableIds: [table.id]
           });
         }
@@ -950,29 +955,38 @@ const TableAllocation = ({
           </Button>
         )}
 
-        {/* Individual sections - SHOW ALL SECTIONS WITH AVAILABLE CAPACITY */}
+        {/* Individual sections - SHOW ALL SECTIONS WITH AVAILABLE CAPACITY INCLUDING PARTIAL */}
         {table.sections.map(section => {
           const availableCapacity = getSectionAvailableCapacity(section);
           const sectionCanFit = selectedGuest.count <= availableCapacity;
           const sectionDisplay = section.section === 'whole' ? 'Table' : section.section;
+          
+          // Show section if it has any available capacity
+          if (availableCapacity > 0) {
+            let displayText = `${sectionDisplay} (${availableCapacity} available`;
+            if (section.status === 'ALLOCATED' && section.allocatedCount) {
+              displayText += `, ${section.allocatedCount} occupied`;
+            }
+            displayText += ')';
 
-          return (
-            <Button
-              key={section.id}
-              variant="outline"
-              onClick={() => assignTableSection(section.id)}
-              className={`w-full mb-1 text-xs py-1 ${
-                availableCapacity > 0 && sectionCanFit 
-                  ? 'border-blue-500 bg-blue-50 hover:bg-blue-100' 
-                  : 'border-gray-300 opacity-50'
-              }`}
-              disabled={availableCapacity === 0 || !sectionCanFit}
-            >
-              <span>{sectionDisplay} ({availableCapacity > 0 ? `${availableCapacity} available` : 'Full'})</span>
-              {availableCapacity > 0 && !sectionCanFit && <span className="ml-1 text-red-600">(Too small)</span>}
-              {availableCapacity === 0 && <span className="ml-1 text-gray-600">(Full)</span>}
-            </Button>
-          );
+            return (
+              <Button
+                key={section.id}
+                variant="outline"
+                onClick={() => assignTableSection(section.id)}
+                className={`w-full mb-1 text-xs py-1 ${
+                  sectionCanFit 
+                    ? 'border-blue-500 bg-blue-50 hover:bg-blue-100' 
+                    : 'border-gray-300 opacity-50'
+                }`}
+                disabled={!sectionCanFit}
+              >
+                <span>{displayText}</span>
+                {!sectionCanFit && <span className="ml-1 text-red-600">(Need {selectedGuest.count}, only {availableCapacity} free)</span>}
+              </Button>
+            );
+          }
+          return null;
         })}
       </div>
     );
