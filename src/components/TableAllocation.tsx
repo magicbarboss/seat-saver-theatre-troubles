@@ -597,7 +597,7 @@ const TableAllocation = ({
     }
   };
 
-  // Get all available sections and whole table options for assignment - FIXED TO PROPERLY HANDLE PARTIAL CAPACITY
+  // Get all available sections and whole table options for assignment - FIXED TO PROPERLY PRIORITIZE PARTIAL CAPACITY
   const getAvailableOptions = () => {
     const options: Array<{
       type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent';
@@ -611,17 +611,6 @@ const TableAllocation = ({
     }> = [];
 
     tables.forEach(table => {
-      // For tables with sections, add whole table option ONLY if ALL sections are completely available
-      if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
-        options.push({
-          type: 'whole-table',
-          table,
-          totalCapacity: table.totalCapacity,
-          display: `${table.name} Whole Table`,
-          tableIds: [table.id]
-        });
-      }
-
       // Add individual sections that have available capacity (including partially allocated ones)
       table.sections.forEach(section => {
         const availableCapacity = getSectionAvailableCapacity(section);
@@ -629,8 +618,8 @@ const TableAllocation = ({
           const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
           let capacityDisplay = '';
           
-          if (section.status === 'ALLOCATED' && section.allocatedCount) {
-            capacityDisplay = `${availableCapacity} seats left (${section.allocatedCount}/${section.capacity} occupied)`;
+          if (section.status === 'ALLOCATED' && section.allocatedCount && section.allocatedCount > 0) {
+            capacityDisplay = `${availableCapacity} seats left`;
           } else {
             capacityDisplay = `${section.capacity} seats`;
           }
@@ -645,121 +634,118 @@ const TableAllocation = ({
           });
         }
       });
+
+      // For tables with sections, add whole table option ONLY if ALL sections are completely available
+      if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
+        options.push({
+          type: 'whole-table',
+          table,
+          totalCapacity: table.totalCapacity,
+          display: `${table.name} Whole Table - ${table.totalCapacity} seats`,
+          tableIds: [table.id]
+        });
+      }
     });
 
-    // Add expansion options for single guests - UPDATED TO WORK WITH PARTIAL OCCUPANCY
+    // Only add expansion options for single guests if no regular seats are available
     if (selectedGuest && selectedGuest.count === 1) {
-      const expandableOptions = getExpandableTablesForSingleGuest();
-      expandableOptions.forEach(option => {
-        options.push({
-          type: 'expand-adjacent',
-          expandOption: option,
-          totalCapacity: option.totalCapacity,
-          display: option.display,
-          tableIds: [option.table.id, option.adjacentTable.id]
+      const regularSeatsAvailable = options.some(option => 
+        option.type === 'section' && option.totalCapacity >= selectedGuest.count
+      );
+      
+      if (!regularSeatsAvailable) {
+        const expandableOptions = getExpandableTablesForSingleGuest();
+        expandableOptions.forEach(option => {
+          options.push({
+            type: 'expand-adjacent',
+            expandOption: option,
+            totalCapacity: option.totalCapacity,
+            display: option.display,
+            tableIds: [option.table.id, option.adjacentTable.id]
+          });
         });
-      });
+      }
     }
 
-    // Add multi-table combinations for large parties (ONLY ADJACENT TABLES AND ONLY FULLY AVAILABLE TABLES)
-    if (selectedGuest && selectedGuest.count > 4) {
-      // Get all available whole tables (2-seat and 4-seat) - must be completely available
-      const availableWholeTables = tables.filter(table => 
-        table.sections.every(s => s.status === 'AVAILABLE')
+    // Only add multi-table combinations for large parties if no single tables can accommodate them
+    if (selectedGuest && selectedGuest.count > 2) {
+      const singleTableCanFit = options.some(option => 
+        (option.type === 'section' || option.type === 'whole-table') && 
+        option.totalCapacity >= selectedGuest.count
       );
+      
+      if (!singleTableCanFit) {
+        // Get all available whole tables (2-seat and 4-seat) - must be completely available
+        const availableWholeTables = tables.filter(table => 
+          table.sections.every(s => s.status === 'AVAILABLE')
+        );
 
-      // Generate ONLY adjacent combinations
-      const generateAdjacentCombinations = (tables: Table[], targetCapacity: number) => {
-        const combinations: Array<{tables: Table[], totalCapacity: number}> = [];
-        
-        // Try combinations of 2 adjacent tables
-        for (let i = 0; i < tables.length; i++) {
-          const adjacentIds = getAdjacentTables(tables[i].id);
+        // Generate ONLY adjacent combinations
+        const generateAdjacentCombinations = (tables: Table[], targetCapacity: number) => {
+          const combinations: Array<{tables: Table[], totalCapacity: number}> = [];
           
-          for (let j = 0; j < tables.length; j++) {
-            if (i !== j && adjacentIds.includes(tables[j].id)) {
-              const combo = [tables[i], tables[j]];
-              const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
-              if (capacity >= targetCapacity) {
-                // Check if we already have this combination (in reverse order)
-                const exists = combinations.some(c => 
-                  c.tables.length === 2 && 
-                  ((c.tables[0].id === tables[i].id && c.tables[1].id === tables[j].id) ||
-                   (c.tables[0].id === tables[j].id && c.tables[1].id === tables[i].id))
-                );
-                if (!exists) {
-                  combinations.push({ tables: combo, totalCapacity: capacity });
+          // Try combinations of 2 adjacent tables
+          for (let i = 0; i < tables.length; i++) {
+            const adjacentIds = getAdjacentTables(tables[i].id);
+            
+            for (let j = 0; j < tables.length; j++) {
+              if (i !== j && adjacentIds.includes(tables[j].id)) {
+                const combo = [tables[i], tables[j]];
+                const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+                if (capacity >= targetCapacity) {
+                  // Check if we already have this combination (in reverse order)
+                  const exists = combinations.some(c => 
+                    c.tables.length === 2 && 
+                    ((c.tables[0].id === tables[i].id && c.tables[1].id === tables[j].id) ||
+                     (c.tables[0].id === tables[j].id && c.tables[1].id === tables[i].id))
+                  );
+                  if (!exists) {
+                    combinations.push({ tables: combo, totalCapacity: capacity });
+                  }
                 }
               }
             }
           }
-        }
 
-        // Try combinations of 3 adjacent tables (only in same row)
-        if (targetCapacity > 8) {
-          // Row 1: T1, T2, T3
-          const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
-          if (row1.length === 3) {
-            const capacity = row1.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: row1, totalCapacity: capacity });
-            }
-          }
+          return combinations;
+        };
 
-          // Row 2: T4, T5, T6
-          const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
-          if (row2.length === 3) {
-            const capacity = row2.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: row2, totalCapacity: capacity });
-            }
-          }
-
-          // Row 3: T7, T8, T9
-          const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
-          if (row3.length === 3) {
-            const capacity = row3.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: row3, totalCapacity: capacity });
-            }
-          }
-
-          // Row 4 partial combinations: T10+T11+T12, T11+T12+T13
-          const row4_123 = tables.filter(t => [10, 11, 12].includes(t.id));
-          if (row4_123.length === 3) {
-            const capacity = row4_123.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: row4_123, totalCapacity: capacity });
-            }
-          }
-
-          const row4_234 = tables.filter(t => [11, 12, 13].includes(t.id));
-          if (row4_234.length === 3) {
-            const capacity = row4_234.reduce((sum, t) => sum + t.totalCapacity, 0);
-            if (capacity >= targetCapacity) {
-              combinations.push({ tables: row4_234, totalCapacity: capacity });
-            }
-          }
-        }
-
-        return combinations;
-      };
-
-      const combinations = generateAdjacentCombinations(availableWholeTables, selectedGuest.count);
-      
-      combinations.forEach(combo => {
-        const tableNames = combo.tables.map(t => t.name).join(' + ');
-        options.push({
-          type: 'multi-table',
-          tables: combo.tables,
-          totalCapacity: combo.totalCapacity,
-          display: `${tableNames} Combined (Adjacent)`,
-          tableIds: combo.tables.map(t => t.id)
+        const combinations = generateAdjacentCombinations(availableWholeTables, selectedGuest.count);
+        
+        combinations.forEach(combo => {
+          const tableNames = combo.tables.map(t => t.name).join(' + ');
+          options.push({
+            type: 'multi-table',
+            tables: combo.tables,
+            totalCapacity: combo.totalCapacity,
+            display: `${tableNames} Combined - ${combo.totalCapacity} seats`,
+            tableIds: combo.tables.map(t => t.id)
+          });
         });
-      });
+      }
     }
 
-    return options.sort((a, b) => a.totalCapacity - b.totalCapacity);
+    // Sort by available capacity, prioritizing exact fits and smaller options first
+    return options.sort((a, b) => {
+      if (!selectedGuest) return a.totalCapacity - b.totalCapacity;
+      
+      // Prioritize exact fits
+      const aExactFit = a.totalCapacity === selectedGuest.count;
+      const bExactFit = b.totalCapacity === selectedGuest.count;
+      
+      if (aExactFit && !bExactFit) return -1;
+      if (!aExactFit && bExactFit) return 1;
+      
+      // Then prioritize sections with partial occupancy (more efficient use)
+      const aPartial = a.section?.status === 'ALLOCATED';
+      const bPartial = b.section?.status === 'ALLOCATED';
+      
+      if (aPartial && !bPartial) return -1;
+      if (!aPartial && bPartial) return 1;
+      
+      // Finally sort by capacity
+      return a.totalCapacity - b.totalCapacity;
+    });
   };
 
   // Handle expansion for single guests joining existing groups
@@ -964,7 +950,7 @@ const TableAllocation = ({
         {table.sections.map(section => {
           const availableCapacity = getSectionAvailableCapacity(section);
           const sectionCanFit = selectedGuest.count <= availableCapacity;
-          const sectionDisplay = section.section === 'whole' ? 'Table' : section.section;
+          const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
           
           // Show section if it has any available capacity
           if (availableCapacity > 0) {
