@@ -278,22 +278,29 @@ const TableAllocation = ({
     });
   };
 
-  // Get available capacity for each section - FIXED FUNCTION
+  // Get available capacity for each section - ENHANCED WITH DEBUG LOGGING
   const getSectionAvailableCapacity = (section: TableSection): number => {
+    console.log(`DEBUG getSectionAvailableCapacity: Section ${section.id}, status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}`);
+    
     if (section.status === 'AVAILABLE') {
+      console.log(`Section ${section.id} is AVAILABLE, returning full capacity: ${section.capacity}`);
       return section.capacity;
     }
     if (section.status === 'ALLOCATED' && section.allocatedCount !== undefined) {
-      return Math.max(0, section.capacity - section.allocatedCount);
+      const available = Math.max(0, section.capacity - section.allocatedCount);
+      console.log(`Section ${section.id} is ALLOCATED, ${section.allocatedCount} used, ${available} available`);
+      return available;
     }
+    console.log(`Section ${section.id} is OCCUPIED or invalid, returning 0`);
     return 0; // OCCUPIED sections have no available capacity
   };
 
-  // Check if a section can accommodate additional guests - FIXED FUNCTION
+  // Check if a section can accommodate additional guests - ENHANCED WITH DEBUG LOGGING
   const canSectionAccommodateGuests = (section: TableSection, guestCount: number): boolean => {
     const availableCapacity = getSectionAvailableCapacity(section);
-    console.log(`Section ${section.id}: status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, availableCapacity=${availableCapacity}, requestedGuests=${guestCount}`);
-    return availableCapacity >= guestCount;
+    const canAccommodate = availableCapacity >= guestCount;
+    console.log(`DEBUG canSectionAccommodateGuests: Section ${section.id}, availableCapacity=${availableCapacity}, guestCount=${guestCount}, canAccommodate=${canAccommodate}`);
+    return canAccommodate;
   };
 
   // Get tables that can be expanded for single guests
@@ -360,10 +367,14 @@ const TableAllocation = ({
   const assignTableSection = (sectionId: string) => {
     if (!selectedGuest) return;
 
+    console.log(`DEBUG assignTableSection: Starting assignment for section ${sectionId}, guest ${selectedGuest.name}, count ${selectedGuest.count}`);
+
     const table = tables.find(t => t.sections.some(s => s.id === sectionId));
     const section = table?.sections.find(s => s.id === sectionId);
     
     if (!table || !section) return;
+
+    console.log(`DEBUG assignTableSection: Found table ${table.name}, section ${section.section}, current status ${section.status}, capacity ${section.capacity}, allocatedCount ${section.allocatedCount || 0}`);
 
     // Check if section can accommodate the guest count
     if (!canSectionAccommodateGuests(section, selectedGuest.count)) {
@@ -376,7 +387,7 @@ const TableAllocation = ({
       return;
     }
 
-    console.log(`BEFORE: Section ${sectionId} has allocatedCount: ${section.allocatedCount || 0}, capacity: ${section.capacity}`);
+    console.log(`BEFORE ASSIGNMENT: Section ${sectionId} has allocatedCount: ${section.allocatedCount || 0}, capacity: ${section.capacity}`);
     console.log(`ASSIGNING: ${selectedGuest.count} guests from ${selectedGuest.name}`);
 
     // Update section - handle both new allocation and adding to existing allocation
@@ -389,12 +400,12 @@ const TableAllocation = ({
               if (s.id === sectionId) {
                 const currentAllocatedCount = s.allocatedCount || 0;
                 const newAllocatedCount = currentAllocatedCount + selectedGuest.count;
-                const newStatus = newAllocatedCount >= s.capacity ? 'ALLOCATED' : 'ALLOCATED';
+                const newStatus = 'ALLOCATED'; // Always keep as ALLOCATED until seated
                 
                 // For display purposes, concatenate guest names when adding to existing allocation
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                console.log(`AFTER: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
+                console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
                 return {
                   ...s,
@@ -505,10 +516,12 @@ const TableAllocation = ({
     
     if (!table || !section || !section.allocatedGuest) return;
 
+    console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, capacity=${section.capacity}`);
+
     // Mark guest as seated
     onGuestSeated(section.allocatedGuest.originalIndex);
 
-    // Update section status - only mark as OCCUPIED if section is completely full
+    // Update section status - PROBLEM IS HERE: We're only checking if THIS SECTION is full, not the WHOLE TABLE
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -516,13 +529,21 @@ const TableAllocation = ({
             ...t,
             sections: t.sections.map(s => {
               if (s.id === sectionId) {
-                // Only mark as OCCUPIED if the section is completely full
-                const isFull = (s.allocatedCount || 0) >= s.capacity;
-                console.log(`Section ${sectionId}: allocatedCount=${s.allocatedCount}, capacity=${s.capacity}, isFull=${isFull}`);
+                // Calculate total table occupancy to determine if we should mark sections as OCCUPIED
+                const tableAllocatedCount = t.sections.reduce((sum, section) => sum + (section.allocatedCount || 0), 0);
+                const tableCapacity = t.totalCapacity;
+                const isTableFull = tableAllocatedCount >= tableCapacity;
+                
+                console.log(`DEBUG markGuestSeated: Table ${t.name} has ${tableAllocatedCount}/${tableCapacity} seats allocated, isTableFull=${isTableFull}`);
+                
+                // Only mark as OCCUPIED if the ENTIRE TABLE is full, not just this section
+                const newStatus = isTableFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
+                
+                console.log(`Section ${sectionId}: changing status to ${newStatus}`);
                 
                 return { 
                   ...s, 
-                  status: isFull ? 'OCCUPIED' as const : 'ALLOCATED' as const 
+                  status: newStatus
                 };
               }
               return s;
