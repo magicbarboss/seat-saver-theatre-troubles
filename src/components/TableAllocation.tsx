@@ -519,7 +519,7 @@ const TableAllocation = ({
     // Mark guest as seated
     onGuestSeated(section.allocatedGuest.originalIndex);
 
-    // Update section status - PROBLEM IS HERE: We're only checking if THIS SECTION is full, not the WHOLE TABLE
+    // FIXED: Only mark sections as OCCUPIED if they are completely full, not the whole table
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -527,15 +527,14 @@ const TableAllocation = ({
             ...t,
             sections: t.sections.map(s => {
               if (s.id === sectionId) {
-                // Calculate total table occupancy to determine if we should mark sections as OCCUPIED
-                const tableAllocatedCount = t.sections.reduce((sum, section) => sum + (section.allocatedCount || 0), 0);
-                const tableCapacity = t.totalCapacity;
-                const isTableFull = tableAllocatedCount >= tableCapacity;
+                // Check if THIS SPECIFIC SECTION is full (not the whole table)
+                const sectionAllocatedCount = s.allocatedCount || 0;
+                const isSectionFull = sectionAllocatedCount >= s.capacity;
                 
-                console.log(`DEBUG markGuestSeated: Table ${t.name} has ${tableAllocatedCount}/${tableCapacity} seats allocated, isTableFull=${isTableFull}`);
+                console.log(`DEBUG markGuestSeated: Section ${s.id} has ${sectionAllocatedCount}/${s.capacity} seats allocated, isSectionFull=${isSectionFull}`);
                 
-                // Only mark as OCCUPIED if the ENTIRE TABLE is full, not just this section
-                const newStatus = isTableFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
+                // Only mark as OCCUPIED if this specific section is full
+                const newStatus = isSectionFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
                 
                 console.log(`Section ${sectionId}: changing status to ${newStatus}`);
                 
@@ -557,7 +556,7 @@ const TableAllocation = ({
     
     toast({
       title: "✅ Guest Seated",
-      description: `${section.allocatedGuest.name} has been seated at ${table.name}${sectionDisplay}${remainingSeats > 0 ? ` (${remainingSeats} seats still available)` : ' (table full)'}`,
+      description: `${section.allocatedGuest.name} has been seated at ${table.name}${sectionDisplay}${remainingSeats > 0 ? ` (${remainingSeats} seats still available)` : ' (section full)'}`,
     });
   };
 
