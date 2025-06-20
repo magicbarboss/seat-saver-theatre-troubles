@@ -300,6 +300,20 @@ const TableAllocation = ({
   const getExpandableTablesForSingleGuest = () => {
     if (!selectedGuest || selectedGuest.count !== 1) return [];
     
+    // First check if there are any regular seats available
+    const regularSeatsAvailable = tables.some(table => 
+      table.sections.some(section => {
+        const availableCapacity = getSectionAvailableCapacity(section);
+        return availableCapacity >= 1;
+      })
+    );
+    
+    // If regular seats are available, don't offer expansion options
+    if (regularSeatsAvailable) {
+      console.log('Regular seats available, not offering expansion options');
+      return [];
+    }
+    
     const expandableOptions: Array<{
       table: Table;
       adjacentTable: Table;
@@ -652,24 +666,18 @@ const TableAllocation = ({
       }
     });
 
-    // Only add expansion options for single guests if no regular seats are available
+    // For single guests, only add expansion options if NO regular seats are available
     if (selectedGuest && selectedGuest.count === 1) {
-      const regularSeatsAvailable = options.some(option => 
-        option.type === 'section' && option.totalCapacity >= selectedGuest.count
-      );
-      
-      if (!regularSeatsAvailable) {
-        const expandableOptions = getExpandableTablesForSingleGuest();
-        expandableOptions.forEach(option => {
-          options.push({
-            type: 'expand-adjacent',
-            expandOption: option,
-            totalCapacity: option.totalCapacity,
-            display: option.display,
-            tableIds: [option.table.id, option.adjacentTable.id]
-          });
+      const expandableOptions = getExpandableTablesForSingleGuest();
+      expandableOptions.forEach(option => {
+        options.push({
+          type: 'expand-adjacent',
+          expandOption: option,
+          totalCapacity: option.totalCapacity,
+          display: option.display,
+          tableIds: [option.table.id, option.adjacentTable.id]
         });
-      }
+      });
     }
 
     // Only add multi-table combinations for large parties if no single tables can accommodate them
@@ -730,7 +738,7 @@ const TableAllocation = ({
       }
     }
 
-    // Sort by available capacity, prioritizing exact fits and smaller options first
+    // Sort by available capacity, prioritizing exact fits and partial occupancy (existing groups)
     return options.sort((a, b) => {
       if (!selectedGuest) return a.totalCapacity - b.totalCapacity;
       
