@@ -605,6 +605,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold text-gray-700">Action</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
@@ -615,7 +616,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Note</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -635,6 +635,17 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   
                   return (
                     <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : 'hover:bg-gray-50'} transition-colors`}>
+                      <TableCell>
+                        <Button
+                          onClick={() => handleCheckIn(booking.originalIndex)}
+                          variant={isCheckedIn ? "destructive" : "default"}
+                          size="sm"
+                          className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
+                          disabled={isSeated}
+                        >
+                          {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
+                        </Button>
+                      </TableCell>
                       <TableCell>
                         <div className="font-mono text-sm text-gray-700">
                           {bookingCode}
@@ -737,17 +748,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         <div className="text-sm text-gray-600 max-w-xs">
                           {note}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          onClick={() => handleCheckIn(booking.originalIndex)}
-                          variant={isCheckedIn ? "destructive" : "default"}
-                          size="sm"
-                          className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
-                          disabled={isSeated}
-                        >
-                          {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
-                        </Button>
                       </TableCell>
                     </TableRow>
                   );
