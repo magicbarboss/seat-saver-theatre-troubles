@@ -859,19 +859,28 @@ const TableAllocation = ({
       return;
     }
 
-    // Allocate all sections of the table
+    // FIXED: Distribute guests across sections properly
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
+          let remainingGuests = selectedGuest.count;
+          
           return {
             ...t,
-            sections: t.sections.map(s => ({
-              ...s,
-              status: 'ALLOCATED' as const,
-              allocatedTo: selectedGuest.name,
-              allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
-              allocatedCount: selectedGuest.count,
-            }))
+            sections: t.sections.map(s => {
+              const guestsForThisSection = Math.min(remainingGuests, s.capacity);
+              remainingGuests -= guestsForThisSection;
+              
+              console.log(`Assigning ${guestsForThisSection} guests to section ${s.id} (capacity: ${s.capacity})`);
+              
+              return {
+                ...s,
+                status: 'ALLOCATED' as const,
+                allocatedTo: selectedGuest.name,
+                allocatedGuest: selectedGuest,
+                allocatedCount: guestsForThisSection, // FIXED: Only assign the actual guests for this section
+              };
+            })
           };
         }
         return t;
