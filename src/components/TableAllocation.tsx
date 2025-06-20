@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, MapPin, Utensils, Radio, CheckCircle, Plus, Minus, ArrowRightLeft } from 'lucide-react';
+import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface CheckedInGuest {
@@ -1055,21 +1055,20 @@ const TableAllocation = ({
           <span className="text-sm font-bold text-purple-700">🎭 STAGE 🎭</span>
         </div>
 
-        {/* Expansion options for single guests */}
+        {/* Expansion options for single guests - REMOVED BROKEN FUNCTIONALITY */}
         {selectedGuest && selectedGuest.count === 1 && getExpandableTablesForSingleGuest().length > 0 && (
           <div className="space-y-2">
             <h4 className="text-xs font-medium text-gray-600">Join Existing Groups (Single Guest)</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {getExpandableTablesForSingleGuest().map(option => (
-                <Button
+                <div
                   key={`expand-${option.table.id}-${option.adjacentTable.id}`}
-                  variant="outline"
-                  onClick={() => handleExpandAdjacent(option)}
-                  className="p-3 h-auto flex flex-col border-2 border-orange-300 bg-orange-50 hover:bg-orange-100"
+                  className="p-3 h-auto flex flex-col border-2 border-orange-300 bg-orange-50 rounded text-center"
                 >
                   <span className="font-bold text-center text-sm">{option.display}</span>
                   <span className="text-xs text-gray-600">{option.totalCapacity} total seats</span>
-                </Button>
+                  <span className="text-xs text-orange-600 mt-1">Feature temporarily disabled</span>
+                </div>
               ))}
             </div>
           </div>
