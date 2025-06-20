@@ -426,7 +426,32 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
-  // Calculate total guests per show time
+  // Calculate total guests for all shows (not just bookings)
+  const getTotalGuestsCount = () => {
+    return groupedBookings.reduce((total, booking) => {
+      const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
+      return total + totalQty;
+    }, 0);
+  };
+
+  // Calculate checked-in guests count
+  const getCheckedInGuestsCount = () => {
+    return Array.from(checkedInGuests).reduce((total, guestIndex) => {
+      const guest = guests[guestIndex];
+      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
+      return total + totalQty;
+    }, 0);
+  };
+
+  // Calculate allocated guests count
+  const getAllocatedGuestsCount = () => {
+    return Array.from(allocatedGuests).reduce((total, guestIndex) => {
+      const guest = guests[guestIndex];
+      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
+      return total + totalQty;
+    }, 0);
+  };
+
   const getShowTimeStats = () => {
     const stats = { '7:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
     
@@ -475,17 +500,17 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           <div className="flex items-center space-x-6 text-lg">
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
               <Users className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-gray-700">{groupedBookings.length}</span>
-              <span className="text-gray-500">Bookings</span>
+              <span className="font-semibold text-gray-700">{getTotalGuestsCount()}</span>
+              <span className="text-gray-500">Total Guests</span>
             </div>
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
               <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="font-semibold text-gray-700">{checkedInGuests.size}</span>
+              <span className="font-semibold text-gray-700">{getCheckedInGuestsCount()}</span>
               <span className="text-gray-500">Checked In</span>
             </div>
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
               <MapPin className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-gray-700">{allocatedGuests.size}</span>
+              <span className="font-semibold text-gray-700">{getAllocatedGuestsCount()}</span>
               <span className="text-gray-500">Allocated</span>
             </div>
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -816,11 +841,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded">
                   <span className="font-medium text-gray-700">Checked In</span>
-                  <span className="font-bold text-green-600 text-xl">{checkedInGuests.size}</span>
+                  <span className="font-bold text-green-600 text-xl">{getCheckedInGuestsCount()}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
                   <span className="font-medium text-gray-700">Table Allocated</span>
-                  <span className="font-bold text-blue-600 text-xl">{allocatedGuests.size}</span>
+                  <span className="font-bold text-blue-600 text-xl">{getAllocatedGuestsCount()}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
                   <span className="font-medium text-gray-700">Seated</span>
@@ -828,11 +853,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <span className="font-medium text-gray-700">Waiting</span>
-                  <span className="font-bold text-red-600 text-xl">{groupedBookings.length - checkedInGuests.size}</span>
+                  <span className="font-bold text-red-600 text-xl">{groupedBookings.length - getCheckedInGuestsCount()}</span>
                 </div>
                 <div className="text-center pt-4">
                   <div className="text-3xl font-bold text-gray-800">
-                    {groupedBookings.length > 0 ? Math.round((checkedInGuests.size / groupedBookings.length) * 100) : 0}%
+                    {groupedBookings.length > 0 ? Math.round((getCheckedInGuestsCount() / groupedBookings.length) * 100) : 0}%
                   </div>
                   <div className="text-gray-600">Check-in Rate</div>
                 </div>
