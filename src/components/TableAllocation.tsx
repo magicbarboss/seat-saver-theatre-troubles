@@ -837,7 +837,12 @@ const TableAllocation = ({
   const assignWholeTable = (table: Table) => {
     if (!selectedGuest) return;
 
+    console.log('=== WHOLE TABLE ASSIGNMENT DEBUG ===');
     console.log('Assigning whole table:', table.name, 'for guest:', selectedGuest.name, 'count:', selectedGuest.count, 'table capacity:', table.totalCapacity);
+    console.log('Current table sections state:');
+    table.sections.forEach(s => {
+      console.log(`  Section ${s.id}: status=${s.status}, capacity=${s.capacity}, allocatedCount=${s.allocatedCount || 0}`);
+    });
 
     if (selectedGuest.count > table.totalCapacity) {
       toast({
@@ -848,44 +853,60 @@ const TableAllocation = ({
       return;
     }
 
-    // Check if all sections are available
-    const allSectionsAvailable = table.sections.every(s => s.status === 'AVAILABLE');
-    if (!allSectionsAvailable) {
+    // Check if all sections are available OR if there's enough remaining capacity
+    const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
+    console.log(`Total available capacity across all sections: ${totalAvailableCapacity}`);
+    
+    if (selectedGuest.count > totalAvailableCapacity) {
       toast({
-        title: "❌ Table Not Available",
-        description: `${table.name} is not fully available for whole table allocation.`,
+        title: "❌ Insufficient Available Capacity",
+        description: `${table.name} only has ${totalAvailableCapacity} seats available, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
         variant: "destructive"
       });
       return;
     }
 
-    // FIXED: Distribute guests across sections properly
+    // ENHANCED: Distribute guests across sections, respecting existing allocations
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
           let remainingGuests = selectedGuest.count;
+          console.log(`Starting distribution of ${remainingGuests} guests`);
           
           return {
             ...t,
             sections: t.sections.map(s => {
-              const guestsForThisSection = Math.min(remainingGuests, s.capacity);
+              const currentAllocated = s.allocatedCount || 0;
+              const availableInThisSection = s.capacity - currentAllocated;
+              const guestsForThisSection = Math.min(remainingGuests, availableInThisSection);
+              const newAllocatedCount = currentAllocated + guestsForThisSection;
               remainingGuests -= guestsForThisSection;
               
-              console.log(`Assigning ${guestsForThisSection} guests to section ${s.id} (capacity: ${s.capacity})`);
+              console.log(`Section ${s.id}: currentAllocated=${currentAllocated}, available=${availableInThisSection}, adding=${guestsForThisSection}, newTotal=${newAllocatedCount}`);
               
-              return {
-                ...s,
-                status: 'ALLOCATED' as const,
-                allocatedTo: selectedGuest.name,
-                allocatedGuest: selectedGuest,
-                allocatedCount: guestsForThisSection, // FIXED: Only assign the actual guests for this section
-              };
+              // Only update sections that are getting new guests or are available
+              if (guestsForThisSection > 0 || s.status === 'AVAILABLE') {
+                const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
+                
+                return {
+                  ...s,
+                  status: 'ALLOCATED' as const,
+                  allocatedTo: newAllocatedTo,
+                  allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
+                  allocatedCount: newAllocatedCount,
+                };
+              }
+              
+              // Return existing section unchanged if no guests assigned
+              return s;
             })
           };
         }
         return t;
       })
     );
+
+    console.log('=== END WHOLE TABLE ASSIGNMENT DEBUG ===');
 
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
