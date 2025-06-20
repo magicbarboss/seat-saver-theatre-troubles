@@ -508,15 +508,25 @@ const TableAllocation = ({
     // Mark guest as seated
     onGuestSeated(section.allocatedGuest.originalIndex);
 
-    // Update section status to OCCUPIED
+    // Update section status - only mark as OCCUPIED if section is completely full
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
           return {
             ...t,
-            sections: t.sections.map(s => 
-              s.id === sectionId ? { ...s, status: 'OCCUPIED' as const } : s
-            )
+            sections: t.sections.map(s => {
+              if (s.id === sectionId) {
+                // Only mark as OCCUPIED if the section is completely full
+                const isFull = (s.allocatedCount || 0) >= s.capacity;
+                console.log(`Section ${sectionId}: allocatedCount=${s.allocatedCount}, capacity=${s.capacity}, isFull=${isFull}`);
+                
+                return { 
+                  ...s, 
+                  status: isFull ? 'OCCUPIED' as const : 'ALLOCATED' as const 
+                };
+              }
+              return s;
+            })
           };
         }
         return t;
@@ -524,9 +534,11 @@ const TableAllocation = ({
     );
 
     const sectionDisplay = section.section === 'whole' ? '' : ` ${section.section}`;
+    const remainingSeats = section.capacity - (section.allocatedCount || 0);
+    
     toast({
       title: "✅ Guest Seated",
-      description: `${section.allocatedGuest.name} has been seated at ${table.name}${sectionDisplay}`,
+      description: `${section.allocatedGuest.name} has been seated at ${table.name}${sectionDisplay}${remainingSeats > 0 ? ` (${remainingSeats} seats still available)` : ' (table full)'}`,
     });
   };
 
