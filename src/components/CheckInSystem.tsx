@@ -426,27 +426,39 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
-  // Calculate total guests for all shows (not just bookings)
+  // Calculate total guests for filtered bookings (respects show filter)
   const getTotalGuestsCount = () => {
-    return groupedBookings.reduce((total, booking) => {
+    return filteredBookings.reduce((total, booking) => {
       const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
       return total + totalQty;
     }, 0);
   };
 
-  // Calculate checked-in guests count
+  // Calculate checked-in guests count for filtered bookings
   const getCheckedInGuestsCount = () => {
     return Array.from(checkedInGuests).reduce((total, guestIndex) => {
       const guest = guests[guestIndex];
+      const showTime = getShowTime(guest);
+      
+      // Only count if matches current show filter
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
+      if (!matchesShow) return total;
+      
       const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
       return total + totalQty;
     }, 0);
   };
 
-  // Calculate allocated guests count
+  // Calculate allocated guests count for filtered bookings
   const getAllocatedGuestsCount = () => {
     return Array.from(allocatedGuests).reduce((total, guestIndex) => {
       const guest = guests[guestIndex];
+      const showTime = getShowTime(guest);
+      
+      // Only count if matches current show filter
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
+      if (!matchesShow) return total;
+      
       const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
       return total + totalQty;
     }, 0);
