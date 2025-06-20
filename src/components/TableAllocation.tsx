@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,7 @@ interface TableSection {
   allocatedTo?: string;
   allocatedGuest?: CheckedInGuest;
   allocatedCount?: number;
+  seatedCount?: number; // Track actually seated guests separately
 }
 
 interface Table {
@@ -212,6 +214,7 @@ const TableAllocation = ({
                 allocatedTo: undefined,
                 allocatedGuest: undefined,
                 allocatedCount: undefined,
+                seatedCount: undefined,
               };
             }
             
@@ -227,6 +230,7 @@ const TableAllocation = ({
                 allocatedTo: undefined,
                 allocatedGuest: undefined,
                 allocatedCount: undefined,
+                seatedCount: undefined,
               };
             }
             
@@ -280,18 +284,20 @@ const TableAllocation = ({
 
   // Get available capacity for each section - ENHANCED WITH DEBUG LOGGING
   const getSectionAvailableCapacity = (section: TableSection): number => {
-    console.log(`DEBUG getSectionAvailableCapacity: Section ${section.id}, status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}`);
+    console.log(`DEBUG getSectionAvailableCapacity: Section ${section.id}, status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, seatedCount=${section.seatedCount || 0}`);
     
     if (section.status === 'AVAILABLE') {
       console.log(`Section ${section.id} is AVAILABLE, returning full capacity: ${section.capacity}`);
       return section.capacity;
     }
-    if (section.status === 'ALLOCATED' && section.allocatedCount !== undefined) {
-      const available = Math.max(0, section.capacity - section.allocatedCount);
-      console.log(`Section ${section.id} is ALLOCATED, ${section.allocatedCount} used, ${available} available`);
+    if (section.status === 'ALLOCATED') {
+      // For allocated sections, available capacity is total capacity minus seated guests
+      const seatedGuests = section.seatedCount || 0;
+      const available = Math.max(0, section.capacity - seatedGuests);
+      console.log(`Section ${section.id} is ALLOCATED, ${seatedGuests} seated, ${available} available out of ${section.capacity} total`);
       return available;
     }
-    console.log(`Section ${section.id} is OCCUPIED or invalid, returning 0`);
+    console.log(`Section ${section.id} is OCCUPIED, returning 0`);
     return 0; // OCCUPIED sections have no available capacity
   };
 
@@ -374,7 +380,7 @@ const TableAllocation = ({
     
     if (!table || !section) return;
 
-    console.log(`DEBUG assignTableSection: Found table ${table.name}, section ${section.section}, current status ${section.status}, capacity ${section.capacity}, allocatedCount ${section.allocatedCount || 0}`);
+    console.log(`DEBUG assignTableSection: Found table ${table.name}, section ${section.section}, current status ${section.status}, capacity ${section.capacity}, seatedCount ${section.seatedCount || 0}`);
 
     // Check if section can accommodate the guest count
     if (!canSectionAccommodateGuests(section, selectedGuest.count)) {
@@ -387,10 +393,7 @@ const TableAllocation = ({
       return;
     }
 
-    console.log(`BEFORE ASSIGNMENT: Section ${sectionId} has allocatedCount: ${section.allocatedCount || 0}, capacity: ${section.capacity}`);
-    console.log(`ASSIGNING: ${selectedGuest.count} guests from ${selectedGuest.name}`);
-
-    // Update section - handle both new allocation and adding to existing allocation
+    // Update section - FIXED to properly track allocation vs seating
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -400,19 +403,19 @@ const TableAllocation = ({
               if (s.id === sectionId) {
                 const currentAllocatedCount = s.allocatedCount || 0;
                 const newAllocatedCount = currentAllocatedCount + selectedGuest.count;
-                const newStatus = 'ALLOCATED'; // Always keep as ALLOCATED until seated
                 
                 // For display purposes, concatenate guest names when adding to existing allocation
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
+                console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ALLOCATED`);
                 
                 return {
                   ...s,
-                  status: newStatus,
+                  status: 'ALLOCATED' as const,
                   allocatedTo: newAllocatedTo,
-                  allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
+                  allocatedGuest: selectedGuest,
                   allocatedCount: newAllocatedCount,
+                  seatedCount: s.seatedCount || 0, // Keep existing seated count
                 };
               }
               return s;
@@ -447,7 +450,7 @@ const TableAllocation = ({
     
     if (!newTable || !newSection) return;
 
-    // FIXED: Check available capacity instead of just status
+    // Check available capacity instead of just status
     const availableCapacity = getSectionAvailableCapacity(newSection);
     
     if (guestToMove.count > availableCapacity) {
@@ -461,7 +464,7 @@ const TableAllocation = ({
 
     console.log(`Moving guest ${guestToMove.name} from section ${currentSectionId} to section ${newSectionId}`);
 
-    // FIXED: Clear ALL sections that have this guest allocated, then allocate to new section
+    // Clear ALL sections that have this guest allocated, then allocate to new section
     setTables(prevTables =>
       prevTables.map(t => ({
         ...t,
@@ -475,6 +478,7 @@ const TableAllocation = ({
               allocatedTo: undefined,
               allocatedGuest: undefined,
               allocatedCount: undefined,
+              seatedCount: undefined,
             };
           }
           // Allocate to new section
@@ -490,6 +494,7 @@ const TableAllocation = ({
               allocatedTo: newAllocatedTo,
               allocatedGuest: guestToMove,
               allocatedCount: newAllocatedCount,
+              seatedCount: s.seatedCount || 0,
             };
           }
           return s;
@@ -514,12 +519,12 @@ const TableAllocation = ({
     
     if (!table || !section || !section.allocatedGuest) return;
 
-    console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, capacity=${section.capacity}`);
+    console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
 
     // Mark guest as seated
     onGuestSeated(section.allocatedGuest.originalIndex);
 
-    // FIXED: Only mark sections as OCCUPIED if they are completely full, not the whole table
+    // FIXED: Properly track seated guests per section
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -527,11 +532,15 @@ const TableAllocation = ({
             ...t,
             sections: t.sections.map(s => {
               if (s.id === sectionId) {
-                // Check if THIS SPECIFIC SECTION is full (not the whole table)
-                const sectionAllocatedCount = s.allocatedCount || 0;
-                const isSectionFull = sectionAllocatedCount >= s.capacity;
+                // Add the guest count to seated count for this section
+                const currentSeatedCount = s.seatedCount || 0;
+                const guestCount = s.allocatedGuest?.count || 0;
+                const newSeatedCount = currentSeatedCount + guestCount;
                 
-                console.log(`DEBUG markGuestSeated: Section ${s.id} has ${sectionAllocatedCount}/${s.capacity} seats allocated, isSectionFull=${isSectionFull}`);
+                // Check if THIS SPECIFIC SECTION is full after seating
+                const isSectionFull = newSeatedCount >= s.capacity;
+                
+                console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}, isSectionFull=${isSectionFull}`);
                 
                 // Only mark as OCCUPIED if this specific section is full
                 const newStatus = isSectionFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
@@ -540,7 +549,14 @@ const TableAllocation = ({
                 
                 return { 
                   ...s, 
-                  status: newStatus
+                  status: newStatus,
+                  seatedCount: newSeatedCount,
+                  // Clear allocation info only if section becomes full
+                  ...(isSectionFull ? {
+                    allocatedTo: undefined,
+                    allocatedGuest: undefined,
+                    allocatedCount: undefined,
+                  } : {})
                 };
               }
               return s;
@@ -552,7 +568,9 @@ const TableAllocation = ({
     );
 
     const sectionDisplay = section.section === 'whole' ? '' : ` ${section.section}`;
-    const remainingSeats = section.capacity - (section.allocatedCount || 0);
+    const currentSeated = section.seatedCount || 0;
+    const afterSeating = currentSeated + (section.allocatedGuest?.count || 0);
+    const remainingSeats = section.capacity - afterSeating;
     
     toast({
       title: "✅ Guest Seated",
@@ -580,6 +598,7 @@ const TableAllocation = ({
                 allocatedTo: undefined,
                 allocatedGuest: undefined,
                 allocatedCount: undefined,
+                seatedCount: undefined,
               } : s
             )
           };
@@ -1156,6 +1175,8 @@ const TableAllocation = ({
 
   const renderSection = (section: TableSection, table: Table) => {
     const availableCapacity = getSectionAvailableCapacity(section);
+    const seatedCount = section.seatedCount || 0;
+    const allocatedCount = section.allocatedCount || 0;
     
     return (
       <div key={section.id} className={`p-3 ${table.hasSections ? 'mb-2' : ''} border rounded-lg ${
@@ -1174,8 +1195,11 @@ const TableAllocation = ({
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-gray-600">
             {section.capacity} seats
-            {section.allocatedCount && section.allocatedCount > 0 && (
-              <span className="text-blue-600"> ({section.allocatedCount} used, {availableCapacity} free)</span>
+            {seatedCount > 0 && (
+              <span className="text-blue-600"> ({seatedCount} seated)</span>
+            )}
+            {allocatedCount > 0 && section.status === 'ALLOCATED' && (
+              <span className="text-orange-600"> ({allocatedCount} allocated, {availableCapacity} free)</span>
             )}
           </span>
           <div className="flex items-center space-x-1">
@@ -1202,7 +1226,7 @@ const TableAllocation = ({
         {section.allocatedTo && (
           <div className="mb-2">
             <p className="font-medium text-xs">{section.allocatedTo}</p>
-            <p className="text-xs text-gray-600">{section.allocatedCount} guests</p>
+            <p className="text-xs text-gray-600">{section.allocatedCount} guests allocated</p>
           </div>
         )}
 
