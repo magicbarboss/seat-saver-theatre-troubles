@@ -447,19 +447,13 @@ const TableAllocation = ({
     
     if (!newTable || !newSection) return;
 
-    if (guestToMove.count > newSection.capacity) {
+    // FIXED: Check available capacity instead of just status
+    const availableCapacity = getSectionAvailableCapacity(newSection);
+    
+    if (guestToMove.count > availableCapacity) {
       toast({
         title: "❌ Insufficient Capacity",
-        description: `${newTable.name} ${newSection.section === 'whole' ? '' : newSection.section} can only seat ${newSection.capacity} guests, but ${guestToMove.name} has ${guestToMove.count} guests.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (newSection.status !== 'AVAILABLE') {
-      toast({
-        title: "❌ Section Unavailable",
-        description: `${newTable.name} ${newSection.section === 'whole' ? '' : newSection.section} is not available.`,
+        description: `${newTable.name} ${newSection.section === 'whole' ? '' : newSection.section} only has ${availableCapacity} seats available, but ${guestToMove.name} has ${guestToMove.count} guests.`,
         variant: "destructive"
       });
       return;
@@ -486,12 +480,16 @@ const TableAllocation = ({
           // Allocate to new section
           if (s.id === newSectionId) {
             console.log(`Allocating section ${s.id} to guest ${guestToMove.name}`);
+            const currentAllocated = s.allocatedCount || 0;
+            const newAllocatedCount = currentAllocated + guestToMove.count;
+            const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
+            
             return {
               ...s,
               status: 'ALLOCATED' as const,
-              allocatedTo: guestToMove.name,
+              allocatedTo: newAllocatedTo,
               allocatedGuest: guestToMove,
-              allocatedCount: guestToMove.count,
+              allocatedCount: newAllocatedCount,
             };
           }
           return s;
@@ -853,7 +851,7 @@ const TableAllocation = ({
       return;
     }
 
-    // Check if all sections are available OR if there's enough remaining capacity
+    // Check if there's enough remaining capacity
     const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
     console.log(`Total available capacity across all sections: ${totalAvailableCapacity}`);
     
@@ -866,7 +864,7 @@ const TableAllocation = ({
       return;
     }
 
-    // ENHANCED: Distribute guests across sections, respecting existing allocations
+    // SIMPLIFIED: Just assign to the first section that can fit all guests, or distribute if needed
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -876,29 +874,30 @@ const TableAllocation = ({
           return {
             ...t,
             sections: t.sections.map(s => {
+              if (remainingGuests <= 0) return s; // No more guests to assign
+              
               const currentAllocated = s.allocatedCount || 0;
               const availableInThisSection = s.capacity - currentAllocated;
               const guestsForThisSection = Math.min(remainingGuests, availableInThisSection);
-              const newAllocatedCount = currentAllocated + guestsForThisSection;
-              remainingGuests -= guestsForThisSection;
               
-              console.log(`Section ${s.id}: currentAllocated=${currentAllocated}, available=${availableInThisSection}, adding=${guestsForThisSection}, newTotal=${newAllocatedCount}`);
-              
-              // Only update sections that are getting new guests or are available
-              if (guestsForThisSection > 0 || s.status === 'AVAILABLE') {
+              if (guestsForThisSection > 0) {
+                const newAllocatedCount = currentAllocated + guestsForThisSection;
+                remainingGuests -= guestsForThisSection;
+                
+                console.log(`Section ${s.id}: currentAllocated=${currentAllocated}, available=${availableInThisSection}, adding=${guestsForThisSection}, newTotal=${newAllocatedCount}`);
+                
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
                 return {
                   ...s,
                   status: 'ALLOCATED' as const,
                   allocatedTo: newAllocatedTo,
-                  allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
+                  allocatedGuest: selectedGuest,
                   allocatedCount: newAllocatedCount,
                 };
               }
               
-              // Return existing section unchanged if no guests assigned
-              return s;
+              return s; // Section unchanged
             })
           };
         }
