@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -151,6 +152,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     // Fallback patterns
     if (itemField.includes('7:00pm') || itemField.includes('7pm')) return '7:00pm';
     if (itemField.includes('9:00pm') || itemField.includes('9pm')) return '9:00pm';
+    if (itemField.includes('8:00pm') || itemField.includes('8pm')) return '8:00pm';
     
     return 'Unknown';
   };
@@ -172,8 +174,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const groups = new Map<string, BookingGroup>();
     
     guests.forEach((guest, index) => {
-      const bookingCode = bookingCodeIndex >= 0 ? guest[bookingCodeIndex] || '' : '';
-      const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
+      if (!guest || typeof guest !== 'object') {
+        console.warn(`Invalid guest at index ${index}:`, guest);
+        return;
+      }
+
+      const bookingCode = bookingCodeIndex >= 0 && guest[bookingCodeIndex] ? guest[bookingCodeIndex] : '';
+      const itemField = itemIndex >= 0 && guest[itemIndex] ? guest[itemIndex] : '';
       
       if (!bookingCode) return;
       
@@ -198,6 +205,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Get ticket types from columns I to AG (indices 8 to 32) - handling duplicates
   const getTicketTypes = (guest: Guest) => {
+    if (!guest || typeof guest !== 'object') return [];
+
     const ticketTypes: string[] = [];
     const seenTickets = new Set<string>(); // Track seen ticket types to avoid duplicates
     
@@ -252,14 +261,17 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Get show time from item field (Column B)
   const getShowTime = (guest: Guest) => {
-    const itemField = itemIndex >= 0 ? guest[itemIndex] || '' : '';
+    if (!guest || typeof guest !== 'object') return 'Unknown';
+    const itemField = itemIndex >= 0 && guest[itemIndex] ? guest[itemIndex] : '';
     return extractShowTime(itemField);
   };
 
   // Filter bookings based on search and show time
   const filteredBookings = useMemo(() => {
     return groupedBookings.filter((booking) => {
-      const bookerField = bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '';
+      if (!booking || !booking.mainBooking) return false;
+
+      const bookerField = bookerIndex >= 0 && booking.mainBooking[bookerIndex] ? booking.mainBooking[bookerIndex] : '';
       const guestName = extractGuestName(bookerField);
       const showTime = getShowTime(booking.mainBooking);
       
@@ -284,7 +296,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setPagerAssignments(newAssignments);
     
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
     
     toast({
       title: "📟 Pager Assigned",
@@ -296,7 +308,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   const bypassPager = (guestIndex: number) => {
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
     
     toast({
       title: "✅ Pager Bypassed",
@@ -309,7 +321,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const handleCheckIn = (mainIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[mainIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    if (!guest) return;
+
+    const guestName = extractGuestName(bookerIndex >= 0 && guest[bookerIndex] ? guest[bookerIndex] : '');
     
     if (newCheckedIn.has(mainIndex)) {
       // Check out - remove pager assignment, allocated status and seated status
@@ -389,7 +403,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setGuestTableAllocations(newGuestTableAllocations);
     
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
+    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
     
     toast({
       title: "📍 Table Allocated",
@@ -399,6 +413,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   const getShowTimeBadgeStyle = (showTime: string) => {
     if (showTime === '7:00pm' || showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (showTime === '8:00pm' || showTime === '8pm') return 'bg-blue-100 text-blue-800 border-blue-200';
     if (showTime === '9:00pm' || showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
@@ -407,8 +422,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const getCheckedInGuestsData = (): CheckedInGuest[] => {
     return Array.from(checkedInGuests).map(guestIndex => {
       const guest = guests[guestIndex];
-      const guestName = extractGuestName(bookerIndex >= 0 ? guest[bookerIndex] || '' : '');
-      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
+      if (!guest) return null;
+
+      const guestName = extractGuestName(bookerIndex >= 0 && guest[bookerIndex] ? guest[bookerIndex] : '');
+      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
       const showTime = getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
@@ -423,15 +440,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         hasBeenSeated: hasBeenSeated,
         hasTableAllocated: hasTableAllocated
       };
-    });
+    }).filter(Boolean) as CheckedInGuest[];
   };
 
   // Calculate total guests for filtered bookings (respects show filter)
   const getTotalGuestsCount = () => {
     return filteredBookings.reduce((total, booking) => {
       if (!booking || !booking.mainBooking) return total;
-      const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
-      return total + totalQty;
+      const totalQty = parseInt(totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1');
+      return total + (isNaN(totalQty) ? 0 : totalQty);
     }, 0);
   };
 
@@ -447,8 +464,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
-      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
-      return total + totalQty;
+      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
+      return total + (isNaN(totalQty) ? 0 : totalQty);
     }, 0);
   };
 
@@ -464,26 +481,29 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
-      const totalQty = parseInt(totalQtyIndex >= 0 ? guest[totalQtyIndex] || '1' : '1');
-      return total + totalQty;
+      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
+      return total + (isNaN(totalQty) ? 0 : totalQty);
     }, 0);
   };
 
   const getShowTimeStats = () => {
-    const stats = { '7:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
+    const stats = { '7:00pm': 0, '8:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
     
     groupedBookings.forEach(booking => {
       if (!booking || !booking.mainBooking) return;
       
       const showTime = getShowTime(booking.mainBooking);
-      const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
+      const totalQty = parseInt(totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1');
+      const safeQty = isNaN(totalQty) ? 0 : totalQty;
       
       if (showTime === '7:00pm' || showTime === '7pm') {
-        stats['7:00pm'] += totalQty;
+        stats['7:00pm'] += safeQty;
+      } else if (showTime === '8:00pm' || showTime === '8pm') {
+        stats['8:00pm'] += safeQty;
       } else if (showTime === '9:00pm' || showTime === '9pm') {
-        stats['9:00pm'] += totalQty;
+        stats['9:00pm'] += safeQty;
       } else {
-        stats['Unknown'] += totalQty;
+        stats['Unknown'] += safeQty;
       }
     });
     
@@ -550,7 +570,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           {selectedGuestForPager !== null && (
             <div className="space-y-4">
               <p className="text-gray-700">
-                Assign a pager to <strong>{extractGuestName(bookerIndex >= 0 ? guests[selectedGuestForPager][bookerIndex] || '' : '')}</strong>
+                Assign a pager to <strong>{extractGuestName(bookerIndex >= 0 && guests[selectedGuestForPager] && guests[selectedGuestForPager][bookerIndex] ? guests[selectedGuestForPager][bookerIndex] : '')}</strong>
               </p>
               
               <div className="space-y-3">
@@ -616,27 +636,34 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   />
                 </div>
               </div>
-              <div className="w-60">
+              <div className="w-80">
                 <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
                 <div className="flex gap-2 mt-2">
                   <Button
                     variant={showFilter === 'all' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('all')}
-                    className="flex-1"
+                    className="flex-1 text-sm"
                   >
                     All Shows
                   </Button>
                   <Button
                     variant={showFilter === '7:00pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('7:00pm')}
-                    className="flex-1"
+                    className="flex-1 text-sm"
                   >
                     7pm Show
                   </Button>
                   <Button
+                    variant={showFilter === '8:00pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('8:00pm')}
+                    className="flex-1 text-sm"
+                  >
+                    8pm Show
+                  </Button>
+                  <Button
                     variant={showFilter === '9:00pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('9:00pm')}
-                    className="flex-1"
+                    className="flex-1 text-sm"
                   >
                     9pm Show
                   </Button>
@@ -664,18 +691,20 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               </TableHeader>
               <TableBody>
                 {filteredBookings.map((booking) => {
+                  if (!booking || !booking.mainBooking) return null;
+
                   const isCheckedIn = checkedInGuests.has(booking.originalIndex);
                   const isSeated = seatedGuests.has(booking.originalIndex);
                   const isAllocated = allocatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   
-                  const bookingCode = bookingCodeIndex >= 0 ? booking.mainBooking[bookingCodeIndex] || '' : '';
-                  const booker = extractGuestName(bookerIndex >= 0 ? booking.mainBooking[bookerIndex] || '' : '');
-                  const totalQty = totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1';
+                  const bookingCode = bookingCodeIndex >= 0 && booking.mainBooking[bookingCodeIndex] ? booking.mainBooking[bookingCodeIndex] : '';
+                  const booker = extractGuestName(bookerIndex >= 0 && booking.mainBooking[bookerIndex] ? booking.mainBooking[bookerIndex] : '');
+                  const totalQty = totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1';
                   const showTime = getShowTime(booking.mainBooking);
                   const ticketTypes = getTicketTypes(booking.mainBooking);
-                  const note = noteIndex >= 0 ? booking.mainBooking[noteIndex] || '' : '';
+                  const note = noteIndex >= 0 && booking.mainBooking[noteIndex] ? booking.mainBooking[noteIndex] : '';
                   
                   return (
                     <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : 'hover:bg-gray-50'} transition-colors`}>
@@ -728,7 +757,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           {booking.addOns.length > 0 ? (
                             <div className="space-y-1">
                               {booking.addOns.map((addOn, idx) => {
-                                const addOnItem = itemIndex >= 0 ? addOn[itemIndex] || '' : '';
+                                const addOnItem = itemIndex >= 0 && addOn[itemIndex] ? addOn[itemIndex] : '';
                                 return (
                                   <div key={idx} className="bg-orange-50 px-2 py-1 rounded text-xs flex items-center">
                                     <Plus className="h-3 w-3 mr-1 text-orange-600" />
@@ -829,10 +858,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 {Object.entries(getShowTimeStats()).map(([time, guestCount]) => {
                   if (time === 'Unknown' && guestCount === 0) return null;
                   const bookingCount = groupedBookings.filter(booking => {
+                    if (!booking || !booking.mainBooking) return false;
                     const showTime = getShowTime(booking.mainBooking);
                     return (time === '7:00pm' && (showTime === '7:00pm' || showTime === '7pm')) ||
+                           (time === '8:00pm' && (showTime === '8:00pm' || showTime === '8pm')) ||
                            (time === '9:00pm' && (showTime === '9:00pm' || showTime === '9pm')) ||
-                           (time === 'Unknown' && showTime !== '7:00pm' && showTime !== '7pm' && showTime !== '9:00pm' && showTime !== '9pm');
+                           (time === 'Unknown' && showTime !== '7:00pm' && showTime !== '7pm' && showTime !== '8:00pm' && showTime !== '8pm' && showTime !== '9:00pm' && showTime !== '9pm');
                   }).length;
                   
                   const totalGuests = Object.values(getShowTimeStats()).reduce((sum, count) => sum + count, 0);
