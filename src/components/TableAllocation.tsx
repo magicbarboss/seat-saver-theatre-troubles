@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -810,46 +809,7 @@ const TableAllocation = ({
     });
   };
 
-  // Handle expansion for single guests joining existing groups
-  const handleExpandAdjacent = (expandOption: { table: Table; adjacentTable: Table }) => {
-    if (!selectedGuest || selectedGuest.count !== 1) return;
-
-    console.log(`Expanding ${expandOption.table.name} with adjacent ${expandOption.adjacentTable.name} for single guest ${selectedGuest.name}`);
-
-    // Allocate the adjacent table to the same guest group
-    setTables(prevTables =>
-      prevTables.map(t => {
-        if (t.id === expandOption.adjacentTable.id) {
-          return {
-            ...t,
-            sections: t.sections.map(s => ({
-              ...s,
-              status: 'ALLOCATED' as const,
-              allocatedTo: selectedGuest.name,
-              allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
-              allocatedCount: selectedGuest.count,
-            }))
-          };
-        }
-        return t;
-      })
-    );
-
-    // Call the parent callback to track allocation
-    onTableAllocated(selectedGuest.originalIndex, [expandOption.adjacentTable.id]);
-
-    onTableAssign(expandOption.adjacentTable.id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
-
-    toast({
-      title: "📍 Table Expanded for Group",
-      description: `${selectedGuest.name} allocated to ${expandOption.adjacentTable.name} (adjacent to existing group at ${expandOption.table.name})`,
-    });
-
-    setShowAssignDialog(false);
-    setSelectedGuest(null);
-  };
-
-  // Handle assignment to whole table (allocate all sections)
+  // Handle assignment to whole table (allocate all sections) - FIXED DISTRIBUTION LOGIC
   const assignWholeTable = (table: Table) => {
     if (!selectedGuest) return;
 
@@ -882,7 +842,7 @@ const TableAllocation = ({
       return;
     }
 
-    // SIMPLIFIED: Just assign to the first section that can fit all guests, or distribute if needed
+    // FIXED: Properly distribute guests across sections
     setTables(prevTables =>
       prevTables.map(t => {
         if (t.id === table.id) {
@@ -895,15 +855,17 @@ const TableAllocation = ({
               if (remainingGuests <= 0) return s; // No more guests to assign
               
               const currentAllocated = s.allocatedCount || 0;
-              const availableInThisSection = s.capacity - currentAllocated;
+              const currentSeated = s.seatedCount || 0;
+              const availableInThisSection = s.capacity - Math.max(currentAllocated, currentSeated);
               const guestsForThisSection = Math.min(remainingGuests, availableInThisSection);
               
               if (guestsForThisSection > 0) {
-                const newAllocatedCount = currentAllocated + guestsForThisSection;
                 remainingGuests -= guestsForThisSection;
                 
-                console.log(`Section ${s.id}: currentAllocated=${currentAllocated}, available=${availableInThisSection}, adding=${guestsForThisSection}, newTotal=${newAllocatedCount}`);
+                console.log(`Section ${s.id}: currentAllocated=${currentAllocated}, currentSeated=${currentSeated}, available=${availableInThisSection}, adding=${guestsForThisSection}`);
                 
+                // FIXED: Only allocate the guests assigned to THIS section, not the total
+                const newAllocatedCount = currentAllocated + guestsForThisSection;
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
                 return {
@@ -911,7 +873,8 @@ const TableAllocation = ({
                   status: 'ALLOCATED' as const,
                   allocatedTo: newAllocatedTo,
                   allocatedGuest: selectedGuest,
-                  allocatedCount: newAllocatedCount,
+                  allocatedCount: newAllocatedCount, // Only the guests for THIS section
+                  seatedCount: s.seatedCount || 0, // Keep existing seated count
                 };
               }
               
