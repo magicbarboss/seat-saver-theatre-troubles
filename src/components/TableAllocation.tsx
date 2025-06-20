@@ -1001,6 +1001,10 @@ const TableAllocation = ({
     const allSectionsAvailable = table.sections.every(s => s.status === 'AVAILABLE');
     const wholeTableCapacity = table.totalCapacity;
     const canFitGuest = selectedGuest.count <= wholeTableCapacity;
+    
+    // FIXED: Calculate total available capacity across all sections
+    const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
+    const canFitInCombinedSections = selectedGuest.count <= totalAvailableCapacity;
 
     return (
       <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
@@ -1008,16 +1012,18 @@ const TableAllocation = ({
           {table.name} ({table.totalCapacity} seats)
         </h3>
         
-        {/* Whole table option - ONLY show if ALL sections are completely available */}
-        {allSectionsAvailable && (
+        {/* Whole table option - Show if ALL sections are available OR if combined sections have enough capacity */}
+        {(allSectionsAvailable || canFitInCombinedSections) && (
           <Button
             variant="outline"
             onClick={() => assignWholeTable(table)}
-            className={`w-full mb-2 text-xs py-1 ${canFitGuest ? 'border-green-500 bg-green-50 hover:bg-green-100' : 'border-gray-300 opacity-50'}`}
-            disabled={!canFitGuest}
+            className={`w-full mb-2 text-xs py-1 ${canFitInCombinedSections ? 'border-green-500 bg-green-50 hover:bg-green-100' : 'border-gray-300 opacity-50'}`}
+            disabled={!canFitInCombinedSections}
           >
-            <span className="font-medium">Whole Table</span>
-            {!canFitGuest && <span className="ml-1 text-red-600">(Too small)</span>}
+            <span className="font-medium">
+              {allSectionsAvailable ? 'Whole Table' : `Distribute Across Sections (${totalAvailableCapacity} available)`}
+            </span>
+            {!canFitInCombinedSections && <span className="ml-1 text-red-600">(Too small)</span>}
           </Button>
         )}
 
