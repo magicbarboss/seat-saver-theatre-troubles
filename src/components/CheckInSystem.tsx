@@ -429,6 +429,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Calculate total guests for filtered bookings (respects show filter)
   const getTotalGuestsCount = () => {
     return filteredBookings.reduce((total, booking) => {
+      if (!booking || !booking.mainBooking) return total;
       const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
       return total + totalQty;
     }, 0);
@@ -437,6 +438,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Calculate checked-in guests count for filtered bookings
   const getCheckedInGuestsCount = () => {
     return Array.from(checkedInGuests).reduce((total, guestIndex) => {
+      if (guestIndex >= guests.length || !guests[guestIndex]) return total;
+      
       const guest = guests[guestIndex];
       const showTime = getShowTime(guest);
       
@@ -452,6 +455,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Calculate allocated guests count for filtered bookings
   const getAllocatedGuestsCount = () => {
     return Array.from(allocatedGuests).reduce((total, guestIndex) => {
+      if (guestIndex >= guests.length || !guests[guestIndex]) return total;
+      
       const guest = guests[guestIndex];
       const showTime = getShowTime(guest);
       
@@ -468,6 +473,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const stats = { '7:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
     
     groupedBookings.forEach(booking => {
+      if (!booking || !booking.mainBooking) return;
+      
       const showTime = getShowTime(booking.mainBooking);
       const totalQty = parseInt(totalQtyIndex >= 0 ? booking.mainBooking[totalQtyIndex] || '1' : '1');
       
