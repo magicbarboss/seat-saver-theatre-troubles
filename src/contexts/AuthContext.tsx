@@ -62,15 +62,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Username already exists' } };
       }
 
-      // Use a proper email format that Supabase will accept
+      // Create a more realistic fake email using a proper domain format
+      const fakeEmail = `${username.toLowerCase()}@theatre-system.app`;
+      
       const { error } = await supabase.auth.signUp({
-        email: `${username}@example.com`, // Use example.com which is a reserved domain
+        email: fakeEmail,
         password,
         options: {
           data: {
             username,
             full_name: fullName
-          }
+          },
+          emailRedirectTo: undefined // Disable email confirmation
         }
       });
 
@@ -95,8 +98,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (username: string, password: string) => {
     try {
+      const fakeEmail = `${username.toLowerCase()}@theatre-system.app`;
+      
       const { error } = await supabase.auth.signInWithPassword({
-        email: `${username}@example.com`,
+        email: fakeEmail,
         password,
       });
 
