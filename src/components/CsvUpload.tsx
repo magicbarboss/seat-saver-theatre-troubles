@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,6 +92,19 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
     }
   };
 
+  const findColumnIndex = (headers: string[], searchTerms: string[]): number => {
+    for (const term of searchTerms) {
+      const index = headers.findIndex(header => 
+        header.toLowerCase().includes(term.toLowerCase())
+      );
+      if (index !== -1) {
+        console.log(`Found column "${headers[index]}" at index ${index} for search term "${term}"`);
+        return index;
+      }
+    }
+    return -1;
+  };
+
   const saveToDatabase = async () => {
     if (!csvData || !user) return;
 
@@ -109,25 +123,49 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
 
       if (listError) throw listError;
 
-      // Prepare guest data
+      // Find column indices for key fields
+      const bookerIndex = findColumnIndex(csvData.headers, ['booker', 'booker name']);
+      const bookingCodeIndex = findColumnIndex(csvData.headers, ['booking code', 'code']);
+      const totalQtyIndex = findColumnIndex(csvData.headers, ['total quantity', 'quantity', 'total']);
+      const itemIndex = findColumnIndex(csvData.headers, ['item', 'show', 'event']);
+      const noteIndex = findColumnIndex(csvData.headers, ['note', 'notes']);
+
+      console.log('Column indices:', {
+        booker: bookerIndex,
+        bookingCode: bookingCodeIndex,
+        totalQty: totalQtyIndex,
+        item: itemIndex,
+        note: noteIndex
+      });
+
+      // Prepare guest data with proper field mapping
       const guestsData = csvData.rows.map((row, index) => {
         const ticketData: any = {};
         csvData.headers.forEach((header, headerIndex) => {
           ticketData[header] = row[headerIndex] || '';
         });
 
+        // Extract key fields from the correct columns
+        const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
+        const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
+        const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
+        const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
+        const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
+
         return {
           guest_list_id: guestList.id,
-          booking_code: row[0] || '',
-          booker_name: row[1] || '',
-          total_quantity: parseInt(row[2]) || 1,
-          show_time: row[3] || '',
-          item_details: row[4] || '',
-          notes: row[5] || '',
+          booking_code: bookingCode,
+          booker_name: bookerName,
+          total_quantity: totalQuantity,
+          show_time: '', // This can be extracted from item details if needed
+          item_details: itemDetails,
+          notes: notes,
           ticket_data: ticketData,
           original_row_index: index
         };
       });
+
+      console.log('Sample guest data being saved:', guestsData[0]);
 
       // Insert guests
       const { error: guestsError } = await supabase
