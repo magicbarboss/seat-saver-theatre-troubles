@@ -165,7 +165,6 @@ const GuestManager = () => {
             table_assignments: guest.table_assignments
           }))}
           headers={guests.length > 0 ? Object.keys(guests[0].ticket_data || {}) : []}
-          guestListId={activeGuestList.id}
         />
       </div>
     );
