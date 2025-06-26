@@ -4,7 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload } from 'lucide-react';
-import CheckInSystem from './CheckInSystem';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
 
 interface CsvData {
@@ -12,10 +14,16 @@ interface CsvData {
   rows: string[][];
 }
 
-const CsvUpload = () => {
+interface CsvUploadProps {
+  onGuestListCreated?: (guestList: any) => void;
+}
+
+const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
   const [csvData, setCsvData] = useState<CsvData | null>(null);
   const [fileName, setFileName] = useState<string>('');
-  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -83,30 +91,70 @@ const CsvUpload = () => {
     }
   };
 
-  if (showCheckIn && csvData) {
-    return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowCheckIn(false)}
-          >
-            ← Back to Upload
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            Using: {fileName}
-          </p>
-        </div>
-        <CheckInSystem 
-          guests={csvData.rows.map(row => row.reduce((obj, cell, index) => {
-            obj[index] = cell;
-            return obj;
-          }, {} as { [key: string]: string }))}
-          headers={csvData.headers}
-        />
-      </div>
-    );
-  }
+  const saveToDatabase = async () => {
+    if (!csvData || !user) return;
+
+    setUploading(true);
+    
+    try {
+      // Create guest list
+      const { data: guestList, error: listError } = await supabase
+        .from('guest_lists')
+        .insert({
+          name: fileName,
+          uploaded_by: user.id
+        })
+        .select()
+        .single();
+
+      if (listError) throw listError;
+
+      // Prepare guest data
+      const guestsData = csvData.rows.map((row, index) => {
+        const ticketData: any = {};
+        csvData.headers.forEach((header, headerIndex) => {
+          ticketData[header] = row[headerIndex] || '';
+        });
+
+        return {
+          guest_list_id: guestList.id,
+          booking_code: row[0] || '',
+          booker_name: row[1] || '',
+          total_quantity: parseInt(row[2]) || 1,
+          show_time: row[3] || '',
+          item_details: row[4] || '',
+          notes: row[5] || '',
+          ticket_data: ticketData,
+          original_row_index: index
+        };
+      });
+
+      // Insert guests
+      const { error: guestsError } = await supabase
+        .from('guests')
+        .insert(guestsData);
+
+      if (guestsError) throw guestsError;
+
+      toast({
+        title: "Success",
+        description: `Uploaded ${csvData.rows.length} guests successfully`,
+      });
+
+      if (onGuestListCreated) {
+        onGuestListCreated(guestList);
+      }
+
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
@@ -138,8 +186,8 @@ const CsvUpload = () => {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">File Contents</h3>
-            <Button onClick={() => setShowCheckIn(true)}>
-              Start Check-In System
+            <Button onClick={saveToDatabase} disabled={uploading}>
+              {uploading ? 'Saving...' : 'Save Guest List'}
             </Button>
           </div>
           <div className="border rounded-md">
@@ -163,7 +211,7 @@ const CsvUpload = () => {
             </Table>
             {csvData.rows.length > 10 && (
               <p className="text-sm text-muted-foreground p-4 border-t">
-                Showing first 10 rows of {csvData.rows.length} total rows. Click "Start Check-In System" for full functionality.
+                Showing first 10 rows of {csvData.rows.length} total rows. Click "Save Guest List" to store all data.
               </p>
             )}
           </div>

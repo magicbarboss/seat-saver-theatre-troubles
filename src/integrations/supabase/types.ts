@@ -9,7 +9,122 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      guest_lists: {
+        Row: {
+          id: string
+          is_active: boolean | null
+          name: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean | null
+          name: string
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      guests: {
+        Row: {
+          booker_name: string | null
+          booking_code: string | null
+          checked_in_at: string | null
+          guest_list_id: string
+          id: string
+          is_allocated: boolean | null
+          is_checked_in: boolean | null
+          is_seated: boolean | null
+          item_details: string | null
+          notes: string | null
+          original_row_index: number | null
+          pager_number: number | null
+          seated_at: string | null
+          show_time: string | null
+          table_assignments: number[] | null
+          ticket_data: Json | null
+          total_quantity: number | null
+        }
+        Insert: {
+          booker_name?: string | null
+          booking_code?: string | null
+          checked_in_at?: string | null
+          guest_list_id: string
+          id?: string
+          is_allocated?: boolean | null
+          is_checked_in?: boolean | null
+          is_seated?: boolean | null
+          item_details?: string | null
+          notes?: string | null
+          original_row_index?: number | null
+          pager_number?: number | null
+          seated_at?: string | null
+          show_time?: string | null
+          table_assignments?: number[] | null
+          ticket_data?: Json | null
+          total_quantity?: number | null
+        }
+        Update: {
+          booker_name?: string | null
+          booking_code?: string | null
+          checked_in_at?: string | null
+          guest_list_id?: string
+          id?: string
+          is_allocated?: boolean | null
+          is_checked_in?: boolean | null
+          is_seated?: boolean | null
+          item_details?: string | null
+          notes?: string | null
+          original_row_index?: number | null
+          pager_number?: number | null
+          seated_at?: string | null
+          show_time?: string | null
+          table_assignments?: number[] | null
+          ticket_data?: Json | null
+          total_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guests_guest_list_id_fkey"
+            columns: ["guest_list_id"]
+            isOneToOne: false
+            referencedRelation: "guest_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          role: string | null
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+          role?: string | null
+          username: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          role?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
