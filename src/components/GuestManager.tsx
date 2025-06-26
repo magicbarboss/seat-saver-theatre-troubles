@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -114,6 +113,20 @@ const GuestManager = () => {
       });
     } else {
       console.log(`Found ${data?.length || 0} guests for guest list ${guestListId}:`, data?.slice(0, 3));
+      // Add more detailed logging for the guest data structure
+      if (data && data.length > 0) {
+        console.log('Available headers:', Object.keys(data[0].ticket_data || {}));
+        console.log('Sample guest data:', {
+          ...data[0].ticket_data,
+          id: data[0].id,
+          booking_code: data[0].booking_code,
+          booker_name: data[0].booker_name,
+          total_quantity: data[0].total_quantity,
+          is_checked_in: data[0].is_checked_in,
+          pager_number: data[0].pager_number,
+          table_assignments: data[0].table_assignments
+        });
+      }
       setGuests(data || []);
     }
   };
@@ -145,6 +158,20 @@ const GuestManager = () => {
   }
 
   if (showCheckIn && activeGuestList && guests.length > 0) {
+    // Transform guests data for CheckInSystem
+    const transformedGuests = guests.map(guest => ({
+      ...guest.ticket_data,
+      id: guest.id,
+      booking_code: guest.booking_code,
+      booker_name: guest.booker_name,
+      total_quantity: guest.total_quantity,
+      is_checked_in: guest.is_checked_in,
+      pager_number: guest.pager_number,
+      table_assignments: guest.table_assignments
+    }));
+
+    const headers = guests.length > 0 ? Object.keys(guests[0].ticket_data || {}) : [];
+
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -164,17 +191,8 @@ const GuestManager = () => {
           </div>
         </div>
         <CheckInSystem 
-          guests={guests.map(guest => ({
-            ...guest.ticket_data,
-            id: guest.id,
-            booking_code: guest.booking_code,
-            booker_name: guest.booker_name,
-            total_quantity: guest.total_quantity,
-            is_checked_in: guest.is_checked_in,
-            pager_number: guest.pager_number,
-            table_assignments: guest.table_assignments
-          }))}
-          headers={guests.length > 0 ? Object.keys(guests[0].ticket_data || {}) : []}
+          guests={transformedGuests}
+          headers={headers}
         />
       </div>
     );
