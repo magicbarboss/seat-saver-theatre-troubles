@@ -69,16 +69,31 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         
         setCsvData({ headers, rows });
       } else {
-        // Handle CSV/TSV files (restore original logic)
+        // Handle CSV/TSV files - detect delimiter
         const text = data as string;
         const lines = text.split('\n').filter(line => line.trim() !== '');
         
         if (lines.length === 0) return;
 
-        const headers = lines[0].split('\t').map(header => header.trim().replace(/"/g, ''));
+        // Check if it's comma-separated or tab-separated by looking at the first line
+        const firstLine = lines[0];
+        const commaCount = (firstLine.match(/,/g) || []).length;
+        const tabCount = (firstLine.match(/\t/g) || []).length;
+        
+        console.log('First line:', firstLine);
+        console.log('Comma count:', commaCount, 'Tab count:', tabCount);
+        
+        // Use the delimiter that appears most frequently
+        const delimiter = commaCount > tabCount ? ',' : '\t';
+        console.log('Using delimiter:', delimiter === ',' ? 'comma' : 'tab');
+
+        const headers = lines[0].split(delimiter).map(header => header.trim().replace(/"/g, ''));
         const rows = lines.slice(1).map(line => 
-          line.split('\t').map(cell => cell.trim().replace(/"/g, ''))
+          line.split(delimiter).map(cell => cell.trim().replace(/"/g, ''))
         );
+
+        console.log('Parsed headers:', headers);
+        console.log('Sample parsed rows:', rows.slice(0, 3));
 
         setCsvData({ headers, rows });
       }
@@ -101,6 +116,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         return index;
       }
     }
+    console.log(`No column found for search terms: ${searchTerms.join(', ')}`);
     return -1;
   };
 
