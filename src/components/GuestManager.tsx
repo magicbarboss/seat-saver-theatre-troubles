@@ -46,6 +46,7 @@ const GuestManager = () => {
 
   useEffect(() => {
     if (activeGuestList) {
+      console.log(`Fetching guests for guest list: ${activeGuestList.id} (${activeGuestList.name})`);
       fetchGuests(activeGuestList.id);
       
       // Set up real-time subscription for guests
@@ -60,6 +61,7 @@ const GuestManager = () => {
             filter: `guest_list_id=eq.${activeGuestList.id}`
           },
           () => {
+            console.log('Real-time update detected, refetching guests...');
             fetchGuests(activeGuestList.id);
           }
         )
@@ -72,26 +74,31 @@ const GuestManager = () => {
   }, [activeGuestList]);
 
   const fetchGuestLists = async () => {
+    console.log('Fetching guest lists...');
     const { data, error } = await supabase
       .from('guest_lists')
       .select('*')
       .order('uploaded_at', { ascending: false });
 
     if (error) {
+      console.error('Error fetching guest lists:', error);
       toast({
         title: "Error",
         description: "Failed to load guest lists",
         variant: "destructive",
       });
     } else {
+      console.log(`Found ${data?.length || 0} guest lists:`, data);
       setGuestLists(data || []);
       if (data && data.length > 0 && !activeGuestList) {
+        console.log(`Setting active guest list to: ${data[0].name}`);
         setActiveGuestList(data[0]);
       }
     }
   };
 
   const fetchGuests = async (guestListId: string) => {
+    console.log(`Fetching guests for guest list ID: ${guestListId}`);
     const { data, error } = await supabase
       .from('guests')
       .select('*')
@@ -99,17 +106,20 @@ const GuestManager = () => {
       .order('original_row_index');
 
     if (error) {
+      console.error('Error fetching guests:', error);
       toast({
         title: "Error",
         description: "Failed to load guests",
         variant: "destructive",
       });
     } else {
+      console.log(`Found ${data?.length || 0} guests for guest list ${guestListId}:`, data?.slice(0, 3));
       setGuests(data || []);
     }
   };
 
   const handleGuestListCreated = (newGuestList: GuestList) => {
+    console.log('New guest list created:', newGuestList);
     setGuestLists(prev => [newGuestList, ...prev]);
     setActiveGuestList(newGuestList);
     setShowUpload(false);

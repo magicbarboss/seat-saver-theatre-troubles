@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,6 +127,8 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
     setUploading(true);
     
     try {
+      console.log('Starting database save process...');
+      
       // Create guest list
       const { data: guestList, error: listError } = await supabase
         .from('guest_lists')
@@ -136,7 +139,12 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         .select()
         .single();
 
-      if (listError) throw listError;
+      if (listError) {
+        console.error('Error creating guest list:', listError);
+        throw listError;
+      }
+      
+      console.log('Created guest list:', guestList);
 
       // Find column indices for key fields
       const bookerIndex = findColumnIndex(csvData.headers, ['booker', 'booker name']);
@@ -167,7 +175,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
         const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
 
-        return {
+        const guestRecord = {
           guest_list_id: guestList.id,
           booking_code: bookingCode,
           booker_name: bookerName,
@@ -178,16 +186,29 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           ticket_data: ticketData,
           original_row_index: index
         };
+        
+        // Log the first few records to debug
+        if (index < 3) {
+          console.log(`Guest record ${index}:`, guestRecord);
+        }
+        
+        return guestRecord;
       });
 
-      console.log('Sample guest data being saved:', guestsData[0]);
+      console.log(`Attempting to insert ${guestsData.length} guest records...`);
 
       // Insert guests
-      const { error: guestsError } = await supabase
+      const { data: insertedGuests, error: guestsError } = await supabase
         .from('guests')
-        .insert(guestsData);
+        .insert(guestsData)
+        .select();
 
-      if (guestsError) throw guestsError;
+      if (guestsError) {
+        console.error('Error inserting guests:', guestsError);
+        throw guestsError;
+      }
+
+      console.log(`Successfully inserted ${insertedGuests?.length || 0} guests`);
 
       toast({
         title: "Success",
@@ -199,6 +220,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
       }
 
     } catch (error: any) {
+      console.error('Database save error:', error);
       toast({
         title: "Upload failed",
         description: error.message,
