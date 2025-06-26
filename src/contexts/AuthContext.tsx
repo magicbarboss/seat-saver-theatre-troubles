@@ -51,6 +51,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (username: string, password: string, fullName: string) => {
     try {
+      // Clean the username and ensure it's valid for email format
+      const cleanUsername = username.toLowerCase().trim().replace(/[^a-zA-Z0-9]/g, '');
+      console.log('Cleaned username:', cleanUsername);
+      
       // First check if username already exists
       const { data: existingProfile } = await supabase
         .from('profiles')
@@ -62,8 +66,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Username already exists' } };
       }
 
-      // Create a more realistic fake email using a proper domain format
-      const fakeEmail = `${username.toLowerCase()}@theatre-system.app`;
+      // Create email using a standard format
+      const fakeEmail = `${cleanUsername}@example.com`;
+      console.log('Generated email:', fakeEmail);
       
       const { error } = await supabase.auth.signUp({
         email: fakeEmail,
@@ -72,10 +77,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             username,
             full_name: fullName
-          },
-          emailRedirectTo: undefined // Disable email confirmation
+          }
         }
       });
+
+      console.log('Sign up error:', error);
 
       if (error) {
         toast({
@@ -92,18 +98,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { error };
     } catch (error: any) {
+      console.log('Sign up catch error:', error);
       return { error };
     }
   };
 
   const signIn = async (username: string, password: string) => {
     try {
-      const fakeEmail = `${username.toLowerCase()}@theatre-system.app`;
+      const cleanUsername = username.toLowerCase().trim().replace(/[^a-zA-Z0-9]/g, '');
+      const fakeEmail = `${cleanUsername}@example.com`;
+      console.log('Sign in with email:', fakeEmail);
       
       const { error } = await supabase.auth.signInWithPassword({
         email: fakeEmail,
         password,
       });
+
+      console.log('Sign in error:', error);
 
       if (error) {
         toast({
@@ -115,6 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return { error };
     } catch (error: any) {
+      console.log('Sign in catch error:', error);
       return { error };
     }
   };
