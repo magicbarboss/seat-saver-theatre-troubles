@@ -8,24 +8,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AuthForm = () => {
-  const [signInData, setSignInData] = useState({ username: '', password: '' });
-  const [signUpData, setSignUpData] = useState({ username: '', password: '', fullName: '' });
+  const [signInData, setSignInData] = useState({ email: '', password: '' });
+  const [signUpData, setSignUpData] = useState({ email: '', password: '', username: '', fullName: '' });
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await signIn(signInData.username, signInData.password);
+    await signIn(signInData.email, signInData.password);
     setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp(signUpData.username, signUpData.password, signUpData.fullName);
+    const { error } = await signUp(signUpData.email, signUpData.password, signUpData.username, signUpData.fullName);
     if (!error) {
-      setSignUpData({ username: '', password: '', fullName: '' });
+      setSignUpData({ email: '', password: '', username: '', fullName: '' });
     }
     setLoading(false);
   };
@@ -47,12 +47,12 @@ const AuthForm = () => {
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-username">Username</Label>
+                  <Label htmlFor="signin-email">Email</Label>
                   <Input
-                    id="signin-username"
-                    type="text"
-                    value={signInData.username}
-                    onChange={(e) => setSignInData({ ...signInData, username: e.target.value })}
+                    id="signin-email"
+                    type="email"
+                    value={signInData.email}
+                    onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
                     required
                   />
                 </div>
@@ -91,6 +91,16 @@ const AuthForm = () => {
                     type="text"
                     value={signUpData.username}
                     onChange={(e) => setSignUpData({ ...signUpData, username: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    value={signUpData.email}
+                    onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
                     required
                   />
                 </div>

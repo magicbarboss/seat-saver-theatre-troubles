@@ -7,8 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  signUp: (username: string, password: string, fullName: string) => Promise<{ error: any }>;
-  signIn: (username: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, username: string, fullName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   loading: boolean;
 }
@@ -49,11 +49,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (username: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, username: string, fullName: string) => {
     try {
-      // Clean the username and ensure it's valid for email format
-      const cleanUsername = username.toLowerCase().trim().replace(/[^a-zA-Z0-9]/g, '');
-      console.log('Cleaned username:', cleanUsername);
+      console.log('Attempting sign up with email:', email);
       
       // First check if username already exists
       const { data: existingProfile } = await supabase
@@ -66,16 +64,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Username already exists' } };
       }
 
-      // Create email using a standard format
-      const fakeEmail = `${cleanUsername}@example.com`;
-      console.log('Generated email:', fakeEmail);
-      
       const { error } = await supabase.auth.signUp({
-        email: fakeEmail,
-        password,
+        email: email,
+        password: password,
         options: {
           data: {
-            username,
+            username: username,
             full_name: fullName
           }
         }
@@ -92,7 +86,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         toast({
           title: "Account created",
-          description: "You can now sign in with your username and password.",
+          description: "Please check your email to verify your account.",
         });
       }
 
@@ -103,15 +97,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signIn = async (username: string, password: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      const cleanUsername = username.toLowerCase().trim().replace(/[^a-zA-Z0-9]/g, '');
-      const fakeEmail = `${cleanUsername}@example.com`;
-      console.log('Sign in with email:', fakeEmail);
+      console.log('Sign in with email:', email);
       
       const { error } = await supabase.auth.signInWithPassword({
-        email: fakeEmail,
-        password,
+        email: email,
+        password: password,
       });
 
       console.log('Sign in error:', error);
@@ -119,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         toast({
           title: "Sign in failed",
-          description: "Invalid username or password",
+          description: "Invalid email or password",
           variant: "destructive",
         });
       }
