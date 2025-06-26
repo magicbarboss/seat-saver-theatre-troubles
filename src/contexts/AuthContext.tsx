@@ -33,6 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, session);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -41,6 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -71,11 +73,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: {
             username: username,
             full_name: fullName
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/`
         }
       });
 
-      console.log('Sign up error:', error);
+      console.log('Sign up result:', error);
 
       if (error) {
         toast({
@@ -85,8 +88,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       } else {
         toast({
-          title: "Account created",
-          description: "Please check your email to verify your account.",
+          title: "Account created successfully!",
+          description: "You can now sign in with your credentials.",
         });
       }
 
@@ -99,20 +102,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Sign in with email:', email);
+      console.log('Sign in attempt with email:', email);
       
       const { error } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
 
-      console.log('Sign in error:', error);
+      console.log('Sign in result:', error);
 
       if (error) {
+        let errorMessage = "Sign in failed";
+        
+        if (error.message === "Email not confirmed") {
+          errorMessage = "Please check your email and click the confirmation link before signing in.";
+        } else if (error.message === "Invalid login credentials") {
+          errorMessage = "Invalid email or password. Please check your credentials.";
+        } else {
+          errorMessage = error.message;
+        }
+
         toast({
           title: "Sign in failed",
-          description: "Invalid email or password",
+          description: errorMessage,
           variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Welcome back!",
+          description: "You have been signed in successfully.",
         });
       }
 
@@ -130,6 +148,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         title: "Sign out failed",
         description: error.message,
         variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
       });
     }
   };
