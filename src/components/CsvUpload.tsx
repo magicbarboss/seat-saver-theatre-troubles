@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,42 +69,16 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         
         setCsvData({ headers, rows });
       } else {
-        // Handle CSV files - fix the parsing logic
+        // Handle CSV/TSV files (restore original logic)
         const text = data as string;
         const lines = text.split('\n').filter(line => line.trim() !== '');
         
         if (lines.length === 0) return;
 
-        // Parse CSV properly by splitting on commas, handling quoted fields
-        const parseCsvLine = (line: string): string[] => {
-          const result = [];
-          let current = '';
-          let inQuotes = false;
-          
-          for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            
-            if (char === '"') {
-              inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-              result.push(current.trim());
-              current = '';
-            } else {
-              current += char;
-            }
-          }
-          
-          // Add the last field
-          result.push(current.trim());
-          
-          return result;
-        };
-
-        const headers = parseCsvLine(lines[0]);
-        const rows = lines.slice(1).map(line => parseCsvLine(line));
-
-        console.log('Parsed CSV headers:', headers);
-        console.log('Sample parsed CSV rows:', rows.slice(0, 3));
+        const headers = lines[0].split('\t').map(header => header.trim().replace(/"/g, ''));
+        const rows = lines.slice(1).map(line => 
+          line.split('\t').map(cell => cell.trim().replace(/"/g, ''))
+        );
 
         setCsvData({ headers, rows });
       }
