@@ -161,14 +161,34 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract ticket type from Item field
+  // Extract ticket type from specific ticket type fields
   const getTicketType = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Unknown';
-    const itemField = guest.Item || guest.item_details || '';
+    if (!guest || typeof guest !== 'object') return 'Standard Ticket';
     
-    // Extract the main part before the time bracket
-    const mainPart = itemField.split('[')[0].trim();
-    return mainPart || 'Standard Ticket';
+    const ticketTypeFields = [
+      'Adult Show Ticket includes 2 Drinks',
+      'Comedy ticket plus 9" Pizza',
+      'OLD Groupon Offer (per person - extras are already included)',
+      'Adult Comedy & Magic Show Ticket + 9" Pizza',
+      'Adult Show Ticket includes 2 Drinks + 9" Pizza',
+      'Adult Show Ticket includes 2 soft drinks',
+      'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
+      'Adult Comedy Magic Show ticket',
+      'Smoke Offer Ticket includes Drink (minimum x2)',
+      'Groupon Magic & Pints Package (per person)',
+      'Groupon Magic & Cocktails Package (per person)',
+      'Wowcher Magic & Cocktails Package (per person)'
+    ];
+    
+    // Find the first ticket type field that has a value
+    for (const field of ticketTypeFields) {
+      const value = guest[field];
+      if (value && value !== '' && value !== '0') {
+        return field;
+      }
+    }
+    
+    return 'Standard Ticket';
   };
 
   // Get all addon information for a guest
@@ -177,20 +197,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     
     const addons = [];
     
-    // Check various addon fields from the console logs
+    // Addon fields
     const addonFields = [
-      'OLD Groupon Offer (per person - extras are already included)',
-      'Groupon Magic & Cocktails Package (per person)',
-      'Groupon Magic & Pints Package (per person)',
-      'Adult Show Ticket includes 2 Drinks',
-      'Adult Show Ticket includes 2 soft drinks',
-      'Comedy ticket plus 9 Pizza',
-      'Adult Comedy & Magic Show Ticket + 9 Pizza',
-      'Adult Show Ticket includes 2 Drinks + 9 Pizza',
-      'Wowcher Magic & Cocktails Package (per person)',
-      'Smoke Offer Ticket includes Drink (minimum x2)',
+      'Prosecco add on',
       'Bottle of Wine',
-      'Prosecco add on'
+      'GlutenBase',
+      'Salt & Pepper Fries',
+      'Vegan'
     ];
     
     addonFields.forEach(field => {
@@ -209,16 +222,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     
     // Main booking notes
     const mainGuest = booking.mainBooking;
-    if (mainGuest.Note) notes.push(mainGuest.Note);
+    if (mainGuest.Note) notes.push(`Note: ${mainGuest.Note}`);
     if (mainGuest.Magic) notes.push(`Magic: ${mainGuest.Magic}`);
     if (mainGuest.DIET) notes.push(`Diet: ${mainGuest.DIET}`);
-    if (mainGuest.Friends) notes.push(`Friends: ${mainGuest.Friends}`);
+    if (mainGuest.Friends) notes.push(`Party: ${mainGuest.Friends}`);
     if (mainGuest.TERMS) notes.push(`Terms: ${mainGuest.TERMS}`);
-    if (mainGuest.Booking) notes.push(`Booking: ${mainGuest.Booking}`);
+    if (mainGuest.Booking) notes.push(`Occasion: ${mainGuest.Booking}`);
     
     // Add-on notes (if any)
     booking.addOns.forEach(addon => {
-      if (addon.Note) notes.push(`Add-on: ${addon.Note}`);
+      if (addon.Note) notes.push(`Add-on Note: ${addon.Note}`);
       if (addon.Magic) notes.push(`Add-on Magic: ${addon.Magic}`);
     });
     
@@ -719,7 +732,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-gray-700 max-w-xs">
-                          {ticketType}
+                          <div className="bg-blue-50 px-2 py-1 rounded text-xs font-medium">
+                            {ticketType.length > 35 ? ticketType.substring(0, 35) + '...' : ticketType}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -727,8 +742,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           {addons.length > 0 ? (
                             <div className="space-y-1">
                               {addons.slice(0, 2).map((addon, idx) => (
-                                <div key={idx} className="bg-blue-50 px-2 py-1 rounded text-xs">
-                                  {addon.length > 40 ? addon.substring(0, 40) + '...' : addon}
+                                <div key={idx} className="bg-green-50 px-2 py-1 rounded text-xs">
+                                  {addon.length > 30 ? addon.substring(0, 30) + '...' : addon}
                                 </div>
                               ))}
                               {addons.length > 2 && (
