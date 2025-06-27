@@ -43,6 +43,7 @@ const TableAllocation = ({
     4: 4, 5: 4, 6: 4, 7: 4, 8: 4, 9: 4,
     10: 2, 11: 2, 12: 2, 13: 2
   });
+  const [tableAllocations, setTableAllocations] = useState<{[key: number]: CheckedInGuest}>({});
 
   // Filter guests who are checked in but not seated yet
   const availableGuests = checkedInGuests.filter(guest => 
@@ -63,6 +64,13 @@ const TableAllocation = ({
   const allocateTable = () => {
     if (!selectedGuest || selectedTables.length === 0) return;
 
+    // Update table allocations
+    const newAllocations = { ...tableAllocations };
+    selectedTables.forEach(tableId => {
+      newAllocations[tableId] = selectedGuest;
+    });
+    setTableAllocations(newAllocations);
+
     onTableAllocated(selectedGuest.originalIndex, selectedTables);
     
     setSelectedGuest(null);
@@ -74,21 +82,25 @@ const TableAllocation = ({
     });
   };
 
-  const seatGuest = () => {
-    if (!selectedGuest) return;
-
-    onGuestSeated(selectedGuest.originalIndex);
+  const seatGuest = (guest: CheckedInGuest) => {
+    onGuestSeated(guest.originalIndex);
     
-    if (selectedGuest.pagerNumber) {
-      onPagerRelease(selectedGuest.pagerNumber);
+    if (guest.pagerNumber) {
+      onPagerRelease(guest.pagerNumber);
     }
     
-    setSelectedGuest(null);
-    setSelectedTables([]);
+    // Remove from table allocations
+    const newAllocations = { ...tableAllocations };
+    Object.keys(newAllocations).forEach(tableId => {
+      if (newAllocations[parseInt(tableId)]?.originalIndex === guest.originalIndex) {
+        delete newAllocations[parseInt(tableId)];
+      }
+    });
+    setTableAllocations(newAllocations);
 
     toast({
       title: "✅ Guest Seated",
-      description: `${selectedGuest.name} has been seated successfully`,
+      description: `${guest.name} has been seated successfully`,
     });
   };
 
@@ -100,12 +112,10 @@ const TableAllocation = ({
   };
 
   const getTableStatus = (tableId: number) => {
-    const allocatedGuest = checkedInGuests.find(guest => 
-      guest.hasTableAllocated && !guest.hasBeenSeated
-    );
+    const allocatedGuest = tableAllocations[tableId];
     
     if (allocatedGuest) {
-      return 'allocated';
+      return allocatedGuest.hasBeenSeated ? 'occupied' : 'allocated';
     }
     
     return 'available';
@@ -120,6 +130,8 @@ const TableAllocation = ({
     }
     
     switch (status) {
+      case 'occupied':
+        return 'bg-red-100 text-red-800 border-red-300';
       case 'allocated':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       default:
@@ -127,44 +139,62 @@ const TableAllocation = ({
     }
   };
 
-  const renderTable = (tableId: number, position: string = '') => (
-    <div key={tableId} className="flex flex-col items-center space-y-1">
-      <Button
-        variant="outline"
-        className={`h-12 w-16 text-xs font-medium transition-colors ${getTableStyle(tableId)}`}
-        onClick={() => handleTableSelect(tableId)}
-        disabled={!selectedGuest}
-      >
-        <div className="text-center">
-          <div className="font-bold">T{tableId}</div>
-          <div className="text-xs opacity-75">{tableCapacities[tableId]}</div>
+  const renderTable = (tableId: number, position: string = '') => {
+    const allocatedGuest = tableAllocations[tableId];
+    
+    return (
+      <div key={tableId} className="flex flex-col items-center space-y-1">
+        <Button
+          variant="outline"
+          className={`h-16 w-20 text-xs font-medium transition-colors ${getTableStyle(tableId)}`}
+          onClick={() => handleTableSelect(tableId)}
+          disabled={!selectedGuest || getTableStatus(tableId) === 'occupied'}
+        >
+          <div className="text-center">
+            <div className="font-bold">T{tableId}</div>
+            <div className="text-xs opacity-75">({tableCapacities[tableId]})</div>
+            {allocatedGuest && (
+              <div className="text-xs mt-1 font-medium">
+                {allocatedGuest.name.split(' ')[0]}
+                {allocatedGuest.pagerNumber && (
+                  <div className="text-xs">P#{allocatedGuest.pagerNumber}</div>
+                )}
+              </div>
+            )}
+          </div>
+        </Button>
+        
+        <div className="flex items-center space-x-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 w-6 p-0"
+            onClick={() => adjustTableCapacity(tableId, -1)}
+          >
+            <Minus className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 w-6 p-0"
+            onClick={() => adjustTableCapacity(tableId, 1)}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
         </div>
-      </Button>
-      
-      <div className="flex items-center space-x-1">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 w-6 p-0"
-          onClick={() => adjustTableCapacity(tableId, -1)}
-        >
-          <Minus className="h-3 w-3" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 w-6 p-0"
-          onClick={() => adjustTableCapacity(tableId, 1)}
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
+        
+        {allocatedGuest && !allocatedGuest.hasBeenSeated && (
+          <Button
+            size="sm"
+            onClick={() => seatGuest(allocatedGuest)}
+            className="text-xs bg-green-600 hover:bg-green-700"
+          >
+            Seat Now
+          </Button>
+        )}
       </div>
-      
-      {position && (
-        <div className="text-xs text-gray-500">{position}</div>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="w-full space-y-6">
@@ -320,7 +350,7 @@ const TableAllocation = ({
                   </Button>
                   
                   <Button
-                    onClick={seatGuest}
+                    onClick={() => selectedGuest && seatGuest(selectedGuest)}
                     className="flex-1 bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
