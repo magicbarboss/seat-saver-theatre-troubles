@@ -292,11 +292,23 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED VERSION
+  // Extract package information from ticket type fields - ENHANCED DEBUG VERSION
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
-    console.log('Checking package for guest:', guest.booker_name, 'Available fields:', Object.keys(guest));
+    console.log('Checking package for guest:', guest.booker_name, 'Booking code:', guest.booking_code);
+    console.log('All guest fields:', Object.keys(guest));
+    
+    // Special debug for Steven McCoubrey
+    if (guest.booking_code === 'JXBR-260625') {
+      console.log('*** STEVEN MCCOUBREY DEBUG ***');
+      console.log('Full guest object:', guest);
+      for (const [fieldName, value] of Object.entries(guest)) {
+        if (value && value !== '' && value !== '0') {
+          console.log(`Non-empty field "${fieldName}": "${value}"`);
+        }
+      }
+    }
     
     // Find fields that contain ticket information by checking all field names
     for (const [fieldName, value] of Object.entries(guest)) {
@@ -321,6 +333,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         } else if ((fieldLower.includes('induces 2 soft drinks') || fieldLower.includes('includes 2 soft drinks')) && fieldLower.includes('pizza')) {
           return '2 Soft Drinks + 9" Pizza';
         } else if (fieldLower.includes('comedy ticket plus 9') && fieldLower.includes('pizza')) {
+          console.log('*** FOUND COMEDY TICKET PLUS 9 PIZZA ***');
           return '9" Pizza';
         } else if (fieldLower.includes('+ 9') && fieldLower.includes('pizza')) {
           return '9" Pizza';
