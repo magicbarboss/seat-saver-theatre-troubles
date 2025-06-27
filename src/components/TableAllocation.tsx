@@ -139,25 +139,32 @@ const TableAllocation = ({
     }
   };
 
-  const renderTable = (tableId: number, position: string = '') => {
+  const renderTable = (tableId: number) => {
     const allocatedGuest = tableAllocations[tableId];
+    const frontSeats = Math.ceil(tableCapacities[tableId] / 2);
+    const backSeats = Math.floor(tableCapacities[tableId] / 2);
     
     return (
-      <div key={tableId} className="flex flex-col items-center space-y-1">
+      <div key={tableId} className="flex flex-col items-center space-y-2">
         <Button
           variant="outline"
-          className={`h-16 w-20 text-xs font-medium transition-colors ${getTableStyle(tableId)}`}
+          className={`h-20 w-24 text-xs font-medium transition-colors relative ${getTableStyle(tableId)}`}
           onClick={() => handleTableSelect(tableId)}
           disabled={!selectedGuest || getTableStatus(tableId) === 'occupied'}
         >
-          <div className="text-center">
-            <div className="font-bold">T{tableId}</div>
-            <div className="text-xs opacity-75">({tableCapacities[tableId]})</div>
+          <div className="text-center w-full">
+            <div className="font-bold text-sm">T{tableId}</div>
+            <div className="text-xs mt-1">
+              <div>{frontSeats} front</div>
+              <div>{backSeats} back</div>
+            </div>
             {allocatedGuest && (
-              <div className="text-xs mt-1 font-medium">
-                {allocatedGuest.name.split(' ')[0]}
+              <div className="text-xs mt-1 font-medium border-t pt-1">
+                <div className="truncate">{allocatedGuest.name.split(' ')[0]}</div>
                 {allocatedGuest.pagerNumber && (
-                  <div className="text-xs">P#{allocatedGuest.pagerNumber}</div>
+                  <div className="text-xs font-bold text-purple-700">
+                    P#{allocatedGuest.pagerNumber}
+                  </div>
                 )}
               </div>
             )}
@@ -173,6 +180,7 @@ const TableAllocation = ({
           >
             <Minus className="h-3 w-3" />
           </Button>
+          <span className="text-xs font-medium w-6 text-center">{tableCapacities[tableId]}</span>
           <Button
             size="sm"
             variant="outline"
@@ -301,7 +309,7 @@ const TableAllocation = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-4 text-center">Front Section</h4>
               <div className="flex justify-center space-x-8">
-                {[1, 2, 3].map(tableId => renderTable(tableId, 'Front'))}
+                {[1, 2, 3].map(tableId => renderTable(tableId))}
               </div>
             </div>
 
@@ -309,7 +317,7 @@ const TableAllocation = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-4 text-center">Middle Section</h4>
               <div className="flex justify-center space-x-4">
-                {[4, 5, 6, 7, 8, 9].map(tableId => renderTable(tableId, 'Middle'))}
+                {[4, 5, 6, 7, 8, 9].map(tableId => renderTable(tableId))}
               </div>
             </div>
 
@@ -317,7 +325,7 @@ const TableAllocation = ({
             <div>
               <h4 className="font-medium text-gray-700 mb-4 text-center">Back Section</h4>
               <div className="flex justify-center space-x-8">
-                {[10, 11, 12, 13].map(tableId => renderTable(tableId, 'Back'))}
+                {[10, 11, 12, 13].map(tableId => renderTable(tableId))}
               </div>
             </div>
 
