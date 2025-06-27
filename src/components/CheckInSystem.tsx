@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +10,14 @@ import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
-  [key: string]: string;
+  [key: string]: any;
+  id: string;
+  booking_code: string;
+  booker_name: string;
+  total_quantity: number;
+  is_checked_in: boolean;
+  pager_number: number | null;
+  table_assignments: number[] | null;
 }
 
 interface CheckInSystemProps {
@@ -109,39 +115,62 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
   console.log('Sample guest data:', guests[0]);
+  console.log('All guests:', guests);
 
-  // Improved column detection with more flexible matching
-  const getColumnIndex = (searchTerms: string[]) => {
-    for (const term of searchTerms) {
-      const index = headers.findIndex(header => 
-        header.toLowerCase().includes(term.toLowerCase())
-      );
-      if (index !== -1) {
-        console.log(`Found column "${headers[index]}" at index ${index} for search term "${term}"`);
-        return index;
+  // Group bookings by booking code to identify add-ons
+  const groupedBookings = useMemo(() => {
+    console.log('Processing guests for grouping:', guests.length);
+    const groups = new Map<string, BookingGroup>();
+    
+    guests.forEach((guest, index) => {
+      if (!guest || typeof guest !== 'object') {
+        console.warn(`Invalid guest at index ${index}:`, guest);
+        return;
       }
-    }
-    console.log(`No column found for search terms: ${searchTerms.join(', ')}`);
-    return -1;
+
+      // Use the booking_code directly from the guest object since it's already structured
+      const bookingCode = guest.booking_code || '';
+      console.log(`Guest ${index}: booking_code = "${bookingCode}"`);
+      
+      if (!bookingCode) {
+        console.warn(`No booking code for guest at index ${index}:`, guest);
+        return;
+      }
+      
+      if (!groups.has(bookingCode)) {
+        // First occurrence - this is the main booking
+        console.log(`Creating new group for booking code: ${bookingCode}`);
+        groups.set(bookingCode, {
+          mainBooking: guest,
+          addOns: [],
+          originalIndex: index,
+          addOnIndices: []
+        });
+      } else {
+        // Subsequent occurrence - this is an add-on
+        console.log(`Adding to existing group for booking code: ${bookingCode}`);
+        const group = groups.get(bookingCode)!;
+        group.addOns.push(guest);
+        group.addOnIndices.push(index);
+      }
+    });
+    
+    const result = Array.from(groups.values());
+    console.log(`Created ${result.length} booking groups from ${guests.length} guests`);
+    console.log('Sample booking group:', result[0]);
+    return result;
+  }, [guests]);
+
+  // Extract guest name from booker field
+  const extractGuestName = (bookerName: string) => {
+    if (!bookerName) return 'Unknown Guest';
+    return bookerName.trim();
   };
 
-  const bookerIndex = getColumnIndex(['booker', 'name', 'customer']);
-  const totalQtyIndex = getColumnIndex(['total quantity', 'quantity', 'qty', 'guests', 'pax']);
-  const noteIndex = getColumnIndex(['note', 'notes', 'message', 'comment']);
-  const itemIndex = getColumnIndex(['item', 'show', 'product']);
-  const bookingCodeIndex = getColumnIndex(['booking code', 'code', 'reference', 'booking ref']);
-
-  console.log('Column indices:', {
-    booker: bookerIndex,
-    totalQty: totalQtyIndex,
-    note: noteIndex,
-    item: itemIndex,
-    bookingCode: bookingCodeIndex
-  });
-
-  // Extract show time from Column B (Item field) - looking for [7:00pm] or [9:00pm] patterns
-  const extractShowTime = (itemField: string) => {
-    if (!itemField) return 'Unknown';
+  // Get show time from item field
+  const getShowTime = (guest: Guest) => {
+    if (!guest || typeof guest !== 'object') return 'Unknown';
+    const itemField = guest.Item || guest.item_details || '';
     
     // Look for time patterns in square brackets like [7:00pm] or [9:00pm]
     const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
@@ -157,122 +186,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return 'Unknown';
   };
 
-  // Check if an item is an add-on (doesn't contain show time info)
-  const isAddOn = (itemField: string) => {
-    if (!itemField) return false;
-    
-    // If it contains show time info, it's a main booking
-    const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
-    if (timeMatch) return false;
-    
-    // If it doesn't contain show time info, it's likely an add-on
-    return true;
-  };
-
-  // Group bookings by booking code to identify add-ons
-  const groupedBookings = useMemo(() => {
-    const groups = new Map<string, BookingGroup>();
-    
-    guests.forEach((guest, index) => {
-      if (!guest || typeof guest !== 'object') {
-        console.warn(`Invalid guest at index ${index}:`, guest);
-        return;
-      }
-
-      const bookingCode = bookingCodeIndex >= 0 && guest[bookingCodeIndex] ? guest[bookingCodeIndex] : '';
-      const itemField = itemIndex >= 0 && guest[itemIndex] ? guest[itemIndex] : '';
-      
-      if (!bookingCode) return;
-      
-      if (!groups.has(bookingCode)) {
-        // First occurrence - this is the main booking
-        groups.set(bookingCode, {
-          mainBooking: guest,
-          addOns: [],
-          originalIndex: index,
-          addOnIndices: []
-        });
-      } else {
-        // Subsequent occurrence - this is an add-on
-        const group = groups.get(bookingCode)!;
-        group.addOns.push(guest);
-        group.addOnIndices.push(index);
-      }
-    });
-    
-    return Array.from(groups.values());
-  }, [guests, bookingCodeIndex, itemIndex]);
-
-  // Get ticket types from columns I to AG (indices 8 to 32) - handling duplicates
-  const getTicketTypes = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return [];
-
-    const ticketTypes: string[] = [];
-    const seenTickets = new Set<string>(); // Track seen ticket types to avoid duplicates
-    
-    // Check columns I through AG (indices 8-32)
-    for (let i = 8; i <= 32 && i < headers.length; i++) {
-      const value = guest[i];
-      if (value && value.trim() !== '' && value !== '0') {
-        const header = headers[i];
-        // Only include if it looks like a ticket quantity
-        if (!isNaN(parseInt(value))) {
-          const ticketDisplay = `${value}x ${header}`;
-          // Only add if we haven't seen this exact ticket type before
-          if (!seenTickets.has(header)) {
-            ticketTypes.push(ticketDisplay);
-            seenTickets.add(header);
-          } else {
-            // If duplicate header, add the quantity to existing one
-            const existingIndex = ticketTypes.findIndex(ticket => ticket.includes(header));
-            if (existingIndex >= 0) {
-              const existingQty = parseInt(ticketTypes[existingIndex].split('x')[0]);
-              const newQty = existingQty + parseInt(value);
-              ticketTypes[existingIndex] = `${newQty}x ${header}`;
-            }
-          }
-        }
-      }
-    }
-    
-    return ticketTypes;
-  };
-
-  // Extract guest name from booker field
-  const extractGuestName = (bookerField: string) => {
-    if (!bookerField) return 'Unknown Guest';
-    
-    // If it's already a clean name, return it
-    if (bookerField.match(/^[A-Za-z\s]+$/)) {
-      return bookerField.trim();
-    }
-    
-    // Clean up the booker field to get just the name
-    const parts = bookerField.split(',');
-    for (const part of parts) {
-      const trimmed = part.trim();
-      if (trimmed.match(/^[A-Za-z\s]+$/) && trimmed.length > 1 && !trimmed.includes('@')) {
-        return trimmed;
-      }
-    }
-    
-    return parts.length > 2 ? parts[2].trim() : parts[0].trim();
-  };
-
-  // Get show time from item field (Column B)
-  const getShowTime = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Unknown';
-    const itemField = itemIndex >= 0 && guest[itemIndex] ? guest[itemIndex] : '';
-    return extractShowTime(itemField);
-  };
-
   // Filter bookings based on search and show time
   const filteredBookings = useMemo(() => {
-    return groupedBookings.filter((booking) => {
+    const result = groupedBookings.filter((booking) => {
       if (!booking || !booking.mainBooking) return false;
 
-      const bookerField = bookerIndex >= 0 && booking.mainBooking[bookerIndex] ? booking.mainBooking[bookerIndex] : '';
-      const guestName = extractGuestName(bookerField);
+      const guestName = extractGuestName(booking.mainBooking.booker_name || '');
       const showTime = getShowTime(booking.mainBooking);
       
       const matchesSearch = searchTerm === '' || 
@@ -282,7 +201,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       
       return matchesSearch && matchesShow;
     });
-  }, [groupedBookings, searchTerm, showFilter, bookerIndex, itemIndex]);
+    
+    console.log(`Filtered bookings: ${result.length} from ${groupedBookings.length} total`);
+    return result;
+  }, [groupedBookings, searchTerm, showFilter]);
 
   // Get available pagers (not currently assigned)
   const getAvailablePagers = () => {
@@ -296,7 +218,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setPagerAssignments(newAssignments);
     
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "📟 Pager Assigned",
@@ -308,7 +230,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   const bypassPager = (guestIndex: number) => {
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "✅ Pager Bypassed",
@@ -323,7 +245,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const guest = guests[mainIndex];
     if (!guest) return;
 
-    const guestName = extractGuestName(bookerIndex >= 0 && guest[bookerIndex] ? guest[bookerIndex] : '');
+    const guestName = extractGuestName(guest.booker_name || '');
     
     if (newCheckedIn.has(mainIndex)) {
       // Check out - remove pager assignment, allocated status and seated status
@@ -403,7 +325,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setGuestTableAllocations(newGuestTableAllocations);
     
     const guest = guests[guestIndex];
-    const guestName = extractGuestName(bookerIndex >= 0 && guest && guest[bookerIndex] ? guest[bookerIndex] : '');
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "📍 Table Allocated",
@@ -424,8 +346,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const guest = guests[guestIndex];
       if (!guest) return null;
 
-      const guestName = extractGuestName(bookerIndex >= 0 && guest[bookerIndex] ? guest[bookerIndex] : '');
-      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
+      const guestName = extractGuestName(guest.booker_name || '');
+      const totalQty = guest.total_quantity || 1;
       const showTime = getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
@@ -447,8 +369,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const getTotalGuestsCount = () => {
     return filteredBookings.reduce((total, booking) => {
       if (!booking || !booking.mainBooking) return total;
-      const totalQty = parseInt(totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1');
-      return total + (isNaN(totalQty) ? 0 : totalQty);
+      const totalQty = booking.mainBooking.total_quantity || 1;
+      return total + totalQty;
     }, 0);
   };
 
@@ -464,8 +386,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
-      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
-      return total + (isNaN(totalQty) ? 0 : totalQty);
+      const totalQty = guest.total_quantity || 1;
+      return total + totalQty;
     }, 0);
   };
 
@@ -481,8 +403,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
-      const totalQty = parseInt(totalQtyIndex >= 0 && guest[totalQtyIndex] ? guest[totalQtyIndex] : '1');
-      return total + (isNaN(totalQty) ? 0 : totalQty);
+      const totalQty = guest.total_quantity || 1;
+      return total + totalQty;
     }, 0);
   };
 
@@ -493,17 +415,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       if (!booking || !booking.mainBooking) return;
       
       const showTime = getShowTime(booking.mainBooking);
-      const totalQty = parseInt(totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1');
-      const safeQty = isNaN(totalQty) ? 0 : totalQty;
+      const totalQty = booking.mainBooking.total_quantity || 1;
       
       if (showTime === '7:00pm' || showTime === '7pm') {
-        stats['7:00pm'] += safeQty;
+        stats['7:00pm'] += totalQty;
       } else if (showTime === '8:00pm' || showTime === '8pm') {
-        stats['8:00pm'] += safeQty;
+        stats['8:00pm'] += totalQty;
       } else if (showTime === '9:00pm' || showTime === '9pm') {
-        stats['9:00pm'] += safeQty;
+        stats['9:00pm'] += totalQty;
       } else {
-        stats['Unknown'] += safeQty;
+        stats['Unknown'] += totalQty;
       }
     });
     
@@ -515,12 +436,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       {/* Debug info - remove this after fixing */}
       <div className="bg-yellow-50 p-4 rounded border">
         <h4 className="font-semibold text-sm">Debug Info:</h4>
-        <p className="text-xs">Headers: {headers.join(', ')}</p>
-        <p className="text-xs">Booker Index: {bookerIndex} ({bookerIndex >= 0 ? headers[bookerIndex] : 'Not found'})</p>
-        <p className="text-xs">Total Qty Index: {totalQtyIndex} ({totalQtyIndex >= 0 ? headers[totalQtyIndex] : 'Not found'})</p>
-        <p className="text-xs">Item Index: {itemIndex} ({itemIndex >= 0 ? headers[itemIndex] : 'Not found'})</p>
-        <p className="text-xs">Ticket columns (I-AG): {headers.slice(8, 33).join(', ')}</p>
-        <p className="text-xs">Grouped bookings: {groupedBookings.length}</p>
+        <p className="text-xs">Total Guests: {guests.length}</p>
+        <p className="text-xs">Grouped Bookings: {groupedBookings.length}</p>
+        <p className="text-xs">Filtered Bookings: {filteredBookings.length}</p>
         <p className="text-xs">Available pagers: {getAvailablePagers().length}/12</p>
         <p className="text-xs">Allocated guests: {allocatedGuests.size}</p>
         <p className="text-xs">Seated guests: {seatedGuests.size}</p>
@@ -570,7 +488,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           {selectedGuestForPager !== null && (
             <div className="space-y-4">
               <p className="text-gray-700">
-                Assign a pager to <strong>{extractGuestName(bookerIndex >= 0 && guests[selectedGuestForPager] && guests[selectedGuestForPager][bookerIndex] ? guests[selectedGuestForPager][bookerIndex] : '')}</strong>
+                Assign a pager to <strong>{extractGuestName(guests[selectedGuestForPager] && guests[selectedGuestForPager].booker_name ? guests[selectedGuestForPager].booker_name : '')}</strong>
               </p>
               
               <div className="space-y-3">
@@ -681,8 +599,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Ticket Types</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Add-Ons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
@@ -699,12 +615,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   
-                  const bookingCode = bookingCodeIndex >= 0 && booking.mainBooking[bookingCodeIndex] ? booking.mainBooking[bookingCodeIndex] : '';
-                  const booker = extractGuestName(bookerIndex >= 0 && booking.mainBooking[bookerIndex] ? booking.mainBooking[bookerIndex] : '');
-                  const totalQty = totalQtyIndex >= 0 && booking.mainBooking[totalQtyIndex] ? booking.mainBooking[totalQtyIndex] : '1';
+                  const bookingCode = booking.mainBooking.booking_code || '';
+                  const booker = extractGuestName(booking.mainBooking.booker_name || '');
+                  const totalQty = booking.mainBooking.total_quantity || 1;
                   const showTime = getShowTime(booking.mainBooking);
-                  const ticketTypes = getTicketTypes(booking.mainBooking);
-                  const note = noteIndex >= 0 && booking.mainBooking[noteIndex] ? booking.mainBooking[noteIndex] : '';
+                  const note = booking.mainBooking.Note || booking.mainBooking.notes || '';
                   
                   return (
                     <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : 'hover:bg-gray-50'} transition-colors`}>
@@ -738,36 +653,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getShowTimeBadgeStyle(showTime)}`}>
                           {showTime}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-700 max-w-xs">
-                          {ticketTypes.length > 0 ? (
-                            <div className="space-y-1">
-                              {ticketTypes.map((ticket, idx) => (
-                                <div key={idx} className="bg-blue-50 px-2 py-1 rounded text-xs">
-                                  {ticket}
-                                </div>
-                              ))}
-                            </div>
-                          ) : 'No tickets'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-700 max-w-xs">
-                          {booking.addOns.length > 0 ? (
-                            <div className="space-y-1">
-                              {booking.addOns.map((addOn, idx) => {
-                                const addOnItem = itemIndex >= 0 && addOn[itemIndex] ? addOn[itemIndex] : '';
-                                return (
-                                  <div key={idx} className="bg-orange-50 px-2 py-1 rounded text-xs flex items-center">
-                                    <Plus className="h-3 w-3 mr-1 text-orange-600" />
-                                    {addOnItem}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : 'No add-ons'}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-center">
