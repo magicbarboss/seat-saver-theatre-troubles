@@ -292,7 +292,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields
+  // Extract package information from ticket type fields - FIXED VERSION
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
@@ -320,6 +320,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           return '2 Soft Drinks + 9" Pizza';
         } else if ((fieldLower.includes('induces 2 soft drinks') || fieldLower.includes('includes 2 soft drinks')) && fieldLower.includes('pizza')) {
           return '2 Soft Drinks + 9" Pizza';
+        } else if (fieldLower.includes('comedy ticket plus 9') && fieldLower.includes('pizza')) {
+          return '9" Pizza';
         } else if (fieldLower.includes('+ 9') && fieldLower.includes('pizza')) {
           return '9" Pizza';
         } else if (fieldLower.includes('plus 9') && fieldLower.includes('pizza')) {
