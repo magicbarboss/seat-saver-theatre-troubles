@@ -128,8 +128,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   console.log('Sample guest data:', guests[0]);
   console.log('All guests:', guests);
 
-  // Party detection logic
+  // Extract guest name from booker field
+  const extractGuestName = (bookerName: string) => {
+    if (!bookerName) return 'Unknown Guest';
+    return bookerName.trim();
+  };
+
+  // Party detection logic - Fixed variable initialization
   const detectPartyConnections = useMemo(() => {
+    if (!guests || guests.length === 0) return new Map<string, PartyGroup>();
+    
     const connections = new Map<string, PartyGroup>();
     
     guests.forEach((guest, index) => {
@@ -446,12 +454,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
     
     return notes.filter(note => note && note.trim() !== '').join(' | ');
-  };
-
-  // Extract guest name from booker field
-  const extractGuestName = (bookerName: string) => {
-    if (!bookerName) return 'Unknown Guest';
-    return bookerName.trim();
   };
 
   // Get show time from item field
