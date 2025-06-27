@@ -165,53 +165,48 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
-    // All the possible ticket type fields from the data
-    const ticketTypeFields = [
-      'Adult Show Ticket includes 2 Drinks',
-      'Comedy ticket plus 9" Pizza', 
-      'OLD Groupon Offer (per person - extras are already included)',
-      'Adult Comedy & Magic Show Ticket + 9" Pizza',
-      'Adult Show Ticket includes 2 Drinks + 9" Pizza',
-      'Adult Show Ticket includes 2 soft drinks',
-      'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
-      'Adult Comedy Magic Show ticket',
-      'Smoke Offer Ticket includes Drink (minimum x2)',
-      'Groupon Magic & Pints Package (per person)',
-      'Groupon Magic & Cocktails Package (per person)',
-      'Wowcher Magic & Cocktails Package (per person)'
-    ];
-    
     console.log('Checking package for guest:', guest.booker_name, 'Available fields:', Object.keys(guest));
     
-    // Find the ticket type and extract package info
-    for (const field of ticketTypeFields) {
-      const value = guest[field];
-      console.log(`Checking field "${field}": value = "${value}"`);
+    // Find fields that contain ticket information by checking all field names
+    for (const [fieldName, value] of Object.entries(guest)) {
+      // Skip non-ticket fields
+      if (['id', 'booking_code', 'booker_name', 'total_quantity', 'is_checked_in', 'pager_number', 'table_assignments', 'DIET', 'Item', 'Note', 'Magic', 'TERMS', 'Total', 'Booker', 'Guests', 'Status', 'Viator', 'Booking', 'Friends', 'Via-Cust', 'GlutenBase', 'Booking Code', 'Bottle of Wine', 'Total Quantity', 'Prosecco add on', 'How did you hear', 'Groupon SECURITY CODE', 'Stay up to date on our newsletter.', 'Salt & Pepper Fries', 'Vegan'].includes(fieldName)) {
+        continue;
+      }
       
+      console.log(`Checking field "${fieldName}": value = "${value}"`);
+      
+      // Check if this field has a non-zero value indicating it's an active ticket type
       if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
-        console.log(`Found active ticket type: ${field} with value: ${value}`);
+        console.log(`Found active ticket type: ${fieldName} with value: ${value}`);
         
-        // Extract package information based on what's included
-        if (field.includes('includes 2 Drinks + 9" Pizza')) {
+        const fieldLower = fieldName.toLowerCase();
+        
+        // Extract package information based on what's included in the field name
+        if (fieldLower.includes('includes 2 drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
           return '2 Drinks + 9" Pizza';
-        } else if (field.includes('+ 9" Pizza')) {
-          return '9" Pizza';
-        } else if (field.includes('includes 2 Drinks')) {
-          return '2 Drinks';
-        } else if (field.includes('includes 2 soft drinks + 9" PIzza')) {
+        } else if (fieldLower.includes('includes 2 soft drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
           return '2 Soft Drinks + 9" Pizza';
-        } else if (field.includes('includes 2 soft drinks')) {
-          return '2 Soft Drinks';
-        } else if (field.includes('plus 9" Pizza')) {
+        } else if ((fieldLower.includes('induces 2 soft drinks') || fieldLower.includes('includes 2 soft drinks')) && fieldLower.includes('pizza')) {
+          return '2 Soft Drinks + 9" Pizza';
+        } else if (fieldLower.includes('+ 9') && fieldLower.includes('pizza')) {
           return '9" Pizza';
-        } else if (field.includes('Magic & Pints Package')) {
+        } else if (fieldLower.includes('plus 9') && fieldLower.includes('pizza')) {
+          return '9" Pizza';
+        } else if (fieldLower.includes('includes 2 drinks')) {
+          return '2 Drinks';
+        } else if (fieldLower.includes('includes 2 soft drinks')) {
+          return '2 Soft Drinks';
+        } else if (fieldLower.includes('magic & pints package')) {
           return 'Pints Package';
-        } else if (field.includes('Magic & Cocktails Package')) {
+        } else if (fieldLower.includes('magic & cocktails package')) {
           return 'Cocktails Package';
-        } else if (field.includes('Smoke Offer')) {
+        } else if (fieldLower.includes('smoke offer') && fieldLower.includes('drink')) {
           return 'Drinks (min x2)';
-        } else if (field.includes('Groupon') || field.includes('OLD Groupon')) {
+        } else if (fieldLower.includes('groupon')) {
           return 'Groupon Package';
+        } else if (fieldLower.includes('wowcher')) {
+          return 'Wowcher Package';
         } else {
           return 'Show Only';
         }
