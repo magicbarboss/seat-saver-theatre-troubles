@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -228,6 +229,29 @@ const TableAllocation = ({
                             Table Allocated - Ready to Page
                           </Badge>
                         </div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      {guest.pagerNumber ? (
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (guest.pagerNumber) {
+                              // This would trigger the pager
+                              toast({
+                                title: "📟 Pager Called",
+                                description: `Paging ${guest.name} on pager #${guest.pagerNumber}`,
+                              });
+                            }
+                          }}
+                        >
+                          <Phone className="h-4 w-4 mr-1" />
+                          Page #{guest.pagerNumber}
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary">No Pager</Badge>
                       )}
                     </div>
                   </div>
