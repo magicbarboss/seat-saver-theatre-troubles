@@ -117,7 +117,7 @@ const GuestManager = () => {
       if (data && data.length > 0) {
         console.log('Available headers:', Object.keys(data[0].ticket_data || {}));
         console.log('Sample guest data:', {
-          ...data[0].ticket_data,
+          ...(data[0].ticket_data || {}),
           id: data[0].id,
           booking_code: data[0].booking_code,
           booker_name: data[0].booker_name,
@@ -160,7 +160,7 @@ const GuestManager = () => {
   if (showCheckIn && activeGuestList && guests.length > 0) {
     // Transform guests data for CheckInSystem
     const transformedGuests = guests.map(guest => ({
-      ...guest.ticket_data,
+      ...(guest.ticket_data || {}),
       id: guest.id,
       booking_code: guest.booking_code,
       booker_name: guest.booker_name,
