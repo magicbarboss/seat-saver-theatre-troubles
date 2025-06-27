@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -178,7 +179,13 @@ const GuestManager = () => {
       };
     });
 
-    const headers = guests.length > 0 ? Object.keys(guests[0].ticket_data || {}) : [];
+    // Fix headers calculation to use the same validation logic
+    const firstGuestTicketData = guests[0]?.ticket_data;
+    const isFirstGuestDataValid = firstGuestTicketData && typeof firstGuestTicketData === 'object' && !Array.isArray(firstGuestTicketData);
+    const headers = guests.length > 0 ? Object.keys(isFirstGuestDataValid ? firstGuestTicketData : {}) : [];
+
+    console.log('Transformed guests for CheckInSystem:', transformedGuests.slice(0, 2));
+    console.log('Headers for CheckInSystem:', headers);
 
     return (
       <div className="space-y-4">
