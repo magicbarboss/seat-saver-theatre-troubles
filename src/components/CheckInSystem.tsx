@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -42,6 +42,14 @@ interface CheckedInGuest {
   hasTableAllocated?: boolean;
 }
 
+interface PartyGroup {
+  id: string;
+  bookingIndices: number[];
+  totalGuests: number;
+  guestNames: string[];
+  connectionType: 'mutual' | 'one-way';
+}
+
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState('all');
@@ -55,6 +63,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
+  const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
 
   // Load state on component mount (only once)
   useEffect(() => {
@@ -68,6 +77,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           setSeatedGuests(new Set(state.seatedGuests || []));
           setAllocatedGuests(new Set(state.allocatedGuests || []));
           setGuestTableAllocations(new Map(state.guestTableAllocations || []));
+          setPartyGroups(new Map(state.partyGroups || []));
           console.log('Loaded saved state from', state.timestamp);
           
           toast({
@@ -95,6 +105,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         seatedGuests: Array.from(seatedGuests),
         allocatedGuests: Array.from(allocatedGuests),
         guestTableAllocations: Array.from(guestTableAllocations.entries()),
+        partyGroups: Array.from(partyGroups.entries()),
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('checkin-system-state', JSON.stringify(state));
@@ -110,12 +121,124 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
   console.log('Sample guest data:', guests[0]);
   console.log('All guests:', guests);
+
+  // Party detection logic
+  const detectPartyConnections = useMemo(() => {
+    const connections = new Map<string, PartyGroup>();
+    
+    guests.forEach((guest, index) => {
+      if (!guest || !guest.Friends) return;
+      
+      const friendsField = guest.Friends.toString().toLowerCase();
+      const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
+      
+      // Find other guests whose names are mentioned in this guest's Friends field
+      guests.forEach((otherGuest, otherIndex) => {
+        if (index === otherIndex || !otherGuest) return;
+        
+        const otherGuestName = extractGuestName(otherGuest.booker_name || '').toLowerCase();
+        const otherFriendsField = otherGuest.Friends ? otherGuest.Friends.toString().toLowerCase() : '';
+        
+        // Check if guest mentions otherGuest
+        if (friendsField.includes(otherGuestName) || otherFriendsField.includes(guestName)) {
+          const partyId = [index, otherIndex].sort().join('-');
+          
+          if (!connections.has(partyId)) {
+            const isMutual = friendsField.includes(otherGuestName) && otherFriendsField.includes(guestName);
+            const totalGuests = (guest.total_quantity || 1) + (otherGuest.total_quantity || 1);
+            
+            connections.set(partyId, {
+              id: partyId,
+              bookingIndices: [index, otherIndex],
+              totalGuests: totalGuests,
+              guestNames: [
+                extractGuestName(guest.booker_name || ''),
+                extractGuestName(otherGuest.booker_name || '')
+              ],
+              connectionType: isMutual ? 'mutual' : 'one-way'
+            });
+          }
+        }
+      });
+    });
+    
+    return connections;
+  }, [guests]);
+
+  // Update party groups when connections change
+  useEffect(() => {
+    setPartyGroups(detectPartyConnections);
+  }, [detectPartyConnections]);
+
+  // Function to get party group for a guest
+  const getPartyGroup = (guestIndex: number): PartyGroup | null => {
+    for (const [, party] of partyGroups) {
+      if (party.bookingIndices.includes(guestIndex)) {
+        return party;
+      }
+    }
+    return null;
+  };
+
+  // Function to check in entire party
+  const handlePartyCheckIn = (partyGroup: PartyGroup) => {
+    let allCheckedIn = true;
+    
+    partyGroup.bookingIndices.forEach(index => {
+      if (!checkedInGuests.has(index)) {
+        allCheckedIn = false;
+      }
+    });
+
+    if (allCheckedIn) {
+      // Check out entire party
+      const newCheckedIn = new Set(checkedInGuests);
+      const newPagerAssignments = new Map(pagerAssignments);
+      const newSeatedGuests = new Set(seatedGuests);
+      const newAllocatedGuests = new Set(allocatedGuests);
+      const newGuestTableAllocations = new Map(guestTableAllocations);
+
+      partyGroup.bookingIndices.forEach(index => {
+        newCheckedIn.delete(index);
+        newPagerAssignments.delete(index);
+        newSeatedGuests.delete(index);
+        newAllocatedGuests.delete(index);
+        newGuestTableAllocations.delete(index);
+      });
+
+      setCheckedInGuests(newCheckedIn);
+      setPagerAssignments(newPagerAssignments);
+      setSeatedGuests(newSeatedGuests);
+      setAllocatedGuests(newAllocatedGuests);
+      setGuestTableAllocations(newGuestTableAllocations);
+
+      toast({
+        title: "✅ Party Checked Out",
+        description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked out`,
+      });
+    } else {
+      // Check in entire party
+      const newCheckedIn = new Set(checkedInGuests);
+      partyGroup.bookingIndices.forEach(index => {
+        newCheckedIn.add(index);
+      });
+      setCheckedInGuests(newCheckedIn);
+      
+      // Assign pager to first guest in party
+      setSelectedGuestForPager(partyGroup.bookingIndices[0]);
+      
+      toast({
+        title: "🎉 Party Checked In",
+        description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked in together`,
+      });
+    }
+  };
 
   // Group bookings by booking code to identify add-ons
   const groupedBookings = useMemo(() => {
@@ -506,7 +629,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Add function to get checked-in guests data for table allocation
   const getCheckedInGuestsData = (): CheckedInGuest[] => {
-    return Array.from(checkedInGuests).map(guestIndex => {
+    const checkedInData = Array.from(checkedInGuests).map(guestIndex => {
       const guest = guests[guestIndex];
       if (!guest) return null;
 
@@ -527,6 +650,39 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         hasTableAllocated: hasTableAllocated
       };
     }).filter(Boolean) as CheckedInGuest[];
+
+    // Add party groups to the checked-in data
+    const partyData: CheckedInGuest[] = [];
+    for (const [, party] of partyGroups) {
+      const allCheckedIn = party.bookingIndices.every(index => checkedInGuests.has(index));
+      if (allCheckedIn) {
+        const firstGuest = guests[party.bookingIndices[0]];
+        const showTime = getShowTime(firstGuest);
+        const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
+        const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index));
+        const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
+
+        partyData.push({
+          name: `${party.guestNames.join(' & ')} (Party)`,
+          count: party.totalGuests,
+          showTime: showTime,
+          originalIndex: party.bookingIndices[0], // Use first guest's index as reference
+          pagerNumber: pagerNumber,
+          hasBeenSeated: hasBeenSeated,
+          hasTableAllocated: hasTableAllocated
+        });
+
+        // Remove individual entries for party members
+        party.bookingIndices.forEach(index => {
+          const individualIndex = checkedInData.findIndex(guest => guest.originalIndex === index);
+          if (individualIndex !== -1) {
+            checkedInData.splice(individualIndex, 1);
+          }
+        });
+      }
+    }
+
+    return [...checkedInData, ...partyData];
   };
 
   // Calculate total guests for filtered bookings (respects show filter)
@@ -606,6 +762,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Available pagers: {getAvailablePagers().length}/12</p>
         <p className="text-xs">Allocated guests: {allocatedGuests.size}</p>
         <p className="text-xs">Seated guests: {seatedGuests.size}</p>
+        <p className="text-xs">Party connections: {partyGroups.size}</p>
         <div className="flex items-center space-x-2 mt-2">
           <Save className="h-4 w-4 text-green-600" />
           <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
@@ -780,6 +937,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const isAllocated = allocatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
+                  const partyGroup = getPartyGroup(booking.originalIndex);
                   
                   const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
@@ -790,17 +948,30 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const allNotes = getAllNotes(booking);
                   
                   return (
-                    <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : 'hover:bg-gray-50'} transition-colors`}>
+                    <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : partyGroup ? 'bg-pink-50 border-pink-200' : 'hover:bg-gray-50'} transition-colors`}>
                       <TableCell>
-                        <Button
-                          onClick={() => handleCheckIn(booking.originalIndex)}
-                          variant={isCheckedIn ? "destructive" : "default"}
-                          size="sm"
-                          className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
-                          disabled={isSeated}
-                        >
-                          {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
-                        </Button>
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            onClick={() => handleCheckIn(booking.originalIndex)}
+                            variant={isCheckedIn ? "destructive" : "default"}
+                            size="sm"
+                            className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
+                            disabled={isSeated}
+                          >
+                            {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
+                          </Button>
+                          {partyGroup && (
+                            <Button
+                              onClick={() => handlePartyCheckIn(partyGroup)}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-pink-100 hover:bg-pink-200 border-pink-300"
+                            >
+                              <UserPlus className="h-3 w-3 mr-1" />
+                              Party ({partyGroup.totalGuests})
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="font-mono text-sm text-gray-700">
@@ -810,11 +981,21 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       <TableCell>
                         <div className="font-semibold text-gray-900">
                           {booker}
+                          {partyGroup && (
+                            <div className="text-xs text-pink-600 font-medium mt-1">
+                              🔗 Connected to: {partyGroup.guestNames.filter(name => name !== booker).join(', ')}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="text-center">
                           <span className="font-bold text-gray-900 text-xl">{totalQty}</span>
+                          {partyGroup && (
+                            <div className="text-xs text-pink-600 font-medium">
+                              Party: {partyGroup.totalGuests}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -976,6 +1157,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
                   <span className="font-medium text-gray-700">Seated</span>
                   <span className="font-bold text-purple-600 text-xl">{seatedGuests.size}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-pink-50 rounded">
+                  <span className="font-medium text-gray-700">Party Connections</span>
+                  <span className="font-bold text-pink-600 text-xl">{partyGroups.size}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded">
                   <span className="font-medium text-gray-700">Waiting</span>
