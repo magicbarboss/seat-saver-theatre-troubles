@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1189,6 +1190,12 @@ const TableAllocation = ({
           <div className="mb-2">
             <p className="font-medium text-xs">{section.allocatedTo}</p>
             <p className="text-xs text-gray-600">{section.allocatedCount} guests allocated</p>
+            {/* Add pager number display for allocated sections */}
+            {section.allocatedGuest?.pagerNumber && (
+              <Badge className="bg-purple-100 text-purple-800 text-xs mt-1">
+                Pager #{section.allocatedGuest.pagerNumber}
+              </Badge>
+            )}
           </div>
         )}
 
