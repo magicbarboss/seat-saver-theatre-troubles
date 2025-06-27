@@ -115,9 +115,12 @@ const GuestManager = () => {
       console.log(`Found ${data?.length || 0} guests for guest list ${guestListId}:`, data?.slice(0, 3));
       // Add more detailed logging for the guest data structure
       if (data && data.length > 0) {
-        console.log('Available headers:', Object.keys(data[0].ticket_data || {}));
+        const ticketData = data[0].ticket_data;
+        const isValidObject = ticketData && typeof ticketData === 'object' && !Array.isArray(ticketData);
+        
+        console.log('Available headers:', Object.keys(isValidObject ? ticketData : {}));
         console.log('Sample guest data:', {
-          ...(data[0].ticket_data || {}),
+          ...(isValidObject ? ticketData : {}),
           id: data[0].id,
           booking_code: data[0].booking_code,
           booker_name: data[0].booker_name,
@@ -159,16 +162,21 @@ const GuestManager = () => {
 
   if (showCheckIn && activeGuestList && guests.length > 0) {
     // Transform guests data for CheckInSystem
-    const transformedGuests = guests.map(guest => ({
-      ...(guest.ticket_data || {}),
-      id: guest.id,
-      booking_code: guest.booking_code,
-      booker_name: guest.booker_name,
-      total_quantity: guest.total_quantity,
-      is_checked_in: guest.is_checked_in,
-      pager_number: guest.pager_number,
-      table_assignments: guest.table_assignments
-    }));
+    const transformedGuests = guests.map(guest => {
+      const ticketData = guest.ticket_data;
+      const isValidObject = ticketData && typeof ticketData === 'object' && !Array.isArray(ticketData);
+      
+      return {
+        ...(isValidObject ? ticketData : {}),
+        id: guest.id,
+        booking_code: guest.booking_code,
+        booker_name: guest.booker_name,
+        total_quantity: guest.total_quantity,
+        is_checked_in: guest.is_checked_in,
+        pager_number: guest.pager_number,
+        table_assignments: guest.table_assignments
+      };
+    });
 
     const headers = guests.length > 0 ? Object.keys(guests[0].ticket_data || {}) : [];
 
