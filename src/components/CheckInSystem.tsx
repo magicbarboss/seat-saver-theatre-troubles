@@ -292,22 +292,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - ENHANCED DEBUG VERSION
+  // Extract package information from ticket type fields - FIXED VERSION
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     console.log('Checking package for guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-    console.log('All guest fields:', Object.keys(guest));
     
-    // Special debug for Steven McCoubrey
-    if (guest.booking_code === 'JXBR-260625') {
-      console.log('*** STEVEN MCCOUBREY DEBUG ***');
-      console.log('Full guest object:', guest);
-      for (const [fieldName, value] of Object.entries(guest)) {
-        if (value && value !== '' && value !== '0') {
-          console.log(`Non-empty field "${fieldName}": "${value}"`);
-        }
-      }
+    // Check for "Comedy ticket plus 9 Pizza" specifically first
+    if (guest['Comedy ticket plus 9 Pizza'] && guest['Comedy ticket plus 9 Pizza'] !== '' && guest['Comedy ticket plus 9 Pizza'] !== '0') {
+      console.log('Found Comedy ticket plus 9 Pizza:', guest['Comedy ticket plus 9 Pizza']);
+      return '9" Pizza';
     }
     
     // Find fields that contain ticket information by checking all field names
@@ -316,8 +310,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       if (['id', 'booking_code', 'booker_name', 'total_quantity', 'is_checked_in', 'pager_number', 'table_assignments', 'DIET', 'Item', 'Note', 'Magic', 'TERMS', 'Total', 'Booker', 'Guests', 'Status', 'Viator', 'Booking', 'Friends', 'Via-Cust', 'GlutenBase', 'Booking Code', 'Bottle of Wine', 'Total Quantity', 'Prosecco add on', 'How did you hear', 'Groupon SECURITY CODE', 'Stay up to date on our newsletter.', 'Salt & Pepper Fries', 'Vegan'].includes(fieldName)) {
         continue;
       }
-      
-      console.log(`Checking field "${fieldName}": value = "${value}"`);
       
       // Check if this field has a non-zero value indicating it's an active ticket type
       if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
@@ -333,7 +325,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         } else if ((fieldLower.includes('induces 2 soft drinks') || fieldLower.includes('includes 2 soft drinks')) && fieldLower.includes('pizza')) {
           return '2 Soft Drinks + 9" Pizza';
         } else if (fieldLower.includes('comedy ticket plus 9') && fieldLower.includes('pizza')) {
-          console.log('*** FOUND COMEDY TICKET PLUS 9 PIZZA ***');
           return '9" Pizza';
         } else if (fieldLower.includes('+ 9') && fieldLower.includes('pizza')) {
           return '9" Pizza';
