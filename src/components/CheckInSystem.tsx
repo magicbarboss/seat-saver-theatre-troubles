@@ -52,7 +52,7 @@ interface PartyGroup {
 
 const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState('7:00pm'); // Default to 7pm instead of 'all'
+  const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
@@ -486,7 +486,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const matchesSearch = searchTerm === '' || 
         guestName.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesShow = showTime === showFilter;
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
       
       return matchesSearch && matchesShow;
     });
@@ -705,7 +705,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const showTime = getShowTime(guest);
       
       // Only count if matches current show filter
-      const matchesShow = showTime === showFilter;
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
       const totalQty = guest.total_quantity || 1;
@@ -722,7 +722,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const showTime = getShowTime(guest);
       
       // Only count if matches current show filter
-      const matchesShow = showTime === showFilter;
+      const matchesShow = showFilter === 'all' || showTime === showFilter;
       if (!matchesShow) return total;
       
       const totalQty = guest.total_quantity || 1;
@@ -880,6 +880,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <div className="w-80">
                 <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
                 <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={showFilter === 'all' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('all')}
+                    className="flex-1 text-sm"
+                  >
+                    All Shows
+                  </Button>
                   <Button
                     variant={showFilter === '7:00pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('7:00pm')}
