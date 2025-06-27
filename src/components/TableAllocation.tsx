@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -149,8 +148,6 @@ const TableAllocation = ({
     switch (status) {
       case 'allocated':
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'occupied':
-        return 'bg-red-100 text-red-800 border-red-300';
       default:
         return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
     }
@@ -231,29 +228,6 @@ const TableAllocation = ({
                             Table Allocated - Ready to Page
                           </Badge>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      {guest.pagerNumber ? (
-                        <Button
-                          size="sm"
-                          className="bg-purple-600 hover:bg-purple-700"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (guest.pagerNumber) {
-                              // This would trigger the pager
-                              toast({
-                                title: "📟 Pager Called",
-                                description: `Paging ${guest.name} on pager #${guest.pagerNumber}`,
-                              });
-                            }
-                          }}
-                        >
-                          <Phone className="h-4 w-4 mr-1" />
-                          Page #{guest.pagerNumber}
-                        </Button>
-                      ) : (
-                        <Badge variant="secondary">No Pager</Badge>
                       )}
                     </div>
                   </div>
@@ -369,6 +343,11 @@ const TableAllocation = ({
                       <span className="text-gray-600">
                         ({selectedTables.reduce((sum, tableId) => sum + (tables.find(t => t.id === tableId)?.capacity || 0), 0)} total seats)
                       </span>
+                      {selectedGuest.pagerNumber && (
+                        <div className="text-purple-700">
+                          Pager #{selectedGuest.pagerNumber}
+                        </div>
+                      )}
                     </div>
                   )}
                   
