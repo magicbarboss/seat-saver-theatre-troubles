@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -64,6 +65,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
+  const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
 
   // Load state on component mount (only once)
   useEffect(() => {
@@ -78,6 +80,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           setAllocatedGuests(new Set(state.allocatedGuests || []));
           setGuestTableAllocations(new Map(state.guestTableAllocations || []));
           setPartyGroups(new Map(state.partyGroups || []));
+          setBookingComments(new Map(state.bookingComments || []));
           console.log('Loaded saved state from', state.timestamp);
           
           toast({
@@ -106,6 +109,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         allocatedGuests: Array.from(allocatedGuests),
         guestTableAllocations: Array.from(guestTableAllocations.entries()),
         partyGroups: Array.from(partyGroups.entries()),
+        bookingComments: Array.from(bookingComments.entries()),
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('checkin-system-state', JSON.stringify(state));
@@ -121,7 +125,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -759,6 +763,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return stats;
   };
 
+  const handleCommentChange = (guestIndex: number, comment: string) => {
+    const newComments = new Map(bookingComments);
+    if (comment.trim() === '') {
+      newComments.delete(guestIndex);
+    } else {
+      newComments.set(guestIndex, comment);
+    }
+    setBookingComments(newComments);
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
@@ -771,6 +785,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Allocated guests: {allocatedGuests.size}</p>
         <p className="text-xs">Seated guests: {seatedGuests.size}</p>
         <p className="text-xs">Party connections: {partyGroups.size}</p>
+        <p className="text-xs">Comments: {bookingComments.size}</p>
         <div className="flex items-center space-x-2 mt-2">
           <Save className="h-4 w-4 text-green-600" />
           <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
@@ -934,6 +949,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Notes</TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center gap-1">
+                      <MessageSquare className="h-4 w-4" />
+                      Comments
+                    </div>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -946,6 +967,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   const partyGroup = getPartyGroup(booking.originalIndex);
+                  const currentComment = bookingComments.get(booking.originalIndex) || '';
                   
                   const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
@@ -1085,6 +1107,17 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       <TableCell>
                         <div className="text-sm text-gray-600 max-w-xs">
                           {allNotes}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="w-40">
+                          <Textarea
+                            placeholder="Add comments..."
+                            value={currentComment}
+                            onChange={(e) => handleCommentChange(booking.originalIndex, e.target.value)}
+                            className="min-h-[60px] text-xs resize-none"
+                            rows={2}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
