@@ -161,6 +161,70 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
+  // Extract ticket type from Item field
+  const getTicketType = (guest: Guest) => {
+    if (!guest || typeof guest !== 'object') return 'Unknown';
+    const itemField = guest.Item || guest.item_details || '';
+    
+    // Extract the main part before the time bracket
+    const mainPart = itemField.split('[')[0].trim();
+    return mainPart || 'Standard Ticket';
+  };
+
+  // Get all addon information for a guest
+  const getAddons = (guest: Guest) => {
+    if (!guest || typeof guest !== 'object') return [];
+    
+    const addons = [];
+    
+    // Check various addon fields from the console logs
+    const addonFields = [
+      'OLD Groupon Offer (per person - extras are already included)',
+      'Groupon Magic & Cocktails Package (per person)',
+      'Groupon Magic & Pints Package (per person)',
+      'Adult Show Ticket includes 2 Drinks',
+      'Adult Show Ticket includes 2 soft drinks',
+      'Comedy ticket plus 9 Pizza',
+      'Adult Comedy & Magic Show Ticket + 9 Pizza',
+      'Adult Show Ticket includes 2 Drinks + 9 Pizza',
+      'Wowcher Magic & Cocktails Package (per person)',
+      'Smoke Offer Ticket includes Drink (minimum x2)',
+      'Bottle of Wine',
+      'Prosecco add on'
+    ];
+    
+    addonFields.forEach(field => {
+      const value = guest[field];
+      if (value && value !== '' && value !== '0') {
+        addons.push(`${field}: ${value}`);
+      }
+    });
+    
+    return addons;
+  };
+
+  // Consolidate all notes for a booking group
+  const getAllNotes = (booking: BookingGroup) => {
+    const notes = [];
+    
+    // Main booking notes
+    const mainGuest = booking.mainBooking;
+    if (mainGuest.Note) notes.push(mainGuest.Note);
+    if (mainGuest.Magic) notes.push(`Magic: ${mainGuest.Magic}`);
+    if (mainGuest.DIET) notes.push(`Diet: ${mainGuest.DIET}`);
+    if (mainGuest.Friends) notes.push(`Friends: ${mainGuest.Friends}`);
+    if (mainGuest.TERMS) notes.push(`Terms: ${mainGuest.TERMS}`);
+    if (mainGuest.Booking) notes.push(`Booking: ${mainGuest.Booking}`);
+    
+    // Add-on notes (if any)
+    booking.addOns.forEach(addon => {
+      if (addon.Note) notes.push(`Add-on: ${addon.Note}`);
+      if (addon.Magic) notes.push(`Add-on Magic: ${addon.Magic}`);
+    });
+    
+    return notes.filter(note => note && note.trim() !== '').join(' | ');
+  };
+
   // Extract guest name from booker field
   const extractGuestName = (bookerName: string) => {
     if (!bookerName) return 'Unknown Guest';
@@ -598,11 +662,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Ticket Type</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Addons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Note</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -618,8 +684,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
+                  const ticketType = getTicketType(booking.mainBooking);
+                  const addons = getAddons(booking.mainBooking);
                   const showTime = getShowTime(booking.mainBooking);
-                  const note = booking.mainBooking.Note || booking.mainBooking.notes || '';
+                  const allNotes = getAllNotes(booking);
                   
                   return (
                     <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : 'hover:bg-gray-50'} transition-colors`}>
@@ -647,6 +715,29 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       <TableCell>
                         <div className="text-center">
                           <span className="font-bold text-gray-900 text-xl">{totalQty}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-700 max-w-xs">
+                          {ticketType}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-gray-600 max-w-xs">
+                          {addons.length > 0 ? (
+                            <div className="space-y-1">
+                              {addons.slice(0, 2).map((addon, idx) => (
+                                <div key={idx} className="bg-blue-50 px-2 py-1 rounded text-xs">
+                                  {addon.length > 40 ? addon.substring(0, 40) + '...' : addon}
+                                </div>
+                              ))}
+                              {addons.length > 2 && (
+                                <div className="text-xs text-gray-500">+{addons.length - 2} more</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">None</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -704,7 +795,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-gray-600 max-w-xs">
-                          {note}
+                          {allNotes}
                         </div>
                       </TableCell>
                     </TableRow>
