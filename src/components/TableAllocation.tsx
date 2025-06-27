@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface CheckedInGuest {
@@ -16,6 +17,7 @@ interface CheckedInGuest {
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
   notes?: string;
+  isWalkIn?: boolean;
 }
 
 interface TableAllocationProps {
@@ -24,6 +26,7 @@ interface TableAllocationProps {
   onPagerRelease: (pagerNumber: number) => void;
   onGuestSeated: (guestIndex: number) => void;
   onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
+  onAddWalkIn?: (walkInGuest: { name: string; count: number; showTime: string; notes?: string }) => void;
 }
 
 interface TableSection {
@@ -51,7 +54,8 @@ const TableAllocation = ({
   checkedInGuests, 
   onPagerRelease, 
   onGuestSeated,
-  onTableAllocated 
+  onTableAllocated,
+  onAddWalkIn 
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
     // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -175,6 +179,13 @@ const TableAllocation = ({
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string>('');
   const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
+  const [showWalkInDialog, setShowWalkInDialog] = useState(false);
+  const [walkInForm, setWalkInForm] = useState({
+    name: '',
+    count: 1,
+    showTime: '7:00 PM',
+    notes: ''
+  });
 
   // Load table state from localStorage on mount
   useEffect(() => {
@@ -1308,14 +1319,68 @@ const TableAllocation = ({
     );
   };
 
+  const handleAddWalkIn = () => {
+    if (!walkInForm.name.trim()) {
+      toast({
+        title: "❌ Name Required",
+        description: "Please enter a name for the walk-in guest.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (walkInForm.count < 1) {
+      toast({
+        title: "❌ Invalid Guest Count",
+        description: "Guest count must be at least 1.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Call the parent callback if provided
+    if (onAddWalkIn) {
+      onAddWalkIn({
+        name: walkInForm.name,
+        count: walkInForm.count,
+        showTime: walkInForm.showTime,
+        notes: walkInForm.notes || undefined
+      });
+    }
+
+    toast({
+      title: "🚶 Walk-In Added",
+      description: `${walkInForm.name} (${walkInForm.count} guests) added as walk-in for ${walkInForm.showTime}`,
+    });
+
+    // Reset form and close dialog
+    setWalkInForm({
+      name: '',
+      count: 1,
+      showTime: '7:00 PM',
+      notes: ''
+    });
+    setShowWalkInDialog(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Guests waiting for table allocation */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="h-5 w-5" />
-            <span>Guests Awaiting Table Allocation ({availableForAllocation.length})</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Users className="h-5 w-5" />
+              <span>Guests Awaiting Table Allocation ({availableForAllocation.length})</span>
+            </div>
+            <Button
+              onClick={() => setShowWalkInDialog(true)}
+              className="bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Walk In
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1326,11 +1391,20 @@ const TableAllocation = ({
               {availableForAllocation.map((guest) => (
                 <div
                   key={guest.originalIndex}
-                  className="p-4 border rounded-lg bg-yellow-50 border-yellow-200 cursor-pointer hover:bg-yellow-100 transition-colors"
+                  className={`p-4 border rounded-lg cursor-pointer hover:bg-yellow-100 transition-colors ${
+                    guest.isWalkIn ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                  }`}
                   onClick={() => handleGuestSelect(guest)}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-semibold text-gray-900">{guest.name}</h4>
+                    <div className="flex items-center space-x-2">
+                      <h4 className="font-semibold text-gray-900">{guest.name}</h4>
+                      {guest.isWalkIn && (
+                        <Badge className="bg-green-600 text-white text-xs">
+                          Walk-In
+                        </Badge>
+                      )}
+                    </div>
                     <Badge variant="outline" className="text-xs">
                       {guest.showTime}
                     </Badge>
@@ -1473,6 +1547,80 @@ const TableAllocation = ({
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Walk-In Dialog */}
+      <Dialog open={showWalkInDialog} onOpenChange={setShowWalkInDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Walk-In Guest</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="walkInName">Guest Name</Label>
+              <Input
+                id="walkInName"
+                value={walkInForm.name}
+                onChange={(e) => setWalkInForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter guest name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="walkInCount">Number of Guests</Label>
+              <Input
+                id="walkInCount"
+                type="number"
+                min="1"
+                max="12"
+                value={walkInForm.count}
+                onChange={(e) => setWalkInForm(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="walkInShowTime">Show Time</Label>
+              <select
+                id="walkInShowTime"
+                value={walkInForm.showTime}
+                onChange={(e) => setWalkInForm(prev => ({ ...prev, showTime: e.target.value }))}
+                className="w-full p-2 border rounded-md"
+              >
+                <option value="7:00 PM">7:00 PM</option>
+                <option value="8:00 PM">8:00 PM</option>
+                <option value="9:00 PM">9:00 PM</option>
+                <option value="10:00 PM">10:00 PM</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="walkInNotes">Notes (Optional)</Label>
+              <Input
+                id="walkInNotes"
+                value={walkInForm.notes}
+                onChange={(e) => setWalkInForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any special requests or notes"
+              />
+            </div>
+
+            <div className="flex space-x-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowWalkInDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddWalkIn}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                Add Walk-In
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
