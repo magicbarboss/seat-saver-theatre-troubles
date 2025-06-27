@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -165,6 +166,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const getTicketType = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Standard Ticket';
     
+    // Updated ticket type fields based on the actual data structure from console logs
     const ticketTypeFields = [
       'Adult Show Ticket includes 2 Drinks',
       'Comedy ticket plus 9" Pizza',
@@ -180,10 +182,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       'Wowcher Magic & Cocktails Package (per person)'
     ];
     
-    // Find the first ticket type field that has a value
+    // Debug: Log guest data to see what fields are available
+    console.log('Checking ticket type for guest:', guest.booker_name, Object.keys(guest));
+    
+    // Find the first ticket type field that has a value > 0
     for (const field of ticketTypeFields) {
       const value = guest[field];
-      if (value && value !== '' && value !== '0') {
+      console.log(`Checking field "${field}": value = "${value}"`);
+      if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
+        console.log(`Found ticket type: ${field} with value: ${value}`);
         return field;
       }
     }
