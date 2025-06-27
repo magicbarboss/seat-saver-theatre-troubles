@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -162,14 +161,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract ticket type from specific ticket type fields
+  // Extract ticket type - focus on package information (drinks + pizza)
   const getTicketType = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Standard Ticket';
+    if (!guest || typeof guest !== 'object') return 'Show Ticket';
     
-    // Updated ticket type fields based on the actual data structure from console logs
+    // All the possible ticket type fields from the data
     const ticketTypeFields = [
       'Adult Show Ticket includes 2 Drinks',
-      'Comedy ticket plus 9" Pizza',
+      'Comedy ticket plus 9" Pizza', 
       'OLD Groupon Offer (per person - extras are already included)',
       'Adult Comedy & Magic Show Ticket + 9" Pizza',
       'Adult Show Ticket includes 2 Drinks + 9" Pizza',
@@ -185,17 +184,43 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     // Debug: Log guest data to see what fields are available
     console.log('Checking ticket type for guest:', guest.booker_name, Object.keys(guest));
     
-    // Find the first ticket type field that has a value > 0
+    // Find the ticket type and extract package info
     for (const field of ticketTypeFields) {
       const value = guest[field];
       console.log(`Checking field "${field}": value = "${value}"`);
       if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
         console.log(`Found ticket type: ${field} with value: ${value}`);
-        return field;
+        
+        // Extract the package information from the field name
+        let packageInfo = 'Show Ticket';
+        
+        if (field.includes('includes 2 Drinks + 9" Pizza') || field.includes('+ 9" Pizza')) {
+          packageInfo = 'Show + 2 Drinks + 9" Pizza';
+        } else if (field.includes('includes 2 Drinks')) {
+          packageInfo = 'Show + 2 Drinks';
+        } else if (field.includes('includes 2 soft drinks + 9" PIzza')) {
+          packageInfo = 'Show + 2 Soft Drinks + 9" Pizza';
+        } else if (field.includes('includes 2 soft drinks')) {
+          packageInfo = 'Show + 2 Soft Drinks';
+        } else if (field.includes('plus 9" Pizza')) {
+          packageInfo = 'Show + 9" Pizza';
+        } else if (field.includes('Magic & Pints Package')) {
+          packageInfo = 'Magic Show + Pints';
+        } else if (field.includes('Magic & Cocktails Package')) {
+          packageInfo = 'Magic Show + Cocktails';
+        } else if (field.includes('Comedy Magic Show')) {
+          packageInfo = 'Comedy Magic Show';
+        } else if (field.includes('Groupon') || field.includes('OLD Groupon')) {
+          packageInfo = 'Groupon Package';
+        } else if (field.includes('Smoke Offer')) {
+          packageInfo = 'Show + Drinks (min x2)';
+        }
+        
+        return packageInfo;
       }
     }
     
-    return 'Standard Ticket';
+    return 'Show Ticket';
   };
 
   // Get all addon information for a guest
