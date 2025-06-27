@@ -161,6 +161,66 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
+  // Extract package information from ticket type fields
+  const getPackageInfo = (guest: Guest) => {
+    if (!guest || typeof guest !== 'object') return 'Show Only';
+    
+    // All the possible ticket type fields from the data
+    const ticketTypeFields = [
+      'Adult Show Ticket includes 2 Drinks',
+      'Comedy ticket plus 9" Pizza', 
+      'OLD Groupon Offer (per person - extras are already included)',
+      'Adult Comedy & Magic Show Ticket + 9" Pizza',
+      'Adult Show Ticket includes 2 Drinks + 9" Pizza',
+      'Adult Show Ticket includes 2 soft drinks',
+      'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
+      'Adult Comedy Magic Show ticket',
+      'Smoke Offer Ticket includes Drink (minimum x2)',
+      'Groupon Magic & Pints Package (per person)',
+      'Groupon Magic & Cocktails Package (per person)',
+      'Wowcher Magic & Cocktails Package (per person)'
+    ];
+    
+    console.log('Checking package for guest:', guest.booker_name, 'Available fields:', Object.keys(guest));
+    
+    // Find the ticket type and extract package info
+    for (const field of ticketTypeFields) {
+      const value = guest[field];
+      console.log(`Checking field "${field}": value = "${value}"`);
+      
+      if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
+        console.log(`Found active ticket type: ${field} with value: ${value}`);
+        
+        // Extract package information based on what's included
+        if (field.includes('includes 2 Drinks + 9" Pizza')) {
+          return '2 Drinks + 9" Pizza';
+        } else if (field.includes('+ 9" Pizza')) {
+          return '9" Pizza';
+        } else if (field.includes('includes 2 Drinks')) {
+          return '2 Drinks';
+        } else if (field.includes('includes 2 soft drinks + 9" PIzza')) {
+          return '2 Soft Drinks + 9" Pizza';
+        } else if (field.includes('includes 2 soft drinks')) {
+          return '2 Soft Drinks';
+        } else if (field.includes('plus 9" Pizza')) {
+          return '9" Pizza';
+        } else if (field.includes('Magic & Pints Package')) {
+          return 'Pints Package';
+        } else if (field.includes('Magic & Cocktails Package')) {
+          return 'Cocktails Package';
+        } else if (field.includes('Smoke Offer')) {
+          return 'Drinks (min x2)';
+        } else if (field.includes('Groupon') || field.includes('OLD Groupon')) {
+          return 'Groupon Package';
+        } else {
+          return 'Show Only';
+        }
+      }
+    }
+    
+    return 'Show Only';
+  };
+
   // Extract ticket type - focus on package information (drinks + pizza)
   const getTicketType = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Ticket';
@@ -707,7 +767,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Ticket Type</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Package</TableHead>
                   <TableHead className="font-semibold text-gray-700">Addons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
@@ -729,7 +789,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
-                  const ticketType = getTicketType(booking.mainBooking);
+                  const packageInfo = getPackageInfo(booking.mainBooking);
                   const addons = getAddons(booking.mainBooking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
@@ -763,10 +823,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-gray-700 max-w-xs">
-                          <div className="bg-blue-50 px-2 py-1 rounded text-xs font-medium">
-                            {ticketType.length > 35 ? ticketType.substring(0, 35) + '...' : ticketType}
-                          </div>
+                        <div className="bg-purple-50 px-3 py-2 rounded-lg text-sm font-medium text-purple-800 border border-purple-200">
+                          {packageInfo}
                         </div>
                       </TableCell>
                       <TableCell>
