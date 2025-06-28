@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -66,30 +66,87 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
+  const [sessionDate, setSessionDate] = useState<string>('');
+  const [showClearDialog, setShowClearDialog] = useState(false);
+
+  // Generate session key based on current date
+  const getSessionKey = () => {
+    const today = new Date().toDateString();
+    return `checkin-system-state-${today}`;
+  };
+
+  // Clear all data and start fresh
+  const clearAllData = () => {
+    setCheckedInGuests(new Set());
+    setPagerAssignments(new Map());
+    setSeatedGuests(new Set());
+    setAllocatedGuests(new Set());
+    setGuestTableAllocations(new Map());
+    setPartyGroups(new Map());
+    setBookingComments(new Map());
+    
+    // Clear from localStorage
+    localStorage.removeItem(getSessionKey());
+    
+    // Clear old session keys (cleanup)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('checkin-system-state-')) {
+        localStorage.removeItem(key);
+      }
+    }
+    
+    setSessionDate(new Date().toDateString());
+    setShowClearDialog(false);
+    
+    toast({
+      title: "🗑️ All Data Cleared",
+      description: "Started fresh session for today",
+    });
+  };
 
   // Load state on component mount (only once)
   useEffect(() => {
     const loadState = () => {
       try {
-        const savedState = localStorage.getItem('checkin-system-state');
+        const today = new Date().toDateString();
+        const todaySessionKey = getSessionKey();
+        const savedState = localStorage.getItem(todaySessionKey);
+        
         if (savedState) {
           const state = JSON.parse(savedState);
-          setCheckedInGuests(new Set(state.checkedInGuests || []));
-          setPagerAssignments(new Map(state.pagerAssignments || []));
-          setSeatedGuests(new Set(state.seatedGuests || []));
-          setAllocatedGuests(new Set(state.allocatedGuests || []));
-          setGuestTableAllocations(new Map(state.guestTableAllocations || []));
-          setPartyGroups(new Map(state.partyGroups || []));
-          setBookingComments(new Map(state.bookingComments || []));
-          console.log('Loaded saved state from', state.timestamp);
+          const savedDate = new Date(state.timestamp).toDateString();
           
-          toast({
-            title: "🔄 State Restored",
-            description: `Previous session data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
-          });
+          // Only load if it's from today
+          if (savedDate === today) {
+            setCheckedInGuests(new Set(state.checkedInGuests || []));
+            setPagerAssignments(new Map(state.pagerAssignments || []));
+            setSeatedGuests(new Set(state.seatedGuests || []));
+            setAllocatedGuests(new Set(state.allocatedGuests || []));
+            setGuestTableAllocations(new Map(state.guestTableAllocations || []));
+            setPartyGroups(new Map(state.partyGroups || []));
+            setBookingComments(new Map(state.bookingComments || []));
+            setSessionDate(savedDate);
+            console.log('Loaded saved state from', state.timestamp);
+            
+            toast({
+              title: "🔄 Today's Session Restored",
+              description: `Previous data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
+            });
+          } else {
+            // Different day - start fresh but keep the old data visible
+            setSessionDate(today);
+            toast({
+              title: "🌅 New Day Started",
+              description: "Starting fresh session for today. Previous day's data has been cleared.",
+            });
+          }
+        } else {
+          setSessionDate(today);
         }
       } catch (error) {
         console.error('Failed to load saved state:', error);
+        setSessionDate(new Date().toDateString());
       }
       setIsInitialized(true);
     };
@@ -112,7 +169,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         bookingComments: Array.from(bookingComments.entries()),
         timestamp: new Date().toISOString()
       };
-      localStorage.setItem('checkin-system-state', JSON.stringify(state));
+      localStorage.setItem(getSessionKey(), JSON.stringify(state));
       setLastSaved(new Date());
       console.log('Auto-saved state at', new Date().toLocaleTimeString());
     };
@@ -184,70 +241,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   useEffect(() => {
     setPartyGroups(detectPartyConnections);
   }, [detectPartyConnections]);
-
-  // Function to get party group for a guest
-  const getPartyGroup = (guestIndex: number): PartyGroup | null => {
-    for (const [, party] of partyGroups) {
-      if (party.bookingIndices.includes(guestIndex)) {
-        return party;
-      }
-    }
-    return null;
-  };
-
-  // Function to check in entire party
-  const handlePartyCheckIn = (partyGroup: PartyGroup) => {
-    let allCheckedIn = true;
-    
-    partyGroup.bookingIndices.forEach(index => {
-      if (!checkedInGuests.has(index)) {
-        allCheckedIn = false;
-      }
-    });
-
-    if (allCheckedIn) {
-      // Check out entire party
-      const newCheckedIn = new Set(checkedInGuests);
-      const newPagerAssignments = new Map(pagerAssignments);
-      const newSeatedGuests = new Set(seatedGuests);
-      const newAllocatedGuests = new Set(allocatedGuests);
-      const newGuestTableAllocations = new Map(guestTableAllocations);
-
-      partyGroup.bookingIndices.forEach(index => {
-        newCheckedIn.delete(index);
-        newPagerAssignments.delete(index);
-        newSeatedGuests.delete(index);
-        newAllocatedGuests.delete(index);
-        newGuestTableAllocations.delete(index);
-      });
-
-      setCheckedInGuests(newCheckedIn);
-      setPagerAssignments(newPagerAssignments);
-      setSeatedGuests(newSeatedGuests);
-      setAllocatedGuests(newAllocatedGuests);
-      setGuestTableAllocations(newGuestTableAllocations);
-
-      toast({
-        title: "✅ Party Checked Out",
-        description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked out`,
-      });
-    } else {
-      // Check in entire party
-      const newCheckedIn = new Set(checkedInGuests);
-      partyGroup.bookingIndices.forEach(index => {
-        newCheckedIn.add(index);
-      });
-      setCheckedInGuests(newCheckedIn);
-      
-      // Assign pager to first guest in party
-      setSelectedGuestForPager(partyGroup.bookingIndices[0]);
-      
-      toast({
-        title: "🎉 Party Checked In",
-        description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked in together`,
-      });
-    }
-  };
 
   // Group bookings by booking code to identify add-ons
   const groupedBookings = useMemo(() => {
@@ -781,22 +774,66 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
-      {/* Debug info - remove this after fixing */}
-      <div className="bg-yellow-50 p-4 rounded border">
-        <h4 className="font-semibold text-sm">Debug Info:</h4>
-        <p className="text-xs">Total Guests: {guests.length}</p>
-        <p className="text-xs">Grouped Bookings: {groupedBookings.length}</p>
-        <p className="text-xs">Filtered Bookings: {filteredBookings.length}</p>
-        <p className="text-xs">Available pagers: {getAvailablePagers().length}/12</p>
-        <p className="text-xs">Allocated guests: {allocatedGuests.size}</p>
-        <p className="text-xs">Seated guests: {seatedGuests.size}</p>
-        <p className="text-xs">Party connections: {partyGroups.size}</p>
-        <p className="text-xs">Comments: {bookingComments.size}</p>
-        <div className="flex items-center space-x-2 mt-2">
-          <Save className="h-4 w-4 text-green-600" />
-          <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
+      {/* Session Management Controls */}
+      <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
+        <div className="flex justify-between items-center">
+          <div>
+            <h4 className="font-semibold text-sm text-yellow-800">Session Information</h4>
+            <p className="text-xs text-yellow-700">
+              Current session: {sessionDate} | Last saved: {lastSaved.toLocaleTimeString()}
+            </p>
+            <p className="text-xs text-yellow-600">
+              Total Guests: {guests.length} | Grouped Bookings: {groupedBookings.length} | 
+              Checked In: {checkedInGuests.size} | Seated: {seatedGuests.size}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowClearDialog(true)}
+              className="text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Clear All Data
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Clear Data Confirmation Dialog */}
+      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Clear All Session Data
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-700">
+              This will clear all check-in data, pager assignments, table allocations, and comments for the current session.
+            </p>
+            <div className="bg-red-50 p-3 rounded border border-red-200">
+              <p className="text-red-800 text-sm font-medium">
+                ⚠️ This action cannot be undone!
+              </p>
+              <p className="text-red-700 text-sm">
+                All guests will appear as not checked in and all pagers will be available.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowClearDialog(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={clearAllData}>
+                <Trash2 className="h-4 w-4 mr-1" />
+                Clear All Data
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <div className="flex justify-between items-center">
@@ -957,7 +994,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const isAllocated = allocatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
-                  const partyGroup = getPartyGroup(booking.originalIndex);
+                  const partyGroup = (() => {
+                    for (const [, party] of partyGroups) {
+                      if (party.bookingIndices.includes(booking.originalIndex)) {
+                        return party;
+                      }
+                    }
+                    return null;
+                  })();
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
                   
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
@@ -982,7 +1026,56 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           </Button>
                           {partyGroup && (
                             <Button
-                              onClick={() => handlePartyCheckIn(partyGroup)}
+                              onClick={() => {
+                                let allCheckedIn = true;
+                                partyGroup.bookingIndices.forEach(index => {
+                                  if (!checkedInGuests.has(index)) {
+                                    allCheckedIn = false;
+                                  }
+                                });
+                                if (allCheckedIn) {
+                                  // Check out entire party
+                                  const newCheckedIn = new Set(checkedInGuests);
+                                  const newPagerAssignments = new Map(pagerAssignments);
+                                  const newSeatedGuests = new Set(seatedGuests);
+                                  const newAllocatedGuests = new Set(allocatedGuests);
+                                  const newGuestTableAllocations = new Map(guestTableAllocations);
+
+                                  partyGroup.bookingIndices.forEach(index => {
+                                    newCheckedIn.delete(index);
+                                    newPagerAssignments.delete(index);
+                                    newSeatedGuests.delete(index);
+                                    newAllocatedGuests.delete(index);
+                                    newGuestTableAllocations.delete(index);
+                                  });
+
+                                  setCheckedInGuests(newCheckedIn);
+                                  setPagerAssignments(newPagerAssignments);
+                                  setSeatedGuests(newSeatedGuests);
+                                  setAllocatedGuests(newAllocatedGuests);
+                                  setGuestTableAllocations(newGuestTableAllocations);
+
+                                  toast({
+                                    title: "✅ Party Checked Out",
+                                    description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked out`,
+                                  });
+                                } else {
+                                  // Check in entire party
+                                  const newCheckedIn = new Set(checkedInGuests);
+                                  partyGroup.bookingIndices.forEach(index => {
+                                    newCheckedIn.add(index);
+                                  });
+                                  setCheckedInGuests(newCheckedIn);
+                                  
+                                  // Assign pager to first guest in party
+                                  setSelectedGuestForPager(partyGroup.bookingIndices[0]);
+                                  
+                                  toast({
+                                    title: "🎉 Party Checked In",
+                                    description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked in together`,
+                                  });
+                                }
+                              }}
                               variant="outline"
                               size="sm"
                               className="text-xs bg-pink-100 hover:bg-pink-200 border-pink-300"
