@@ -296,7 +296,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - ENHANCED DEBUGGING
+  // Extract package information from ticket type fields - FIXED DETECTION
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
@@ -311,72 +311,57 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       }
     });
     
-    // Find fields that contain ticket information by checking all field names
-    for (const [fieldName, value] of Object.entries(guest)) {
-      // Skip non-ticket fields
-      if (['id', 'booking_code', 'booker_name', 'total_quantity', 'is_checked_in', 'pager_number', 'table_assignments', 'DIET', 'Item', 'Note', 'Magic', 'TERMS', 'Total', 'Booker', 'Guests', 'Status', 'Viator', 'Booking', 'Friends', 'Via-Cust', 'GlutenBase', 'Booking Code', 'Bottle of Wine', 'Total Quantity', 'Prosecco add on', 'How did you hear', 'Groupon SECURITY CODE', 'Stay up to date on our newsletter.', 'Salt & Pepper Fries', 'Vegan'].includes(fieldName)) {
-        continue;
-      }
-      
-      // Check if this field has a non-zero value indicating it's an active ticket type
-      if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
-        console.log(`Found active ticket type: ${fieldName} with value: ${value}`);
-        
-        const fieldLower = fieldName.toLowerCase();
-        
-        // Handle exact matches first (case insensitive)
-        if (fieldLower === 'house magicians show ticket & 2 drinks + 9 pizza') {
-          console.log('Matched: 2 Drinks + 9" Pizza');
-          return '2 Drinks + 9" Pizza';
-        } else if (fieldLower === 'house magicians show ticket & 2 drinks') {
-          console.log('Matched: 2 Drinks');
-          return '2 Drinks';
-        } else if (fieldLower === 'house magicians show ticket') {
-          console.log('Matched: Show Only');
-          return 'Show Only';
-        }
-        
-        // Check for variations in field names that might contain "2 drinks"
-        if (fieldLower.includes('2 drinks') && fieldLower.includes('pizza')) {
-          console.log('Matched pattern: 2 drinks + pizza');
-          return '2 Drinks + 9" Pizza';
-        } else if (fieldLower.includes('2 drinks')) {
-          console.log('Matched pattern: 2 drinks');
-          return '2 Drinks';
-        }
-        
-        // Legacy patterns for backwards compatibility
-        if (fieldLower.includes('includes 2 drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
-          return '2 Drinks + 9" Pizza';
-        } else if (fieldLower.includes('includes 2 soft drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
-          return '2 Soft Drinks + 9" Pizza';
-        } else if ((fieldLower.includes('induces 2 soft drinks') || fieldLower.includes('includes 2 soft drinks')) && fieldLower.includes('pizza')) {
-          return '2 Soft Drinks + 9" Pizza';
-        } else if (fieldLower.includes('comedy ticket plus 9') && fieldLower.includes('pizza')) {
-          return '9" Pizza';
-        } else if (fieldLower.includes('+ 9') && fieldLower.includes('pizza')) {
-          return '9" Pizza';
-        } else if (fieldLower.includes('plus 9') && fieldLower.includes('pizza')) {
-          return '9" Pizza';
-        } else if (fieldLower.includes('includes 2 drinks')) {
-          return '2 Drinks';
-        } else if (fieldLower.includes('includes 2 soft drinks')) {
-          return '2 Soft Drinks';
-        } else if (fieldLower.includes('magic & pints package')) {
-          return 'Pints Package';
-        } else if (fieldLower.includes('magic & cocktails package')) {
-          return 'Cocktails Package';
-        } else if (fieldLower.includes('smoke offer') && fieldLower.includes('drink')) {
-          return 'Drinks (min x2)';
-        } else if (fieldLower.includes('groupon')) {
-          return 'Groupon Package';
-        } else if (fieldLower.includes('wowcher')) {
-          return 'Wowcher Package';
-        }
-        
-        // If we found an active ticket type but don't recognize the pattern, log it
-        console.log(`Unrecognized ticket type pattern: "${fieldName}"`);
-      }
+    // Check specific ticket fields in order of priority
+    // First check for pizza + drinks combo
+    if (guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '') {
+      console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
+      return '2 Drinks + 9" Pizza';
+    }
+    
+    // Then check for just drinks
+    if (guest['House Magicians Show Ticket & 2 Drinks'] && guest['House Magicians Show Ticket & 2 Drinks'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks'] !== '') {
+      console.log('Found: House Magicians Show Ticket & 2 Drinks');
+      return '2 Drinks';
+    }
+    
+    // Check for soft drinks + pizza
+    if (guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '') {
+      console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
+      return '2 Soft Drinks + 9" Pizza';
+    }
+    
+    // Check for soft drinks only
+    if (guest['House Magicians Show Ticket & 2 soft drinks'] && guest['House Magicians Show Ticket & 2 soft drinks'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks'] !== '') {
+      console.log('Found: House Magicians Show Ticket & 2 soft drinks');
+      return '2 Soft Drinks';
+    }
+    
+    // Check for show only tickets (both variations)
+    if ((guest['House Magicians Show Ticket'] && guest['House Magicians Show Ticket'] !== '0' && guest['House Magicians Show Ticket'] !== '') ||
+        (guest['House Magicians Show ticket'] && guest['House Magicians Show ticket'] !== '0' && guest['House Magicians Show ticket'] !== '')) {
+      console.log('Found: House Magicians Show Ticket (Show Only)');
+      return 'Show Only';
+    }
+    
+    // Check for other package types
+    if (guest['Groupon Magic & Pints Package (per person)'] && guest['Groupon Magic & Pints Package (per person)'] !== '0' && guest['Groupon Magic & Pints Package (per person)'] !== '') {
+      return 'Pints Package';
+    }
+    
+    if (guest['Groupon Magic & Cocktails Package (per person)'] && guest['Groupon Magic & Cocktails Package (per person)'] !== '0' && guest['Groupon Magic & Cocktails Package (per person)'] !== '') {
+      return 'Cocktails Package';
+    }
+    
+    if (guest['Wowcher Magic & Cocktails Package (per person)'] && guest['Wowcher Magic & Cocktails Package (per person)'] !== '0' && guest['Wowcher Magic & Cocktails Package (per person)'] !== '') {
+      return 'Wowcher Package';
+    }
+    
+    if (guest['Smoke Offer Ticket includes Drink (minimum x2)'] && guest['Smoke Offer Ticket includes Drink (minimum x2)'] !== '0' && guest['Smoke Offer Ticket includes Drink (minimum x2)'] !== '') {
+      return 'Drinks (min x2)';
+    }
+    
+    if (guest['OLD Groupon Offer (per person - extras are already included)'] && guest['OLD Groupon Offer (per person - extras are already included)'] !== '0' && guest['OLD Groupon Offer (per person - extras are already included)'] !== '') {
+      return 'Groupon Package';
     }
     
     console.log('No active ticket types found, defaulting to Show Only');
