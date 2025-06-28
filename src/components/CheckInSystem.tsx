@@ -298,57 +298,60 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isAndrew = guestName.includes('andrew');
+    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla');
     
-    if (isAndrew) {
-      console.log('=== ENHANCED ANDREW WILLIAMS DEBUG ===');
+    if (isTargetGuest) {
+      console.log('=== DETAILED DEBUG FOR TARGET GUEST ===');
       console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-      console.log('All guest fields and values:');
+      console.log('Full guest object keys:', Object.keys(guest));
+      console.log('Full guest object:', guest);
+      
+      // Check all fields that contain "drink" or "ticket"
       Object.entries(guest).forEach(([key, value]) => {
-        if (key.toLowerCase().includes('ticket') || key.toLowerCase().includes('drink') || key.toLowerCase().includes('pizza')) {
-          console.log(`"${key}": "${value}" (type: ${typeof value})`);
+        if (key.toLowerCase().includes('ticket') || key.toLowerCase().includes('drink')) {
+          console.log(`Field "${key}": value="${value}" (type: ${typeof value}, truthy: ${!!value}, not '0': ${value !== '0'}, not empty: ${value !== ''})`);
         }
       });
     }
     
-    // Check specific ticket fields in order of priority
-    // First check for pizza + drinks combo
-    if (guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '') {
-      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
-      return '2 Drinks + 9" Pizza';
-    }
-    
-    // Then check for just drinks - FIXED CHECK
+    // Check the specific field that should work
     const drinksField = guest['House Magicians Show Ticket & 2 Drinks'];
-    if (isAndrew) {
-      console.log('Checking drinks field:', drinksField, 'Type:', typeof drinksField);
-      console.log('Is truthy?', !!drinksField);
-      console.log('Not zero string?', drinksField !== '0');
-      console.log('Not empty string?', drinksField !== '');
-      console.log('Greater than 0?', parseInt(drinksField) > 0);
+    if (isTargetGuest) {
+      console.log('Checking main drinks field:', drinksField);
+      console.log('Field exists?', drinksField !== undefined);
+      console.log('Field is truthy?', !!drinksField);
+      console.log('Field is not "0"?', drinksField !== '0');
+      console.log('Field is not empty?', drinksField !== '');
+      console.log('Field parsed as int > 0?', parseInt(String(drinksField)) > 0);
     }
     
-    if (drinksField && drinksField !== '0' && drinksField !== '' && parseInt(drinksField) > 0) {
-      if (isAndrew) console.log('SUCCESS: Found House Magicians Show Ticket & 2 Drinks');
+    if (drinksField && drinksField !== '0' && drinksField !== '' && parseInt(String(drinksField)) > 0) {
+      if (isTargetGuest) console.log('SUCCESS: Found House Magicians Show Ticket & 2 Drinks');
       return '2 Drinks';
+    }
+    
+    // Check for pizza + drinks combo
+    if (guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '') {
+      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
+      return '2 Drinks + 9" Pizza';
     }
     
     // Check for soft drinks + pizza
     if (guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '') {
-      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
+      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
       return '2 Soft Drinks + 9" Pizza';
     }
     
     // Check for soft drinks only
     if (guest['House Magicians Show Ticket & 2 soft drinks'] && guest['House Magicians Show Ticket & 2 soft drinks'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks'] !== '') {
-      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 soft drinks');
+      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 soft drinks');
       return '2 Soft Drinks';
     }
     
     // Check for show only tickets (both variations)
     if ((guest['House Magicians Show Ticket'] && guest['House Magicians Show Ticket'] !== '0' && guest['House Magicians Show Ticket'] !== '') ||
         (guest['House Magicians Show ticket'] && guest['House Magicians Show ticket'] !== '0' && guest['House Magicians Show ticket'] !== '')) {
-      if (isAndrew) console.log('Found: House Magicians Show Ticket (Show Only)');
+      if (isTargetGuest) console.log('Found: House Magicians Show Ticket (Show Only)');
       return 'Show Only';
     }
     
@@ -373,7 +376,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       return 'Groupon Package';
     }
     
-    if (isAndrew) console.log('No active ticket types found for Andrew, defaulting to Show Only');
+    if (isTargetGuest) console.log('No active ticket types found, defaulting to Show Only');
     return 'Show Only';
   };
 
@@ -388,7 +391,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       'OLD Groupon Offer (per person - extras are already included)',
       'Adult Comedy & Magic Show Ticket + 9" Pizza',
       'Adult Show Ticket includes 2 Drinks + 9" Pizza',
-      'Adult Show Ticket includes 2 soft drinks',
+      'Adult Show Ticket induces 2 soft drinks',
       'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
       'Adult Comedy Magic Show ticket',
       'Smoke Offer Ticket includes Drink (minimum x2)',
