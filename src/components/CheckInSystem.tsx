@@ -952,6 +952,28 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setBookingComments(newComments);
   };
 
+  const handleIntervalOrderToggle = async (guestIndex: number, orderType: 'pizza' | 'drinks') => {
+    const newOrders = new Map(intervalOrders);
+    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
+    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
+    newOrders.set(guestIndex, updatedOrder);
+    setIntervalOrders(newOrders);
+
+    // Update database - this is now just for tracking, doesn't affect check-in status
+    await updateGuestInDatabase(guestIndex, {
+      interval_pizza_order: updatedOrder.pizza,
+      interval_drinks_order: updatedOrder.drinks
+    });
+
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: updatedOrder[orderType] ? "✅ Interval Order Tracked" : "❌ Interval Order Removed",
+      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'marked as ordered' : 'unmarked'} for interval`,
+    });
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
