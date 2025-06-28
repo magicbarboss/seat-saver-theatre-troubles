@@ -293,12 +293,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED LOGIC
+  // Extract package information from ticket type fields - UPDATED WITH CALCULATIONS
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
     const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla');
+    const totalGuests = guest.total_quantity || 1;
     
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG ===');
@@ -333,25 +334,35 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         if (numValue > 0) {
           if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
           
-          // Return the appropriate package based on the field name
+          // Return the appropriate package with calculations based on the field name
           if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
-            return '2 Drinks + 9" Pizza';
+            const drinkTokens = 2 * totalGuests;
+            const pizzas = 1 * totalGuests;
+            return `2 Drinks + 9" Pizza (${drinkTokens} tokens, ${pizzas} pizzas)`;
           } else if (field.includes('& 2 Drinks')) {
-            return '2 Drinks';
+            const drinkTokens = 2 * totalGuests;
+            return `2 Drinks (${drinkTokens} tokens)`;
           } else if (field.includes('& 2 soft drinks + 9')) {
-            return '2 Soft Drinks + 9" Pizza';
+            const drinkTokens = 2 * totalGuests;
+            const pizzas = 1 * totalGuests;
+            return `2 Soft Drinks + 9" Pizza (${drinkTokens} soft drinks, ${pizzas} pizzas)`;
           } else if (field.includes('& 2 soft drinks')) {
-            return '2 Soft Drinks';
+            const drinkTokens = 2 * totalGuests;
+            return `2 Soft Drinks (${drinkTokens} soft drinks)`;
           } else if (field.includes('Magic & Pints Package')) {
-            return 'Pints Package';
+            const drinkTokens = 2 * totalGuests; // Assuming pints package includes 2 drinks
+            return `Pints Package (${drinkTokens} pints)`;
           } else if (field.includes('Magic & Cocktails Package')) {
-            return 'Cocktails Package';
+            const drinkTokens = 2 * totalGuests; // Assuming cocktails package includes 2 drinks
+            return `Cocktails Package (${drinkTokens} cocktails)`;
           } else if (field.includes('Wowcher')) {
-            return 'Wowcher Package';
+            const drinkTokens = 2 * totalGuests; // Assuming Wowcher package includes 2 drinks
+            return `Wowcher Package (${drinkTokens} drinks)`;
           } else if (field.includes('Smoke Offer')) {
-            return 'Drinks (min x2)';
+            const drinkTokens = Math.max(2, 1 * totalGuests); // Minimum 2 drinks
+            return `Drinks (min x2) (${drinkTokens} drinks)`;
           } else if (field.includes('OLD Groupon')) {
-            return 'Groupon Package';
+            return `Groupon Package (${totalGuests} guests)`;
           } else {
             return 'Show Only';
           }
