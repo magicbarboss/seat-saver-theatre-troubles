@@ -904,16 +904,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   />
                 </div>
               </div>
-              <div className="w-80">
+              <div className="w-72">
                 <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    variant={showFilter === 'all' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('all')}
-                    className="flex-1 text-sm"
-                  >
-                    All Shows
-                  </Button>
                   <Button
                     variant={showFilter === '7:00pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('7:00pm')}
