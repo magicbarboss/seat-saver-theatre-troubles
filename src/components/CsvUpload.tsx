@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload } from 'lucide-react';
+import { Upload } from 'lucides-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -45,28 +45,61 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        console.log('Raw Excel data:', jsonData.slice(0, 10));
+        console.log('Raw Excel data (first 15 rows):', jsonData.slice(0, 15));
         
         if (jsonData.length === 0) return;
         
-        // Look for headers starting from row 4 (index 3)
-        const headerRowIndex = 3;
-        console.log('Using header row at index:', headerRowIndex, 'with data:', jsonData[headerRowIndex]);
+        // Find the header row by looking for a row that contains 'Booker' or 'booking'
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+          const row = jsonData[i] as any[];
+          if (row && row.some(cell => 
+            String(cell || '').toLowerCase().includes('booker') || 
+            String(cell || '').toLowerCase().includes('booking')
+          )) {
+            headerRowIndex = i;
+            console.log('Found header row at index:', i, 'with data:', row);
+            break;
+          }
+        }
+        
+        // If no header found, try the default row 4 (index 3)
+        if (headerRowIndex === -1) {
+          headerRowIndex = 3;
+          console.log('No header row found, using default index 3');
+        }
         
         if (jsonData.length <= headerRowIndex) {
           console.log('Not enough rows in the file');
           return;
         }
         
-        const headers = (jsonData[headerRowIndex] as string[]).map(header => String(header || '').trim());
-        const rows = jsonData.slice(headerRowIndex + 1)
-          .filter(row => row && (row as any[]).length > 1)
-          .map(row => 
-            (row as any[]).map(cell => String(cell || '').trim())
-          );
+        const headers = (jsonData[headerRowIndex] as string[])
+          .map(header => String(header || '').trim())
+          .filter(header => header !== ''); // Remove empty headers
         
         console.log('Processed headers:', headers);
-        console.log('Sample processed rows:', rows.slice(0, 3));
+        
+        const rows = jsonData.slice(headerRowIndex + 1)
+          .filter(row => {
+            if (!row || (row as any[]).length === 0) return false;
+            // Check if row has meaningful data (not just empty cells)
+            const meaningfulCells = (row as any[]).filter(cell => 
+              String(cell || '').trim() !== ''
+            );
+            return meaningfulCells.length > 2; // At least 3 non-empty cells
+          })
+          .map(row => {
+            const processedRow = (row as any[]).map(cell => String(cell || '').trim());
+            // Pad row to match header length
+            while (processedRow.length < headers.length) {
+              processedRow.push('');
+            }
+            return processedRow.slice(0, headers.length); // Trim to header length
+          });
+        
+        console.log('Sample processed rows:', rows.slice(0, 5));
+        console.log(`Final data: ${headers.length} headers, ${rows.length} rows`);
         
         setCsvData({ headers, rows });
       } else {
@@ -76,22 +109,44 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         
         if (lines.length === 0) return;
 
-        // Check if it's comma-separated or tab-separated by looking at the first line
-        const firstLine = lines[0];
-        const commaCount = (firstLine.match(/,/g) || []).length;
-        const tabCount = (firstLine.match(/\t/g) || []).length;
+        // Find header row
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(lines.length, 10); i++) {
+          if (lines[i].toLowerCase().includes('booker') || lines[i].toLowerCase().includes('booking')) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        // Check if it's comma-separated or tab-separated by looking at the header line
+        const headerLine = lines[headerRowIndex];
+        const commaCount = (headerLine.match(/,/g) || []).length;
+        const tabCount = (headerLine.match(/\t/g) || []).length;
         
-        console.log('First line:', firstLine);
+        console.log('Header line:', headerLine);
         console.log('Comma count:', commaCount, 'Tab count:', tabCount);
         
         // Use the delimiter that appears most frequently
         const delimiter = commaCount > tabCount ? ',' : '\t';
         console.log('Using delimiter:', delimiter === ',' ? 'comma' : 'tab');
 
-        const headers = lines[0].split(delimiter).map(header => header.trim().replace(/"/g, ''));
-        const rows = lines.slice(1).map(line => 
-          line.split(delimiter).map(cell => cell.trim().replace(/"/g, ''))
-        );
+        const headers = lines[headerRowIndex].split(delimiter)
+          .map(header => header.trim().replace(/"/g, ''))
+          .filter(header => header !== '');
+        
+        const rows = lines.slice(headerRowIndex + 1)
+          .filter(line => {
+            const cells = line.split(delimiter);
+            const meaningfulCells = cells.filter(cell => cell.trim().replace(/"/g, '') !== '');
+            return meaningfulCells.length > 2;
+          })
+          .map(line => {
+            const processedRow = line.split(delimiter).map(cell => cell.trim().replace(/"/g, ''));
+            while (processedRow.length < headers.length) {
+              processedRow.push('');
+            }
+            return processedRow.slice(0, headers.length);
+          });
 
         console.log('Parsed headers:', headers);
         console.log('Sample parsed rows:', rows.slice(0, 3));
@@ -161,11 +216,12 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         note: noteIndex
       });
 
-      // Prepare guest data with proper field mapping
+      // Prepare guest data with proper field mapping and enhanced validation
       const guestsData = csvData.rows.map((row, index) => {
         const ticketData: any = {};
         csvData.headers.forEach((header, headerIndex) => {
-          ticketData[header] = row[headerIndex] || '';
+          const cellValue = row[headerIndex] || '';
+          ticketData[header] = cellValue;
         });
 
         // Extract key fields from the correct columns
@@ -174,6 +230,12 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
         const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
         const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
+
+        // Enhanced validation - skip rows with no meaningful data
+        if (!bookerName && !bookingCode && totalQuantity <= 0) {
+          console.log(`Skipping row ${index}: no meaningful data`);
+          return null;
+        }
 
         const guestRecord = {
           guest_list_id: guestList.id,
@@ -188,12 +250,20 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         };
         
         // Log the first few records to debug
-        if (index < 3) {
+        if (index < 5) {
           console.log(`Guest record ${index}:`, guestRecord);
+          // Special logging for Andrew Williams
+          if (bookerName.toLowerCase().includes('andrew')) {
+            console.log('=== ANDREW WILLIAMS DEBUG INFO ===');
+            console.log('Booker name:', bookerName);
+            console.log('Ticket data keys:', Object.keys(ticketData));
+            console.log('House Magicians Show Ticket & 2 Drinks field:', ticketData['House Magicians Show Ticket & 2 Drinks']);
+            console.log('All ticket data:', ticketData);
+          }
         }
         
         return guestRecord;
-      });
+      }).filter(record => record !== null); // Remove null records
 
       console.log(`Attempting to insert ${guestsData.length} guest records...`);
 
@@ -212,7 +282,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
 
       toast({
         title: "Success",
-        description: `Uploaded ${csvData.rows.length} guests successfully`,
+        description: `Uploaded ${guestsData.length} guests successfully`,
       });
 
       if (onGuestListCreated) {
