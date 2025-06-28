@@ -4,9 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -938,7 +938,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Package</TableHead>
@@ -948,7 +947,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">Notes</TableHead>
-                  <TableHead className="font-semibold text-gray-700">
+                  <TableHead className="font-semibold text-gray-700 w-48">
                     <div className="flex items-center gap-1">
                       <MessageSquare className="h-4 w-4" />
                       Comments
@@ -968,7 +967,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const partyGroup = getPartyGroup(booking.originalIndex);
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
                   
-                  const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
@@ -1000,11 +998,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                               Party ({partyGroup.totalGuests})
                             </Button>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-mono text-sm text-gray-700">
-                          {bookingCode}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1109,7 +1102,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="w-40">
+                        <div className="w-48">
                           <Textarea
                             placeholder="Add comments..."
                             value={currentComment}
