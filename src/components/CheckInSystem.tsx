@@ -213,7 +213,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Function to update guest in database
   const updateGuestInDatabase = async (guestIndex: number, updates: Partial<Guest>) => {
-    if (!guests[guestIndex]) return false;
+    if (!guests[guestIndex]) return;
 
     const guest = guests[guestIndex];
     try {
@@ -229,14 +229,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           description: "Failed to sync changes. Please try again.",
           variant: "destructive"
         });
-        return false;
       } else {
         setLastSaved(new Date());
-        return true;
       }
     } catch (error) {
       console.error('Error updating guest:', error);
-      return false;
     }
   };
 
@@ -956,36 +953,27 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   const handleIntervalOrderToggle = async (guestIndex: number, orderType: 'pizza' | 'drinks') => {
-    const guest = guests[guestIndex];
-    if (!guest) return;
+    const newOrders = new Map(intervalOrders);
+    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
+    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
+    newOrders.set(guestIndex, updatedOrder);
+    setIntervalOrders(newOrders);
 
-    const currentOrder = intervalOrders.get(guestIndex) || { pizza: false, drinks: false };
-    const newValue = !currentOrder[orderType];
-    const updatedOrder = { ...currentOrder, [orderType]: newValue };
-    
-    console.log(`Toggling ${orderType} for guest ${guestIndex} from ${currentOrder[orderType]} to ${newValue}`);
-    
-    // Update database first
-    const dbUpdates = {
+    // Update database
+    await updateGuestInDatabase(guestIndex, {
       interval_pizza_order: updatedOrder.pizza,
       interval_drinks_order: updatedOrder.drinks
-    };
-    
-    const success = await updateGuestInDatabase(guestIndex, dbUpdates);
-    
-    if (success) {
-      // Only update local state if database update was successful
-      const newOrders = new Map(intervalOrders);
-      newOrders.set(guestIndex, updatedOrder);
-      setIntervalOrders(newOrders);
+    });
 
-      const guestName = extractGuestName(guest.booker_name || '');
-      
-      toast({
-        title: newValue ? "✅ Interval Order Added" : "❌ Interval Order Removed",
-        description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${newValue ? 'ordered' : 'removed'} for interval`,
-      });
-    }
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    console.log(`Toggle ${orderType} for ${guestName}: ${updatedOrder[orderType]}`);
+    
+    toast({
+      title: updatedOrder[orderType] ? "✅ Interval Order Added" : "❌ Interval Order Removed",
+      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'ordered' : 'removed'} for interval`,
+    });
   };
 
   return (
@@ -1159,9 +1147,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
-                      <Pizza className="h-4 w-4" />
-                      <Coffee className="h-4 w-4" />
-                      Interval Orders
+                      <Pizza className="h-3 w-3" />
+                      <Coffee className="h-3 w-3" />
+                      Interval
                     </div>
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
@@ -1316,40 +1304,24 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-2 items-center">
+                        <div className="flex flex-col gap-1 items-center">
                           <Button
-                            onClick={() => {
-                              console.log('Pizza button clicked for guest:', booking.originalIndex);
-                              handleIntervalOrderToggle(booking.originalIndex, 'pizza');
-                            }}
+                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
                             variant={intervalOrder.pizza ? "default" : "outline"}
                             size="sm"
-                            className={`h-10 w-16 text-xs font-semibold ${
-                              intervalOrder.pizza 
-                                ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md' 
-                                : 'bg-white hover:bg-orange-50 border-2 border-orange-200 text-orange-600'
-                            }`}
+                            className={`h-6 w-6 p-0 ${intervalOrder.pizza ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white hover:bg-orange-50 border-orange-200'}`}
                             disabled={!isCheckedIn}
                           >
-                            <Pizza className="h-4 w-4 mr-1" />
-                            {intervalOrder.pizza ? 'YES' : 'NO'}
+                            <Pizza className="h-3 w-3" />
                           </Button>
                           <Button
-                            onClick={() => {
-                              console.log('Drinks button clicked for guest:', booking.originalIndex);
-                              handleIntervalOrderToggle(booking.originalIndex, 'drinks');
-                            }}
+                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
                             variant={intervalOrder.drinks ? "default" : "outline"}
                             size="sm"
-                            className={`h-10 w-16 text-xs font-semibold ${
-                              intervalOrder.drinks 
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md' 
-                                : 'bg-white hover:bg-blue-50 border-2 border-blue-200 text-blue-600'
-                            }`}
+                            className={`h-6 w-6 p-0 ${intervalOrder.drinks ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-blue-50 border-blue-200'}`}
                             disabled={!isCheckedIn}
                           >
-                            <Coffee className="h-4 w-4 mr-1" />
-                            {intervalOrder.drinks ? 'YES' : 'NO'}
+                            <Coffee className="h-3 w-3" />
                           </Button>
                         </div>
                       </TableCell>
