@@ -6,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Toggle } from '@/components/ui/toggle';
 import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -760,7 +759,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setAllocatedGuests(newAllocatedGuests);
   };
 
-  // New: Handle table allocation (not seated yet)
+  // Updated: Handle table allocation (not seated yet)
   const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
     await updateGuestInDatabase(guestIndex, {
       is_allocated: true,
