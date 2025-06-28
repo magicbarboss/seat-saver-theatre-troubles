@@ -303,73 +303,60 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG ===');
       console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
+      console.log('Full guest data:', guest);
     }
     
-    // Check the specific field that should work - FIXED: Convert to string and check properly
-    const drinksField = guest['House Magicians Show Ticket & 2 Drinks'];
-    if (isTargetGuest) {
-      console.log('Drinks field value:', drinksField, 'Type:', typeof drinksField);
-    }
+    // Check all possible ticket fields that might contain package information
+    const ticketFields = [
+      'House Magicians Show Ticket & 2 Drinks',
+      'House Magicians Show Ticket & 2 soft drinks',
+      'House Magicians Show Ticket & 2 Drinks + 9 Pizza',
+      'House Magicians Show Ticket & 2 soft drinks + 9 PIzza',
+      'House Magicians Show Ticket',
+      'House Magicians Show ticket',
+      'Groupon Magic & Pints Package (per person)',
+      'Groupon Magic & Cocktails Package (per person)',
+      'Wowcher Magic & Cocktails Package (per person)',
+      'Smoke Offer Ticket includes Drink (minimum x2)',
+      'OLD Groupon Offer (per person - extras are already included)'
+    ];
     
-    if (drinksField && String(drinksField).trim() !== '' && String(drinksField) !== '0' && parseInt(String(drinksField)) > 0) {
-      if (isTargetGuest) console.log('SUCCESS: Found House Magicians Show Ticket & 2 Drinks');
-      return '2 Drinks';
-    }
-    
-    // Check for pizza + drinks combo
-    const pizzaDrinksField = guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'];
-    if (pizzaDrinksField && String(pizzaDrinksField).trim() !== '' && String(pizzaDrinksField) !== '0' && parseInt(String(pizzaDrinksField)) > 0) {
-      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
-      return '2 Drinks + 9" Pizza';
-    }
-    
-    // Check for soft drinks + pizza
-    const softDrinksPizzaField = guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'];
-    if (softDrinksPizzaField && String(softDrinksPizzaField).trim() !== '' && String(softDrinksPizzaField) !== '0' && parseInt(String(softDrinksPizzaField)) > 0) {
-      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
-      return '2 Soft Drinks + 9" Pizza';
-    }
-    
-    // Check for soft drinks only
-    const softDrinksField = guest['House Magicians Show Ticket & 2 soft drinks'];
-    if (softDrinksField && String(softDrinksField).trim() !== '' && String(softDrinksField) !== '0' && parseInt(String(softDrinksField)) > 0) {
-      if (isTargetGuest) console.log('Found: House Magicians Show Ticket & 2 soft drinks');
-      return '2 Soft Drinks';
-    }
-    
-    // Check for show only tickets (both variations)
-    const showTicketField1 = guest['House Magicians Show Ticket'];
-    const showTicketField2 = guest['House Magicians Show ticket'];
-    if ((showTicketField1 && String(showTicketField1).trim() !== '' && String(showTicketField1) !== '0' && parseInt(String(showTicketField1)) > 0) ||
-        (showTicketField2 && String(showTicketField2).trim() !== '' && String(showTicketField2) !== '0' && parseInt(String(showTicketField2)) > 0)) {
-      if (isTargetGuest) console.log('Found: House Magicians Show Ticket (Show Only)');
-      return 'Show Only';
-    }
-    
-    // Check for other package types
-    const grouponPintsField = guest['Groupon Magic & Pints Package (per person)'];
-    if (grouponPintsField && String(grouponPintsField).trim() !== '' && String(grouponPintsField) !== '0' && parseInt(String(grouponPintsField)) > 0) {
-      return 'Pints Package';
-    }
-    
-    const grouponCocktailsField = guest['Groupon Magic & Cocktails Package (per person)'];
-    if (grouponCocktailsField && String(grouponCocktailsField).trim() !== '' && String(grouponCocktailsField) !== '0' && parseInt(String(grouponCocktailsField)) > 0) {
-      return 'Cocktails Package';
-    }
-    
-    const wowcherField = guest['Wowcher Magic & Cocktails Package (per person)'];
-    if (wowcherField && String(wowcherField).trim() !== '' && String(wowcherField) !== '0' && parseInt(String(wowcherField)) > 0) {
-      return 'Wowcher Package';
-    }
-    
-    const smokeOfferField = guest['Smoke Offer Ticket includes Drink (minimum x2)'];
-    if (smokeOfferField && String(smokeOfferField).trim() !== '' && String(smokeOfferField) !== '0' && parseInt(String(smokeOfferField)) > 0) {
-      return 'Drinks (min x2)';
-    }
-    
-    const oldGrouponField = guest['OLD Groupon Offer (per person - extras are already included)'];
-    if (oldGrouponField && String(oldGrouponField).trim() !== '' && String(oldGrouponField) !== '0' && parseInt(String(oldGrouponField)) > 0) {
-      return 'Groupon Package';
+    // Find which ticket type this guest has
+    for (const field of ticketFields) {
+      const value = guest[field];
+      if (isTargetGuest) {
+        console.log(`Checking field "${field}": value = "${value}", type = ${typeof value}`);
+      }
+      
+      if (value && String(value).trim() !== '' && String(value) !== '0') {
+        const numValue = parseInt(String(value));
+        if (numValue > 0) {
+          if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
+          
+          // Return the appropriate package based on the field name
+          if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
+            return '2 Drinks + 9" Pizza';
+          } else if (field.includes('& 2 Drinks')) {
+            return '2 Drinks';
+          } else if (field.includes('& 2 soft drinks + 9')) {
+            return '2 Soft Drinks + 9" Pizza';
+          } else if (field.includes('& 2 soft drinks')) {
+            return '2 Soft Drinks';
+          } else if (field.includes('Magic & Pints Package')) {
+            return 'Pints Package';
+          } else if (field.includes('Magic & Cocktails Package')) {
+            return 'Cocktails Package';
+          } else if (field.includes('Wowcher')) {
+            return 'Wowcher Package';
+          } else if (field.includes('Smoke Offer')) {
+            return 'Drinks (min x2)';
+          } else if (field.includes('OLD Groupon')) {
+            return 'Groupon Package';
+          } else {
+            return 'Show Only';
+          }
+        }
+      }
     }
     
     if (isTargetGuest) console.log('No active ticket types found, defaulting to Show Only');
