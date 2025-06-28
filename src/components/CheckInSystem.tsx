@@ -952,30 +952,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setBookingComments(newComments);
   };
 
-  const handleIntervalOrderToggle = async (guestIndex: number, orderType: 'pizza' | 'drinks') => {
-    const newOrders = new Map(intervalOrders);
-    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
-    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
-    newOrders.set(guestIndex, updatedOrder);
-    setIntervalOrders(newOrders);
-
-    // Update database
-    await updateGuestInDatabase(guestIndex, {
-      interval_pizza_order: updatedOrder.pizza,
-      interval_drinks_order: updatedOrder.drinks
-    });
-
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    console.log(`Toggle ${orderType} for ${guestName}: ${updatedOrder[orderType]}`);
-    
-    toast({
-      title: updatedOrder[orderType] ? "✅ Interval Order Added" : "❌ Interval Order Removed",
-      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'ordered' : 'removed'} for interval`,
-    });
-  };
-
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
@@ -1149,7 +1125,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                     <div className="flex items-center gap-1">
                       <Pizza className="h-3 w-3" />
                       <Coffee className="h-3 w-3" />
-                      Interval
+                      Interval Orders
                     </div>
                   </TableHead>
                   <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
@@ -1212,7 +1188,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           {booker}
                           {partyGroup && (
                             <div className="text-xs text-pink-600 font-medium mt-1">
-                              🔗 Connected to: {partyGroup.guestNames.filter(name => name !== booker).join(', ')}
+                              🔗 Connected to: {partyGroup?.guestNames.filter(name => name !== booker).join(', ')}
                             </div>
                           )}
                         </div>
@@ -1304,24 +1280,32 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 items-center">
+                        <div className="flex flex-col gap-2 items-center">
                           <Button
                             onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
                             variant={intervalOrder.pizza ? "default" : "outline"}
                             size="sm"
-                            className={`h-6 w-6 p-0 ${intervalOrder.pizza ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white hover:bg-orange-50 border-orange-200'}`}
-                            disabled={!isCheckedIn}
+                            className={`h-8 px-3 text-sm font-medium ${
+                              intervalOrder.pizza 
+                                ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500' 
+                                : 'bg-white hover:bg-orange-50 border-orange-300 text-orange-700'
+                            }`}
                           >
-                            <Pizza className="h-3 w-3" />
+                            <Pizza className="h-4 w-4 mr-1" />
+                            {intervalOrder.pizza ? 'YES' : 'NO'}
                           </Button>
                           <Button
                             onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
                             variant={intervalOrder.drinks ? "default" : "outline"}
                             size="sm"
-                            className={`h-6 w-6 p-0 ${intervalOrder.drinks ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-blue-50 border-blue-200'}`}
-                            disabled={!isCheckedIn}
+                            className={`h-8 px-3 text-sm font-medium ${
+                              intervalOrder.drinks 
+                                ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' 
+                                : 'bg-white hover:bg-blue-50 border-blue-300 text-blue-700'
+                            }`}
                           >
-                            <Coffee className="h-3 w-3" />
+                            <Coffee className="h-4 w-4 mr-1" />
+                            {intervalOrder.drinks ? 'YES' : 'NO'}
                           </Button>
                         </div>
                       </TableCell>
