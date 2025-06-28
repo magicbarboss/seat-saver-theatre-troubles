@@ -24,6 +24,7 @@ interface Guest {
 interface CheckInSystemProps {
   guests: Guest[];
   headers: string[];
+  showTimes: string[];
 }
 
 interface BookingGroup {
@@ -51,7 +52,7 @@ interface PartyGroup {
   connectionType: 'mutual' | 'one-way';
 }
 
-const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
+const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
@@ -68,6 +69,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
   const [sessionDate, setSessionDate] = useState<string>('');
   const [showClearDialog, setShowClearDialog] = useState(false);
+
+  // Auto-filter to first show time on component mount
+  useEffect(() => {
+    if (showTimes && showTimes.length > 0 && showFilter === 'all') {
+      setShowFilter(showTimes[0]);
+      console.log(`Auto-filtering to first show time: ${showTimes[0]}`);
+    }
+  }, [showTimes]);
 
   // Generate session key based on current date
   const getSessionKey = () => {
@@ -983,19 +992,22 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                 <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
                 <div className="flex gap-2 mt-2">
                   <Button
-                    variant={showFilter === '7:00pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('7:00pm')}
-                    className="flex-1 text-sm"
+                    variant="outline"
+                    onClick={() => setShowFilter('all')}
+                    className={`flex-1 text-sm ${showFilter === 'all' ? 'bg-gray-200' : ''}`}
                   >
-                    7pm Show
+                    All Shows
                   </Button>
-                  <Button
-                    variant={showFilter === '9:00pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('9:00pm')}
-                    className="flex-1 text-sm"
-                  >
-                    9pm Show
-                  </Button>
+                  {showTimes.map(time => (
+                    <Button
+                      key={time}
+                      variant={showFilter === time ? 'default' : 'outline'}
+                      onClick={() => setShowFilter(time)}
+                      className="flex-1 text-sm"
+                    >
+                      {time}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </div>
