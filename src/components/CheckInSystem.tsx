@@ -1097,7 +1097,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm text-gray-600 max-w-xs whitespace-normal break-words">
+                        <div className="text-sm text-gray-600 max-w-md whitespace-normal break-words">
                           {allNotes}
                         </div>
                       </TableCell>
