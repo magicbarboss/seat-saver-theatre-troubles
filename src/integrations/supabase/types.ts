@@ -37,12 +37,9 @@ export type Database = {
         Row: {
           booker_name: string | null
           booking_code: string | null
-          booking_comments: string | null
           checked_in_at: string | null
           guest_list_id: string
           id: string
-          interval_drinks_order: boolean | null
-          interval_pizza_order: boolean | null
           is_allocated: boolean | null
           is_checked_in: boolean | null
           is_seated: boolean | null
@@ -59,12 +56,9 @@ export type Database = {
         Insert: {
           booker_name?: string | null
           booking_code?: string | null
-          booking_comments?: string | null
           checked_in_at?: string | null
           guest_list_id: string
           id?: string
-          interval_drinks_order?: boolean | null
-          interval_pizza_order?: boolean | null
           is_allocated?: boolean | null
           is_checked_in?: boolean | null
           is_seated?: boolean | null
@@ -81,12 +75,9 @@ export type Database = {
         Update: {
           booker_name?: string | null
           booking_code?: string | null
-          booking_comments?: string | null
           checked_in_at?: string | null
           guest_list_id?: string
           id?: string
-          interval_drinks_order?: boolean | null
-          interval_pizza_order?: boolean | null
           is_allocated?: boolean | null
           is_checked_in?: boolean | null
           is_seated?: boolean | null

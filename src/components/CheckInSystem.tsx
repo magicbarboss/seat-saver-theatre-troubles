@@ -4,11 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
@@ -20,11 +19,6 @@ interface Guest {
   is_checked_in: boolean;
   pager_number: number | null;
   table_assignments: number[] | null;
-  is_seated: boolean;
-  is_allocated: boolean;
-  booking_comments: string | null;
-  checked_in_at: string | null;
-  seated_at: string | null;
 }
 
 interface CheckInSystemProps {
@@ -73,144 +67,62 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
 
-  // Load state from Supabase on component mount
+  // Load state on component mount (only once)
   useEffect(() => {
-    const loadStateFromSupabase = () => {
-      if (!guests || guests.length === 0) return;
-      
-      const newCheckedInGuests = new Set<number>();
-      const newPagerAssignments = new Map<number, number>();
-      const newSeatedGuests = new Set<number>();
-      const newAllocatedGuests = new Set<number>();
-      const newGuestTableAllocations = new Map<number, number[]>();
-      const newBookingComments = new Map<number, string>();
-
-      guests.forEach((guest, index) => {
-        if (guest.is_checked_in) {
-          newCheckedInGuests.add(index);
-        }
-        if (guest.pager_number) {
-          newPagerAssignments.set(index, guest.pager_number);
-        }
-        if (guest.is_seated) {
-          newSeatedGuests.add(index);
-        }
-        if (guest.is_allocated) {
-          newAllocatedGuests.add(index);
-        }
-        if (guest.table_assignments && guest.table_assignments.length > 0) {
-          newGuestTableAllocations.set(index, guest.table_assignments);
-        }
-        if (guest.booking_comments) {
-          newBookingComments.set(index, guest.booking_comments);
-        }
-      });
-
-      setCheckedInGuests(newCheckedInGuests);
-      setPagerAssignments(newPagerAssignments);
-      setSeatedGuests(newSeatedGuests);
-      setAllocatedGuests(newAllocatedGuests);
-      setGuestTableAllocations(newGuestTableAllocations);
-      setBookingComments(newBookingComments);
-      setIsInitialized(true);
-      
-      console.log('Loaded state from Supabase:', {
-        checkedIn: newCheckedInGuests.size,
-        seated: newSeatedGuests.size,
-        allocated: newAllocatedGuests.size,
-        pagers: newPagerAssignments.size,
-        comments: newBookingComments.size
-      });
-    };
-
-    loadStateFromSupabase();
-  }, [guests]);
-
-  // Subscribe to real-time updates
-  useEffect(() => {
-    if (!isInitialized || !guests || guests.length === 0) return;
-
-    const channel = supabase
-      .channel('guests-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'guests'
-        },
-        (payload) => {
-          console.log('Real-time update received:', payload);
-          // Find the guest index that was updated
-          const updatedGuest = payload.new as Guest;
-          const guestIndex = guests.findIndex(g => g.id === updatedGuest.id);
+    const loadState = () => {
+      try {
+        const savedState = localStorage.getItem('checkin-system-state');
+        if (savedState) {
+          const state = JSON.parse(savedState);
+          setCheckedInGuests(new Set(state.checkedInGuests || []));
+          setPagerAssignments(new Map(state.pagerAssignments || []));
+          setSeatedGuests(new Set(state.seatedGuests || []));
+          setAllocatedGuests(new Set(state.allocatedGuests || []));
+          setGuestTableAllocations(new Map(state.guestTableAllocations || []));
+          setPartyGroups(new Map(state.partyGroups || []));
+          setBookingComments(new Map(state.bookingComments || []));
+          console.log('Loaded saved state from', state.timestamp);
           
-          if (guestIndex !== -1) {
-            // Update local state based on the database change
-            setCheckedInGuests(prev => {
-              const newSet = new Set(prev);
-              if (updatedGuest.is_checked_in) {
-                newSet.add(guestIndex);
-              } else {
-                newSet.delete(guestIndex);
-              }
-              return newSet;
-            });
-
-            setSeatedGuests(prev => {
-              const newSet = new Set(prev);
-              if (updatedGuest.is_seated) {
-                newSet.add(guestIndex);
-              } else {
-                newSet.delete(guestIndex);
-              }
-              return newSet;
-            });
-
-            setPagerAssignments(prev => {
-              const newMap = new Map(prev);
-              if (updatedGuest.pager_number) {
-                newMap.set(guestIndex, updatedGuest.pager_number);
-              } else {
-                newMap.delete(guestIndex);
-              }
-              return newMap;
-            });
-          }
+          toast({
+            title: "🔄 State Restored",
+            description: `Previous session data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
+          });
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isInitialized, guests]);
-
-  // Function to update guest in database
-  const updateGuestInDatabase = async (guestIndex: number, updates: Partial<Guest>) => {
-    if (!guests[guestIndex]) return;
-
-    const guest = guests[guestIndex];
-    try {
-      const { error } = await supabase
-        .from('guests')
-        .update(updates)
-        .eq('id', guest.id);
-
-      if (error) {
-        console.error('Failed to update guest:', error);
-        toast({
-          title: "❌ Update Failed",
-          description: "Failed to sync changes. Please try again.",
-          variant: "destructive"
-        });
-      } else {
-        setLastSaved(new Date());
+      } catch (error) {
+        console.error('Failed to load saved state:', error);
       }
-    } catch (error) {
-      console.error('Error updating guest:', error);
-    }
-  };
+      setIsInitialized(true);
+    };
+
+    loadState();
+  }, []);
+
+  // Auto-save functionality - separate effect that only runs after initialization
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const saveState = () => {
+      const state = {
+        checkedInGuests: Array.from(checkedInGuests),
+        pagerAssignments: Array.from(pagerAssignments.entries()),
+        seatedGuests: Array.from(seatedGuests),
+        allocatedGuests: Array.from(allocatedGuests),
+        guestTableAllocations: Array.from(guestTableAllocations.entries()),
+        partyGroups: Array.from(partyGroups.entries()),
+        bookingComments: Array.from(bookingComments.entries()),
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem('checkin-system-state', JSON.stringify(state));
+      setLastSaved(new Date());
+      console.log('Auto-saved state at', new Date().toLocaleTimeString());
+    };
+
+    const interval = setInterval(saveState, 30000);
+    return () => {
+      clearInterval(interval);
+      saveState();
+    };
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -284,7 +196,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   // Function to check in entire party
-  const handlePartyCheckIn = async (partyGroup: PartyGroup) => {
+  const handlePartyCheckIn = (partyGroup: PartyGroup) => {
     let allCheckedIn = true;
     
     partyGroup.bookingIndices.forEach(index => {
@@ -301,24 +213,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const newAllocatedGuests = new Set(allocatedGuests);
       const newGuestTableAllocations = new Map(guestTableAllocations);
 
-      // Update database for all party members
-      for (const index of partyGroup.bookingIndices) {
-        await updateGuestInDatabase(index, {
-          is_checked_in: false,
-          pager_number: null,
-          is_seated: false,
-          is_allocated: false,
-          table_assignments: null,
-          checked_in_at: null,
-          seated_at: null
-        });
-
+      partyGroup.bookingIndices.forEach(index => {
         newCheckedIn.delete(index);
         newPagerAssignments.delete(index);
         newSeatedGuests.delete(index);
         newAllocatedGuests.delete(index);
         newGuestTableAllocations.delete(index);
-      }
+      });
 
       setCheckedInGuests(newCheckedIn);
       setPagerAssignments(newPagerAssignments);
@@ -333,16 +234,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     } else {
       // Check in entire party
       const newCheckedIn = new Set(checkedInGuests);
-      
-      // Update database for all party members
-      for (const index of partyGroup.bookingIndices) {
-        await updateGuestInDatabase(index, {
-          is_checked_in: true,
-          checked_in_at: new Date().toISOString()
-        });
+      partyGroup.bookingIndices.forEach(index => {
         newCheckedIn.add(index);
-      }
-      
+      });
       setCheckedInGuests(newCheckedIn);
       
       // Assign pager to first guest in party
@@ -399,13 +293,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - UPDATED WITH CALCULATIONS
+  // Extract package information from ticket type fields - FIXED LOGIC
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
     const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla');
-    const totalGuests = guest.total_quantity || 1;
     
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG ===');
@@ -440,35 +333,25 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         if (numValue > 0) {
           if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
           
-          // Return the appropriate package with calculations based on the field name
+          // Return the appropriate package based on the field name
           if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
-            const drinkTokens = 2 * totalGuests;
-            const pizzas = 1 * totalGuests;
-            return `2 Drinks + 9" Pizza (${drinkTokens} tokens, ${pizzas} pizzas)`;
+            return '2 Drinks + 9" Pizza';
           } else if (field.includes('& 2 Drinks')) {
-            const drinkTokens = 2 * totalGuests;
-            return `2 Drinks (${drinkTokens} tokens)`;
+            return '2 Drinks';
           } else if (field.includes('& 2 soft drinks + 9')) {
-            const drinkTokens = 2 * totalGuests;
-            const pizzas = 1 * totalGuests;
-            return `2 Soft Drinks + 9" Pizza (${drinkTokens} soft drinks, ${pizzas} pizzas)`;
+            return '2 Soft Drinks + 9" Pizza';
           } else if (field.includes('& 2 soft drinks')) {
-            const drinkTokens = 2 * totalGuests;
-            return `2 Soft Drinks (${drinkTokens} soft drinks)`;
+            return '2 Soft Drinks';
           } else if (field.includes('Magic & Pints Package')) {
-            const drinkTokens = 2 * totalGuests; // Assuming pints package includes 2 drinks
-            return `Pints Package (${drinkTokens} pints)`;
+            return 'Pints Package';
           } else if (field.includes('Magic & Cocktails Package')) {
-            const drinkTokens = 2 * totalGuests; // Assuming cocktails package includes 2 drinks
-            return `Cocktails Package (${drinkTokens} cocktails)`;
+            return 'Cocktails Package';
           } else if (field.includes('Wowcher')) {
-            const drinkTokens = 2 * totalGuests; // Assuming Wowcher package includes 2 drinks
-            return `Wowcher Package (${drinkTokens} drinks)`;
+            return 'Wowcher Package';
           } else if (field.includes('Smoke Offer')) {
-            const drinkTokens = Math.max(2, 1 * totalGuests); // Minimum 2 drinks
-            return `Drinks (min x2) (${drinkTokens} drinks)`;
+            return 'Drinks (min x2)';
           } else if (field.includes('OLD Groupon')) {
-            return `Groupon Package (${totalGuests} guests)`;
+            return 'Groupon Package';
           } else {
             return 'Show Only';
           }
@@ -634,30 +517,44 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return availablePagers.filter(pager => !assignedPagers.has(pager));
   };
 
-  const handleCheckIn = async (mainIndex: number) => {
+  const assignPager = (guestIndex: number, pagerId: number) => {
+    const newAssignments = new Map(pagerAssignments);
+    newAssignments.set(guestIndex, pagerId);
+    setPagerAssignments(newAssignments);
+    
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: "📟 Pager Assigned",
+      description: `Pager ${pagerId} assigned to ${guestName}`,
+    });
+    
+    setSelectedGuestForPager(null);
+  };
+
+  const bypassPager = (guestIndex: number) => {
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: "✅ Pager Bypassed",
+      description: `${guestName} seated without pager`,
+    });
+    
+    setSelectedGuestForPager(null);
+  };
+
+  const handleCheckIn = (mainIndex: number) => {
+    const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[mainIndex];
     if (!guest) return;
 
     const guestName = extractGuestName(guest.booker_name || '');
-    const isCurrentlyCheckedIn = checkedInGuests.has(mainIndex);
     
-    if (isCurrentlyCheckedIn) {
-      // Check out - remove all related states
-      await updateGuestInDatabase(mainIndex, {
-        is_checked_in: false,
-        pager_number: null,
-        is_seated: false,
-        is_allocated: false,
-        table_assignments: null,
-        checked_in_at: null,
-        seated_at: null
-      });
-
-      // Update local state
-      const newCheckedIn = new Set(checkedInGuests);
+    if (newCheckedIn.has(mainIndex)) {
+      // Check out - remove pager assignment, allocated status and seated status
       newCheckedIn.delete(mainIndex);
-      setCheckedInGuests(newCheckedIn);
-
       const newPagerAssignments = new Map(pagerAssignments);
       newPagerAssignments.delete(mainIndex);
       setPagerAssignments(newPagerAssignments);
@@ -675,28 +572,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       setGuestTableAllocations(newGuestTableAllocations);
       
       toast({
-        title: "✅ Guest Checked Out",
-        description: `${guestName} has been checked out and all assignments cleared.`,
+        title: "✅ Checked Out",
+        description: `${guestName} has been checked out and pager freed.`,
       });
     } else {
-      // Check in - just mark as checked in, don't auto-assign pager
-      await updateGuestInDatabase(mainIndex, {
-        is_checked_in: true,
-        checked_in_at: new Date().toISOString()
-      });
-
-      const newCheckedIn = new Set(checkedInGuests);
+      // Check in - need to assign pager
       newCheckedIn.add(mainIndex);
-      setCheckedInGuests(newCheckedIn);
-      
-      // Open pager assignment dialog
       setSelectedGuestForPager(mainIndex);
-      
-      toast({
-        title: "🎉 Guest Checked In",
-        description: `${guestName} checked in successfully. Please assign a pager.`,
-      });
     }
+    setCheckedInGuests(newCheckedIn);
   };
 
   const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
@@ -706,12 +590,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
-  const handlePagerRelease = async (pagerNumber: number) => {
+  const handlePagerRelease = (pagerNumber: number) => {
     // Find the guest with this pager and remove the assignment
     const newPagerAssignments = new Map(pagerAssignments);
     for (const [guestIndex, assignedPager] of pagerAssignments) {
       if (assignedPager === pagerNumber) {
-        await updateGuestInDatabase(guestIndex, { pager_number: null });
         newPagerAssignments.delete(guestIndex);
         break;
       }
@@ -724,13 +607,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     });
   };
 
-  const handleGuestSeated = async (guestIndex: number) => {
-    await updateGuestInDatabase(guestIndex, {
-      is_seated: true,
-      seated_at: new Date().toISOString(),
-      is_allocated: false
-    });
-
+  const handleGuestSeated = (guestIndex: number) => {
     const newSeatedGuests = new Set(seatedGuests);
     newSeatedGuests.add(guestIndex);
     setSeatedGuests(newSeatedGuests);
@@ -739,23 +616,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.delete(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "🪑 Guest Seated",
-      description: `${guestName} has been seated successfully.`,
-    });
   };
 
-  // Updated: Handle table allocation (not seated yet)
-  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
-    await updateGuestInDatabase(guestIndex, {
-      is_allocated: true,
-      table_assignments: tableIds
-    });
-
+  // New: Handle table allocation (not seated yet)
+  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.add(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
@@ -905,14 +769,12 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return stats;
   };
 
-  const handleCommentChange = async (guestIndex: number, comment: string) => {
+  const handleCommentChange = (guestIndex: number, comment: string) => {
     const newComments = new Map(bookingComments);
     if (comment.trim() === '') {
       newComments.delete(guestIndex);
-      await updateGuestInDatabase(guestIndex, { booking_comments: null });
     } else {
       newComments.set(guestIndex, comment);
-      await updateGuestInDatabase(guestIndex, { booking_comments: comment });
     }
     setBookingComments(newComments);
   };
@@ -933,7 +795,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <div className="flex items-center space-x-2 mt-2">
           <Save className="h-4 w-4 text-green-600" />
           <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
-          <span className="text-xs text-blue-600">✨ Real-time sync enabled</span>
         </div>
       </div>
 
@@ -1030,7 +891,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <TabsContent value="checkin" className="space-y-6">
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <div className="flex space-x-4 items-end">
-              <div className="flex-1 max-w-md">
+              <div className="flex-1">
                 <Label htmlFor="search" className="text-base font-medium text-gray-700">Search by Booker Name</Label>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -1077,6 +938,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Package</TableHead>
@@ -1085,8 +947,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
-                  <TableHead className="font-semibold text-gray-700 w-48">
+                  <TableHead className="font-semibold text-gray-700">Notes</TableHead>
+                  <TableHead className="font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       <MessageSquare className="h-4 w-4" />
                       Comments
@@ -1106,6 +968,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const partyGroup = getPartyGroup(booking.originalIndex);
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
                   
+                  const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
@@ -1122,8 +985,9 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                             variant={isCheckedIn ? "destructive" : "default"}
                             size="sm"
                             className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
+                            disabled={isSeated}
                           >
-                            {isCheckedIn ? 'Check Out' : 'Check In'}
+                            {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
                           </Button>
                           {partyGroup && (
                             <Button
@@ -1139,11 +1003,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <div className="font-mono text-sm text-gray-700">
+                          {bookingCode}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="font-semibold text-gray-900">
                           {booker}
                           {partyGroup && (
                             <div className="text-xs text-pink-600 font-medium mt-1">
-                              🔗 Connected to: {partyGroup?.guestNames.filter(name => name !== booker).join(', ')}
+                              🔗 Connected to: {partyGroup.guestNames.filter(name => name !== booker).join(', ')}
                             </div>
                           )}
                         </div>
@@ -1193,7 +1062,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                               #{assignedPager}
                             </div>
                           ) : isCheckedIn ? (
-                            <div className="text-orange-600 text-sm font-medium">Bypassed</div>
+                            <div className="text-gray-500 text-sm">Bypassed</div>
                           ) : (
                             <div className="text-gray-400 text-sm">-</div>
                           )}
@@ -1234,13 +1103,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="w-96 min-w-96">
-                        <div className="text-sm text-gray-600 whitespace-normal break-words leading-relaxed w-full">
+                      <TableCell>
+                        <div className="text-sm text-gray-600 max-w-xs">
                           {allNotes}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="w-48">
+                        <div className="w-40">
                           <Textarea
                             placeholder="Add comments..."
                             value={currentComment}
