@@ -95,11 +95,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     };
 
     loadState();
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   // Auto-save functionality - separate effect that only runs after initialization
   useEffect(() => {
-    if (!isInitialized) return; // Don't save until we've loaded the initial state
+    if (!isInitialized) return;
 
     const saveState = () => {
       const state = {
@@ -117,10 +117,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       console.log('Auto-saved state at', new Date().toLocaleTimeString());
     };
 
-    // Set up auto-save interval
-    const interval = setInterval(saveState, 30000); // Save every 30 seconds
-
-    // Save on component unmount
+    const interval = setInterval(saveState, 30000);
     return () => {
       clearInterval(interval);
       saveState();
@@ -296,50 +293,62 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED DETECTION
+  // Extract package information from ticket type fields - ENHANCED DEBUGGING
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
-    console.log('=== DETAILED PACKAGE CHECK ===');
-    console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-    console.log('All guest fields:', Object.keys(guest));
+    const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
+    const isAndrew = guestName.includes('andrew');
     
-    // Log all non-zero fields to see what ticket types are available
-    Object.entries(guest).forEach(([key, value]) => {
-      if (value && value !== '' && value !== '0' && !['id', 'booking_code', 'booker_name', 'total_quantity', 'is_checked_in', 'pager_number', 'table_assignments'].includes(key)) {
-        console.log(`Field "${key}": "${value}"`);
-      }
-    });
+    if (isAndrew) {
+      console.log('=== ENHANCED ANDREW WILLIAMS DEBUG ===');
+      console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
+      console.log('All guest fields and values:');
+      Object.entries(guest).forEach(([key, value]) => {
+        if (key.toLowerCase().includes('ticket') || key.toLowerCase().includes('drink') || key.toLowerCase().includes('pizza')) {
+          console.log(`"${key}": "${value}" (type: ${typeof value})`);
+        }
+      });
+    }
     
     // Check specific ticket fields in order of priority
     // First check for pizza + drinks combo
     if (guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks + 9 Pizza'] !== '') {
-      console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
+      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 Drinks + 9 Pizza');
       return '2 Drinks + 9" Pizza';
     }
     
-    // Then check for just drinks
-    if (guest['House Magicians Show Ticket & 2 Drinks'] && guest['House Magicians Show Ticket & 2 Drinks'] !== '0' && guest['House Magicians Show Ticket & 2 Drinks'] !== '') {
-      console.log('Found: House Magicians Show Ticket & 2 Drinks');
+    // Then check for just drinks - FIXED CHECK
+    const drinksField = guest['House Magicians Show Ticket & 2 Drinks'];
+    if (isAndrew) {
+      console.log('Checking drinks field:', drinksField, 'Type:', typeof drinksField);
+      console.log('Is truthy?', !!drinksField);
+      console.log('Not zero string?', drinksField !== '0');
+      console.log('Not empty string?', drinksField !== '');
+      console.log('Greater than 0?', parseInt(drinksField) > 0);
+    }
+    
+    if (drinksField && drinksField !== '0' && drinksField !== '' && parseInt(drinksField) > 0) {
+      if (isAndrew) console.log('SUCCESS: Found House Magicians Show Ticket & 2 Drinks');
       return '2 Drinks';
     }
     
     // Check for soft drinks + pizza
     if (guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks + 9 PIzza'] !== '') {
-      console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
+      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 soft drinks + 9 PIzza');
       return '2 Soft Drinks + 9" Pizza';
     }
     
     // Check for soft drinks only
     if (guest['House Magicians Show Ticket & 2 soft drinks'] && guest['House Magicians Show Ticket & 2 soft drinks'] !== '0' && guest['House Magicians Show Ticket & 2 soft drinks'] !== '') {
-      console.log('Found: House Magicians Show Ticket & 2 soft drinks');
+      if (isAndrew) console.log('Found: House Magicians Show Ticket & 2 soft drinks');
       return '2 Soft Drinks';
     }
     
     // Check for show only tickets (both variations)
     if ((guest['House Magicians Show Ticket'] && guest['House Magicians Show Ticket'] !== '0' && guest['House Magicians Show Ticket'] !== '') ||
         (guest['House Magicians Show ticket'] && guest['House Magicians Show ticket'] !== '0' && guest['House Magicians Show ticket'] !== '')) {
-      console.log('Found: House Magicians Show Ticket (Show Only)');
+      if (isAndrew) console.log('Found: House Magicians Show Ticket (Show Only)');
       return 'Show Only';
     }
     
@@ -364,7 +373,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       return 'Groupon Package';
     }
     
-    console.log('No active ticket types found, defaulting to Show Only');
+    if (isAndrew) console.log('No active ticket types found for Andrew, defaulting to Show Only');
     return 'Show Only';
   };
 
