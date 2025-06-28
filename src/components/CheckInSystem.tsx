@@ -296,11 +296,20 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - UPDATED FOR NEW HEADERS
+  // Extract package information from ticket type fields - ENHANCED DEBUGGING
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
-    console.log('Checking package for guest:', guest.booker_name, 'Booking code:', guest.booking_code);
+    console.log('=== DETAILED PACKAGE CHECK ===');
+    console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
+    console.log('All guest fields:', Object.keys(guest));
+    
+    // Log all non-zero fields to see what ticket types are available
+    Object.entries(guest).forEach(([key, value]) => {
+      if (value && value !== '' && value !== '0' && !['id', 'booking_code', 'booker_name', 'total_quantity', 'is_checked_in', 'pager_number', 'table_assignments'].includes(key)) {
+        console.log(`Field "${key}": "${value}"`);
+      }
+    });
     
     // Find fields that contain ticket information by checking all field names
     for (const [fieldName, value] of Object.entries(guest)) {
@@ -315,13 +324,25 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         
         const fieldLower = fieldName.toLowerCase();
         
-        // Handle new header formats specifically
+        // Handle exact matches first (case insensitive)
         if (fieldLower === 'house magicians show ticket & 2 drinks + 9 pizza') {
+          console.log('Matched: 2 Drinks + 9" Pizza');
           return '2 Drinks + 9" Pizza';
         } else if (fieldLower === 'house magicians show ticket & 2 drinks') {
+          console.log('Matched: 2 Drinks');
           return '2 Drinks';
         } else if (fieldLower === 'house magicians show ticket') {
+          console.log('Matched: Show Only');
           return 'Show Only';
+        }
+        
+        // Check for variations in field names that might contain "2 drinks"
+        if (fieldLower.includes('2 drinks') && fieldLower.includes('pizza')) {
+          console.log('Matched pattern: 2 drinks + pizza');
+          return '2 Drinks + 9" Pizza';
+        } else if (fieldLower.includes('2 drinks')) {
+          console.log('Matched pattern: 2 drinks');
+          return '2 Drinks';
         }
         
         // Legacy patterns for backwards compatibility
@@ -352,9 +373,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         } else if (fieldLower.includes('wowcher')) {
           return 'Wowcher Package';
         }
+        
+        // If we found an active ticket type but don't recognize the pattern, log it
+        console.log(`Unrecognized ticket type pattern: "${fieldName}"`);
       }
     }
     
+    console.log('No active ticket types found, defaulting to Show Only');
     return 'Show Only';
   };
 
