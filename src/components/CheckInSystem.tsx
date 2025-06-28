@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
+import { Toggle } from '@/components/ui/toggle';
+import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare, Pizza, Coffee } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import TableAllocation from './TableAllocation';
 
@@ -66,6 +67,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
+  const [intervalOrders, setIntervalOrders] = useState<Map<number, { pizza: boolean; drinks: boolean }>>(new Map());
 
   // Load state on component mount (only once)
   useEffect(() => {
@@ -81,6 +83,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           setGuestTableAllocations(new Map(state.guestTableAllocations || []));
           setPartyGroups(new Map(state.partyGroups || []));
           setBookingComments(new Map(state.bookingComments || []));
+          setIntervalOrders(new Map(state.intervalOrders || []));
           console.log('Loaded saved state from', state.timestamp);
           
           toast({
@@ -110,6 +113,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         guestTableAllocations: Array.from(guestTableAllocations.entries()),
         partyGroups: Array.from(partyGroups.entries()),
         bookingComments: Array.from(bookingComments.entries()),
+        intervalOrders: Array.from(intervalOrders.entries()),
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('checkin-system-state', JSON.stringify(state));
@@ -122,7 +126,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, intervalOrders]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -790,6 +794,22 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setBookingComments(newComments);
   };
 
+  const handleIntervalOrderToggle = (guestIndex: number, orderType: 'pizza' | 'drinks') => {
+    const newOrders = new Map(intervalOrders);
+    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
+    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
+    newOrders.set(guestIndex, updatedOrder);
+    setIntervalOrders(newOrders);
+
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: updatedOrder[orderType] ? "✅ Interval Order Added" : "❌ Interval Order Removed",
+      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'ordered' : 'removed'} for interval`,
+    });
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
@@ -803,6 +823,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Seated guests: {seatedGuests.size}</p>
         <p className="text-xs">Party connections: {partyGroups.size}</p>
         <p className="text-xs">Comments: {bookingComments.size}</p>
+        <p className="text-xs">Interval orders: {intervalOrders.size}</p>
         <div className="flex items-center space-x-2 mt-2">
           <Save className="h-4 w-4 text-green-600" />
           <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
@@ -957,6 +978,13 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">
+                    <div className="flex items-center gap-1">
+                      <Pizza className="h-3 w-3" />
+                      <Coffee className="h-3 w-3" />
+                      Interval
+                    </div>
+                  </TableHead>
                   <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
                   <TableHead className="font-semibold text-gray-700 w-48">
                     <div className="flex items-center gap-1">
@@ -977,6 +1005,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   const partyGroup = getPartyGroup(booking.originalIndex);
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
+                  const intervalOrder = intervalOrders.get(booking.originalIndex) || { pizza: false, drinks: false };
                   
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
@@ -1105,6 +1134,28 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           ) : (
                             <div className="text-gray-400 text-sm">Waiting</div>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 items-center">
+                          <Toggle
+                            pressed={intervalOrder.pizza}
+                            onPressedChange={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
+                            size="sm"
+                            className="h-6 w-6 p-0 data-[state=on]:bg-orange-100 data-[state=on]:text-orange-800"
+                            disabled={!isCheckedIn}
+                          >
+                            <Pizza className="h-3 w-3" />
+                          </Toggle>
+                          <Toggle
+                            pressed={intervalOrder.drinks}
+                            onPressedChange={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
+                            size="sm"
+                            className="h-6 w-6 p-0 data-[state=on]:bg-blue-100 data-[state=on]:text-blue-800"
+                            disabled={!isCheckedIn}
+                          >
+                            <Coffee className="h-3 w-3" />
+                          </Toggle>
                         </div>
                       </TableCell>
                       <TableCell className="w-96 min-w-96">
