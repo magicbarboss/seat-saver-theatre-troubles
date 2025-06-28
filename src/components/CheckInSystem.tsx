@@ -512,21 +512,25 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return notes.filter(note => note && note.trim() !== '').join(' | ');
   };
 
-  // Get show time from item field
+  // Get show time from item field - UPDATED to normalize show times
   const getShowTime = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Unknown';
-    const itemField = guest.Item || guest.item_details || '';
+    const itemField = guest.Item || guest.item_details || guest.show_time || '';
     
     // Look for time patterns in square brackets like [7:00pm] or [9:00pm]
     const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
     if (timeMatch) {
+      const time = timeMatch[1].toLowerCase();
+      // Normalize to standard format
+      if (time.includes('7:00pm') || time.includes('7pm')) return '7pm';
+      if (time.includes('9:00pm') || time.includes('9pm')) return '9pm';
       return timeMatch[1];
     }
     
-    // Fallback patterns
-    if (itemField.includes('7:00pm') || itemField.includes('7pm')) return '7:00pm';
-    if (itemField.includes('9:00pm') || itemField.includes('9pm')) return '9:00pm';
-    if (itemField.includes('8:00pm') || itemField.includes('8pm')) return '8:00pm';
+    // Fallback patterns - normalize to simple format
+    if (itemField.includes('7:00pm') || itemField.includes('7pm')) return '7pm';
+    if (itemField.includes('9:00pm') || itemField.includes('9pm')) return '9pm';
+    if (itemField.includes('8:00pm') || itemField.includes('8pm')) return '8pm';
     
     return 'Unknown';
   };
@@ -679,9 +683,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   };
 
   const getShowTimeBadgeStyle = (showTime: string) => {
-    if (showTime === '7:00pm' || showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (showTime === '8:00pm' || showTime === '8pm') return 'bg-blue-100 text-blue-800 border-blue-200';
-    if (showTime === '9:00pm' || showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
+    if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (showTime === '8pm') return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
@@ -787,7 +791,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   };
 
   const getShowTimeStats = () => {
-    const stats = { '7:00pm': 0, '8:00pm': 0, '9:00pm': 0, 'Unknown': 0 };
+    const stats = { '7pm': 0, '8pm': 0, '9pm': 0, 'Unknown': 0 };
     
     groupedBookings.forEach(booking => {
       if (!booking || !booking.mainBooking) return;
@@ -795,12 +799,12 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const showTime = getShowTime(booking.mainBooking);
       const totalQty = booking.mainBooking.total_quantity || 1;
       
-      if (showTime === '7:00pm' || showTime === '7pm') {
-        stats['7:00pm'] += totalQty;
-      } else if (showTime === '8:00pm' || showTime === '8pm') {
-        stats['8:00pm'] += totalQty;
-      } else if (showTime === '9:00pm' || showTime === '9pm') {
-        stats['9:00pm'] += totalQty;
+      if (showTime === '7pm') {
+        stats['7pm'] += totalQty;
+      } else if (showTime === '8pm') {
+        stats['8pm'] += totalQty;
+      } else if (showTime === '9pm') {
+        stats['9pm'] += totalQty;
       } else {
         stats['Unknown'] += totalQty;
       }
@@ -998,16 +1002,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                   >
                     All Shows
                   </Button>
-                  {showTimes.map(time => (
-                    <Button
-                      key={time}
-                      variant={showFilter === time ? 'default' : 'outline'}
-                      onClick={() => setShowFilter(time)}
-                      className="flex-1 text-sm"
-                    >
-                      {time}
-                    </Button>
-                  ))}
+                  <Button
+                    variant={showFilter === '7pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('7pm')}
+                    className="flex-1 text-sm"
+                  >
+                    7pm
+                  </Button>
+                  <Button
+                    variant={showFilter === '9pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('9pm')}
+                    className="flex-1 text-sm"
+                  >
+                    9pm
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1298,10 +1306,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                   const bookingCount = groupedBookings.filter(booking => {
                     if (!booking || !booking.mainBooking) return false;
                     const showTime = getShowTime(booking.mainBooking);
-                    return (time === '7:00pm' && (showTime === '7:00pm' || showTime === '7pm')) ||
-                           (time === '8:00pm' && (showTime === '8:00pm' || showTime === '8pm')) ||
-                           (time === '9:00pm' && (showTime === '9:00pm' || showTime === '9pm')) ||
-                           (time === 'Unknown' && showTime !== '7:00pm' && showTime !== '7pm' && showTime !== '8:00pm' && showTime !== '8pm' && showTime !== '9:00pm' && showTime !== '9pm');
+                    return (time === '7pm' && (showTime === '7pm' || showTime === '7pm')) ||
+                           (time === '8pm' && (showTime === '8pm' || showTime === '8pm')) ||
+                           (time === '9pm' && (showTime === '9pm' || showTime === '9pm'));
                   }).length;
                   
                   const totalGuests = Object.values(getShowTimeStats()).reduce((sum, count) => sum + count, 0);
