@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Toggle } from '@/components/ui/toggle';
-import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare, Pizza, Coffee } from 'lucide-react';
+import { Search, Users, CheckCircle, User, Clock, Radio, MapPin, Save, UserPlus, MessageSquare } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
@@ -24,8 +24,6 @@ interface Guest {
   is_seated: boolean;
   is_allocated: boolean;
   booking_comments: string | null;
-  interval_pizza_order: boolean;
-  interval_drinks_order: boolean;
   checked_in_at: string | null;
   seated_at: string | null;
 }
@@ -75,7 +73,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
-  const [intervalOrders, setIntervalOrders] = useState<Map<number, { pizza: boolean; drinks: boolean }>>(new Map());
 
   // Load state from Supabase on component mount
   useEffect(() => {
@@ -88,7 +85,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       const newAllocatedGuests = new Set<number>();
       const newGuestTableAllocations = new Map<number, number[]>();
       const newBookingComments = new Map<number, string>();
-      const newIntervalOrders = new Map<number, { pizza: boolean; drinks: boolean }>();
 
       guests.forEach((guest, index) => {
         if (guest.is_checked_in) {
@@ -109,12 +105,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         if (guest.booking_comments) {
           newBookingComments.set(index, guest.booking_comments);
         }
-        
-        const pizzaOrder = guest.interval_pizza_order || false;
-        const drinksOrder = guest.interval_drinks_order || false;
-        if (pizzaOrder || drinksOrder) {
-          newIntervalOrders.set(index, { pizza: pizzaOrder, drinks: drinksOrder });
-        }
       });
 
       setCheckedInGuests(newCheckedInGuests);
@@ -123,7 +113,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       setAllocatedGuests(newAllocatedGuests);
       setGuestTableAllocations(newGuestTableAllocations);
       setBookingComments(newBookingComments);
-      setIntervalOrders(newIntervalOrders);
       setIsInitialized(true);
       
       console.log('Loaded state from Supabase:', {
@@ -131,8 +120,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         seated: newSeatedGuests.size,
         allocated: newAllocatedGuests.size,
         pagers: newPagerAssignments.size,
-        comments: newBookingComments.size,
-        intervalOrders: newIntervalOrders.size
+        comments: newBookingComments.size
       });
     };
 
@@ -184,18 +172,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               const newMap = new Map(prev);
               if (updatedGuest.pager_number) {
                 newMap.set(guestIndex, updatedGuest.pager_number);
-              } else {
-                newMap.delete(guestIndex);
-              }
-              return newMap;
-            });
-
-            setIntervalOrders(prev => {
-              const newMap = new Map(prev);
-              const pizzaOrder = updatedGuest.interval_pizza_order || false;
-              const drinksOrder = updatedGuest.interval_drinks_order || false;
-              if (pizzaOrder || drinksOrder) {
-                newMap.set(guestIndex, { pizza: pizzaOrder, drinks: drinksOrder });
               } else {
                 newMap.delete(guestIndex);
               }
@@ -952,28 +928,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     setBookingComments(newComments);
   };
 
-  const handleIntervalOrderToggle = async (guestIndex: number, orderType: 'pizza' | 'drinks') => {
-    const newOrders = new Map(intervalOrders);
-    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
-    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
-    newOrders.set(guestIndex, updatedOrder);
-    setIntervalOrders(newOrders);
-
-    // Update database - this is now just for tracking, doesn't affect check-in status
-    await updateGuestInDatabase(guestIndex, {
-      interval_pizza_order: updatedOrder.pizza,
-      interval_drinks_order: updatedOrder.drinks
-    });
-
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: updatedOrder[orderType] ? "✅ Interval Order Tracked" : "❌ Interval Order Removed",
-      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'marked as ordered' : 'unmarked'} for interval`,
-    });
-  };
-
   return (
     <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       {/* Debug info - remove this after fixing */}
@@ -987,7 +941,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <p className="text-xs">Seated guests: {seatedGuests.size}</p>
         <p className="text-xs">Party connections: {partyGroups.size}</p>
         <p className="text-xs">Comments: {bookingComments.size}</p>
-        <p className="text-xs">Interval orders: {intervalOrders.size}</p>
         <div className="flex items-center space-x-2 mt-2">
           <Save className="h-4 w-4 text-green-600" />
           <span className="text-xs text-green-600">Last saved: {lastSaved.toLocaleTimeString()}</span>
@@ -1143,13 +1096,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">
-                    <div className="flex items-center gap-1">
-                      <Pizza className="h-3 w-3" />
-                      <Coffee className="h-3 w-3" />
-                      Interval Orders
-                    </div>
-                  </TableHead>
                   <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
                   <TableHead className="font-semibold text-gray-700 w-48">
                     <div className="flex items-center gap-1">
@@ -1170,7 +1116,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
                   const partyGroup = getPartyGroup(booking.originalIndex);
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
-                  const intervalOrder = intervalOrders.get(booking.originalIndex) || { pizza: false, drinks: false };
                   
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
@@ -1299,36 +1244,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           ) : (
                             <div className="text-gray-400 text-sm">Waiting</div>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-2 items-center">
-                          <Button
-                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
-                            variant={intervalOrder.pizza ? "default" : "outline"}
-                            size="sm"
-                            className={`h-8 px-3 text-sm font-medium ${
-                              intervalOrder.pizza 
-                                ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-500' 
-                                : 'bg-white hover:bg-orange-50 border-orange-300 text-orange-700'
-                            }`}
-                          >
-                            <Pizza className="h-4 w-4 mr-1" />
-                            {intervalOrder.pizza ? 'YES' : 'NO'}
-                          </Button>
-                          <Button
-                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
-                            variant={intervalOrder.drinks ? "default" : "outline"}
-                            size="sm"
-                            className={`h-8 px-3 text-sm font-medium ${
-                              intervalOrder.drinks 
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white border-blue-500' 
-                                : 'bg-white hover:bg-blue-50 border-blue-300 text-blue-700'
-                            }`}
-                          >
-                            <Coffee className="h-4 w-4 mr-1" />
-                            {intervalOrder.drinks ? 'YES' : 'NO'}
-                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="w-96 min-w-96">
