@@ -634,45 +634,15 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return availablePagers.filter(pager => !assignedPagers.has(pager));
   };
 
-  const assignPager = async (guestIndex: number, pagerId: number) => {
-    await updateGuestInDatabase(guestIndex, { pager_number: pagerId });
-
-    const newAssignments = new Map(pagerAssignments);
-    newAssignments.set(guestIndex, pagerId);
-    setPagerAssignments(newAssignments);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "📟 Pager Assigned",
-      description: `Pager ${pagerId} assigned to ${guestName}`,
-    });
-    
-    setSelectedGuestForPager(null);
-  };
-
-  const bypassPager = (guestIndex: number) => {
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "✅ Pager Bypassed",
-      description: `${guestName} seated without pager`,
-    });
-    
-    setSelectedGuestForPager(null);
-  };
-
   const handleCheckIn = async (mainIndex: number) => {
-    const newCheckedIn = new Set(checkedInGuests);
     const guest = guests[mainIndex];
     if (!guest) return;
 
     const guestName = extractGuestName(guest.booker_name || '');
+    const isCurrentlyCheckedIn = checkedInGuests.has(mainIndex);
     
-    if (newCheckedIn.has(mainIndex)) {
-      // Check out - remove pager assignment, allocated status and seated status
+    if (isCurrentlyCheckedIn) {
+      // Check out - remove all related states
       await updateGuestInDatabase(mainIndex, {
         is_checked_in: false,
         pager_number: null,
@@ -683,7 +653,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         seated_at: null
       });
 
+      // Update local state
+      const newCheckedIn = new Set(checkedInGuests);
       newCheckedIn.delete(mainIndex);
+      setCheckedInGuests(newCheckedIn);
+
       const newPagerAssignments = new Map(pagerAssignments);
       newPagerAssignments.delete(mainIndex);
       setPagerAssignments(newPagerAssignments);
@@ -701,20 +675,28 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
       setGuestTableAllocations(newGuestTableAllocations);
       
       toast({
-        title: "✅ Checked Out",
-        description: `${guestName} has been checked out and pager freed.`,
+        title: "✅ Guest Checked Out",
+        description: `${guestName} has been checked out and all assignments cleared.`,
       });
     } else {
-      // Check in - need to assign pager
+      // Check in - just mark as checked in, don't auto-assign pager
       await updateGuestInDatabase(mainIndex, {
         is_checked_in: true,
         checked_in_at: new Date().toISOString()
       });
 
+      const newCheckedIn = new Set(checkedInGuests);
       newCheckedIn.add(mainIndex);
+      setCheckedInGuests(newCheckedIn);
+      
+      // Open pager assignment dialog
       setSelectedGuestForPager(mainIndex);
+      
+      toast({
+        title: "🎉 Guest Checked In",
+        description: `${guestName} checked in successfully. Please assign a pager.`,
+      });
     }
-    setCheckedInGuests(newCheckedIn);
   };
 
   const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
@@ -757,6 +739,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.delete(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
+    
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: "🪑 Guest Seated",
+      description: `${guestName} has been seated successfully.`,
+    });
   };
 
   // Updated: Handle table allocation (not seated yet)
@@ -1132,9 +1122,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                             variant={isCheckedIn ? "destructive" : "default"}
                             size="sm"
                             className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
-                            disabled={isSeated}
                           >
-                            {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
+                            {isCheckedIn ? 'Check Out' : 'Check In'}
                           </Button>
                           {partyGroup && (
                             <Button
@@ -1204,7 +1193,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                               #{assignedPager}
                             </div>
                           ) : isCheckedIn ? (
-                            <div className="text-gray-500 text-sm">Bypassed</div>
+                            <div className="text-orange-600 text-sm font-medium">Bypassed</div>
                           ) : (
                             <div className="text-gray-400 text-sm">-</div>
                           )}
