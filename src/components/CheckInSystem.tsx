@@ -804,6 +804,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     const guest = guests[guestIndex];
     const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
+    console.log(`Toggle ${orderType} for ${guestName}: ${updatedOrder[orderType]}`);
+    
     toast({
       title: updatedOrder[orderType] ? "✅ Interval Order Added" : "❌ Interval Order Removed",
       description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'ordered' : 'removed'} for interval`,
@@ -1138,24 +1140,24 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1 items-center">
-                          <Toggle
-                            pressed={intervalOrder.pizza}
-                            onPressedChange={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
+                          <Button
+                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
+                            variant={intervalOrder.pizza ? "default" : "outline"}
                             size="sm"
-                            className="h-6 w-6 p-0 data-[state=on]:bg-orange-100 data-[state=on]:text-orange-800"
+                            className={`h-6 w-6 p-0 ${intervalOrder.pizza ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-white hover:bg-orange-50 border-orange-200'}`}
                             disabled={!isCheckedIn}
                           >
                             <Pizza className="h-3 w-3" />
-                          </Toggle>
-                          <Toggle
-                            pressed={intervalOrder.drinks}
-                            onPressedChange={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
+                          </Button>
+                          <Button
+                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
+                            variant={intervalOrder.drinks ? "default" : "outline"}
                             size="sm"
-                            className="h-6 w-6 p-0 data-[state=on]:bg-blue-100 data-[state=on]:text-blue-800"
+                            className={`h-6 w-6 p-0 ${intervalOrder.drinks ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-white hover:bg-blue-50 border-blue-200'}`}
                             disabled={!isCheckedIn}
                           >
                             <Coffee className="h-3 w-3" />
-                          </Toggle>
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="w-96 min-w-96">
