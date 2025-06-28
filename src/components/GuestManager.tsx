@@ -308,8 +308,7 @@ const GuestManager = () => {
         {showCheckIn && (
           <CheckInSystem 
             guests={[]}
-            onUpdateGuest={updateGuestCheckIn}
-            onClose={() => setShowCheckIn(false)}
+            headers={[]}
           />
         )}
 
