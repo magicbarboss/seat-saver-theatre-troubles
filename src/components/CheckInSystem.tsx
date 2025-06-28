@@ -356,6 +356,44 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return 'Show Only';
   };
 
+  // Calculate total package quantities based on guest count
+  const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
+    const quantities = [];
+    
+    // Extract drink quantities
+    if (packageInfo.includes('2 Drinks') || packageInfo.includes('2 soft drinks')) {
+      const totalDrinks = 2 * guestCount;
+      const drinkType = packageInfo.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
+      quantities.push(`${totalDrinks} ${drinkType}`);
+    } else if (packageInfo.includes('Pints Package')) {
+      const totalPints = 2 * guestCount; // Assuming 2 pints per person
+      quantities.push(`${totalPints} Pint Tokens`);
+    } else if (packageInfo.includes('Cocktails Package')) {
+      const totalCocktails = 2 * guestCount; // Assuming 2 cocktails per person
+      quantities.push(`${totalCocktails} Cocktail Tokens`);
+    } else if (packageInfo.includes('Drinks (min x2)')) {
+      const totalDrinks = Math.max(2, 2 * guestCount);
+      quantities.push(`${totalDrinks} Drink Tokens`);
+    }
+    
+    // Extract pizza quantities
+    if (packageInfo.includes('9" Pizza')) {
+      const totalPizzas = 1 * guestCount; // 1 pizza per person
+      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+    }
+    
+    // Handle special packages
+    if (packageInfo === 'Groupon Package') {
+      quantities.push('Groupon Items Included');
+    } else if (packageInfo === 'Wowcher Package') {
+      quantities.push('Wowcher Items Included');
+    } else if (packageInfo === 'Show Only') {
+      quantities.push('Show Ticket Only');
+    }
+    
+    return quantities.length > 0 ? quantities : ['Show Ticket Only'];
+  };
+
   // Extract ticket type - focus on package information (drinks + pizza)
   const getTicketType = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Ticket';
@@ -970,7 +1008,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Package</TableHead>
+                  <TableHead className="font-semibold text-gray-700 min-w-[200px]">Package & Totals</TableHead>
                   <TableHead className="font-semibold text-gray-700">Addons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
@@ -1007,6 +1045,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
+                  const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
                   const addons = getAddons(booking.mainBooking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
@@ -1106,9 +1145,20 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="bg-purple-50 px-3 py-2 rounded-lg text-sm font-medium text-purple-800 border border-purple-200">
-                          {packageInfo}
+                      <TableCell className="min-w-[200px]">
+                        <div className="space-y-2">
+                          <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                            <div className="text-sm font-medium text-purple-800 mb-1">
+                              {packageInfo}
+                            </div>
+                            <div className="space-y-1">
+                              {packageQuantities.map((quantity, idx) => (
+                                <div key={idx} className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                                  {quantity}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
