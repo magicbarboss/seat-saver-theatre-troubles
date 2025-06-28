@@ -213,7 +213,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
 
   // Function to update guest in database
   const updateGuestInDatabase = async (guestIndex: number, updates: Partial<Guest>) => {
-    if (!guests[guestIndex]) return;
+    if (!guests[guestIndex]) return false;
 
     const guest = guests[guestIndex];
     try {
@@ -229,11 +229,14 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           description: "Failed to sync changes. Please try again.",
           variant: "destructive"
         });
+        return false;
       } else {
         setLastSaved(new Date());
+        return true;
       }
     } catch (error) {
       console.error('Error updating guest:', error);
+      return false;
     }
   };
 
@@ -953,29 +956,36 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
   };
 
   const handleIntervalOrderToggle = async (guestIndex: number, orderType: 'pizza' | 'drinks') => {
-    const newOrders = new Map(intervalOrders);
-    const currentOrder = newOrders.get(guestIndex) || { pizza: false, drinks: false };
-    const updatedOrder = { ...currentOrder, [orderType]: !currentOrder[orderType] };
-    
-    // Update local state first for immediate feedback
-    newOrders.set(guestIndex, updatedOrder);
-    setIntervalOrders(newOrders);
+    const guest = guests[guestIndex];
+    if (!guest) return;
 
-    // Update database
-    await updateGuestInDatabase(guestIndex, {
+    const currentOrder = intervalOrders.get(guestIndex) || { pizza: false, drinks: false };
+    const newValue = !currentOrder[orderType];
+    const updatedOrder = { ...currentOrder, [orderType]: newValue };
+    
+    console.log(`Toggling ${orderType} for guest ${guestIndex} from ${currentOrder[orderType]} to ${newValue}`);
+    
+    // Update database first
+    const dbUpdates = {
       interval_pizza_order: updatedOrder.pizza,
       interval_drinks_order: updatedOrder.drinks
-    });
+    };
+    
+    const success = await updateGuestInDatabase(guestIndex, dbUpdates);
+    
+    if (success) {
+      // Only update local state if database update was successful
+      const newOrders = new Map(intervalOrders);
+      newOrders.set(guestIndex, updatedOrder);
+      setIntervalOrders(newOrders);
 
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    console.log(`Toggle ${orderType} for ${guestName}: ${updatedOrder[orderType]}`);
-    
-    toast({
-      title: updatedOrder[orderType] ? "✅ Interval Order Added" : "❌ Interval Order Removed",
-      description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${updatedOrder[orderType] ? 'ordered' : 'removed'} for interval`,
-    });
+      const guestName = extractGuestName(guest.booker_name || '');
+      
+      toast({
+        title: newValue ? "✅ Interval Order Added" : "❌ Interval Order Removed",
+        description: `${guestName} - ${orderType === 'pizza' ? 'Pizza' : 'Drinks'} ${newValue ? 'ordered' : 'removed'} for interval`,
+      });
+    }
   };
 
   return (
@@ -1308,7 +1318,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                       <TableCell>
                         <div className="flex flex-col gap-2 items-center">
                           <Button
-                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'pizza')}
+                            onClick={() => {
+                              console.log('Pizza button clicked for guest:', booking.originalIndex);
+                              handleIntervalOrderToggle(booking.originalIndex, 'pizza');
+                            }}
                             variant={intervalOrder.pizza ? "default" : "outline"}
                             size="sm"
                             className={`h-10 w-16 text-xs font-semibold ${
@@ -1322,7 +1335,10 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                             {intervalOrder.pizza ? 'YES' : 'NO'}
                           </Button>
                           <Button
-                            onClick={() => handleIntervalOrderToggle(booking.originalIndex, 'drinks')}
+                            onClick={() => {
+                              console.log('Drinks button clicked for guest:', booking.originalIndex);
+                              handleIntervalOrderToggle(booking.originalIndex, 'drinks');
+                            }}
                             variant={intervalOrder.drinks ? "default" : "outline"}
                             size="sm"
                             className={`h-10 w-16 text-xs font-semibold ${
