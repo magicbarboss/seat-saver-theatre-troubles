@@ -915,13 +915,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                     7pm Show
                   </Button>
                   <Button
-                    variant={showFilter === '8:00pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('8:00pm')}
-                    className="flex-1 text-sm"
-                  >
-                    8pm Show
-                  </Button>
-                  <Button
                     variant={showFilter === '9:00pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('9:00pm')}
                     className="flex-1 text-sm"
@@ -938,7 +931,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead className="font-semibold text-gray-700">Action</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Booking Code</TableHead>
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700">Package</TableHead>
@@ -947,7 +939,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Notes</TableHead>
+                  <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
                   <TableHead className="font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       <MessageSquare className="h-4 w-4" />
@@ -968,7 +960,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   const partyGroup = getPartyGroup(booking.originalIndex);
                   const currentComment = bookingComments.get(booking.originalIndex) || '';
                   
-                  const bookingCode = booking.mainBooking.booking_code || '';
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
@@ -1000,11 +991,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                               Party ({partyGroup.totalGuests})
                             </Button>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-mono text-sm text-gray-700">
-                          {bookingCode}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -1103,8 +1089,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-gray-600 max-w-xs">
+                      <TableCell className="w-96 min-w-96">
+                        <div className="text-sm text-gray-600">
                           {allNotes}
                         </div>
                       </TableCell>
