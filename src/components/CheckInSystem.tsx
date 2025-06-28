@@ -296,17 +296,11 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED VERSION
+  // Extract package information from ticket type fields - UPDATED FOR NEW HEADERS
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     console.log('Checking package for guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-    
-    // Check for "Comedy ticket plus 9 Pizza" specifically first
-    if (guest['Comedy ticket plus 9 Pizza'] && guest['Comedy ticket plus 9 Pizza'] !== '' && guest['Comedy ticket plus 9 Pizza'] !== '0') {
-      console.log('Found Comedy ticket plus 9 Pizza:', guest['Comedy ticket plus 9 Pizza']);
-      return '9" Pizza';
-    }
     
     // Find fields that contain ticket information by checking all field names
     for (const [fieldName, value] of Object.entries(guest)) {
@@ -321,7 +315,16 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         
         const fieldLower = fieldName.toLowerCase();
         
-        // Extract package information based on what's included in the field name
+        // Handle new header formats specifically
+        if (fieldLower === 'house magicians show ticket & 2 drinks + 9 pizza') {
+          return '2 Drinks + 9" Pizza';
+        } else if (fieldLower === 'house magicians show ticket & 2 drinks') {
+          return '2 Drinks';
+        } else if (fieldLower === 'house magicians show ticket') {
+          return 'Show Only';
+        }
+        
+        // Legacy patterns for backwards compatibility
         if (fieldLower.includes('includes 2 drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
           return '2 Drinks + 9" Pizza';
         } else if (fieldLower.includes('includes 2 soft drinks') && (fieldLower.includes('+ 9') || fieldLower.includes('pizza'))) {
@@ -348,8 +351,6 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
           return 'Groupon Package';
         } else if (fieldLower.includes('wowcher')) {
           return 'Wowcher Package';
-        } else {
-          return 'Show Only';
         }
       }
     }
