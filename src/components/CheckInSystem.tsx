@@ -902,7 +902,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
         <TabsContent value="checkin" className="space-y-6">
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <div className="flex space-x-4 items-end">
-              <div className="flex-1">
+              <div className="flex-1 max-w-md">
                 <Label htmlFor="search" className="text-base font-medium text-gray-700">Search by Booker Name</Label>
                 <div className="relative mt-2">
                   <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
