@@ -175,7 +175,8 @@ const GuestManager = () => {
         total_quantity: guest.total_quantity,
         is_checked_in: guest.is_checked_in,
         pager_number: guest.pager_number,
-        table_assignments: guest.table_assignments
+        table_assignments: guest.table_assignments,
+        show_time: guest.show_time
       };
     });
 
@@ -184,8 +185,12 @@ const GuestManager = () => {
     const isFirstGuestDataValid = firstGuestTicketData && typeof firstGuestTicketData === 'object' && !Array.isArray(firstGuestTicketData);
     const headers = guests.length > 0 ? Object.keys(isFirstGuestDataValid ? firstGuestTicketData : {}) : [];
 
+    // Get unique show times and sort them
+    const showTimes = [...new Set(transformedGuests.map(g => g.show_time).filter(Boolean))].sort();
+
     console.log('Transformed guests for CheckInSystem:', transformedGuests.slice(0, 2));
     console.log('Headers for CheckInSystem:', headers);
+    console.log('Available show times:', showTimes);
 
     return (
       <div className="space-y-4">
@@ -208,6 +213,7 @@ const GuestManager = () => {
         <CheckInSystem 
           guests={transformedGuests}
           headers={headers}
+          showTimes={showTimes}
         />
       </div>
     );
@@ -229,14 +235,31 @@ const GuestManager = () => {
           </Button>
         </div>
 
+        {/* Quick Actions Section */}
+        {activeGuestList && guests.length > 0 && (
+          <div className="mb-6 p-4 bg-card rounded-lg border">
+            <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
+            <div className="flex gap-3">
+              <Button onClick={() => setShowCheckIn(true)} className="flex-1">
+                Open Check-In System
+              </Button>
+              <Button variant="outline" onClick={() => setShowUpload(true)} className="flex-1">
+                Upload New List
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Guest Lists</h2>
-                <Button onClick={() => setShowUpload(true)}>
-                  Upload New List
-                </Button>
+                {(!activeGuestList || guests.length === 0) && (
+                  <Button onClick={() => setShowUpload(true)}>
+                    Upload New List
+                  </Button>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -273,7 +296,11 @@ const GuestManager = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">{activeGuestList.name}</h2>
-                  <Button onClick={() => setShowCheckIn(true)}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowCheckIn(true)}
+                    className="hidden md:block"
+                  >
                     Open Check-In System
                   </Button>
                 </div>
