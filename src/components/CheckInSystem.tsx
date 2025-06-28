@@ -946,7 +946,7 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
                   <TableHead className="font-semibold text-gray-700">Table</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700 w-80">Notes</TableHead>
+                  <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
                   <TableHead className="font-semibold text-gray-700 w-48">
                     <div className="flex items-center gap-1">
                       <MessageSquare className="h-4 w-4" />
@@ -1096,8 +1096,8 @@ const CheckInSystem = ({ guests, headers }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="w-80">
-                        <div className="text-sm text-gray-600 max-w-lg whitespace-normal break-words leading-relaxed">
+                      <TableCell className="w-96 min-w-96">
+                        <div className="text-sm text-gray-600 whitespace-normal break-words leading-relaxed w-full">
                           {allNotes}
                         </div>
                       </TableCell>
