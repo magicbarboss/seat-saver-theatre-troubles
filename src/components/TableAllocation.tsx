@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +16,9 @@ import {
   AlertCircle,
   Utensils,
   UserCheck,
-  Sparkles
+  Sparkles,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import SmartAllocation from './SmartAllocation';
@@ -49,6 +50,8 @@ interface Table {
   notes?: string;
   frontSeats?: CheckedInGuest[];
   backSeats?: CheckedInGuest[];
+  frontCapacity?: number;
+  backCapacity?: number;
 }
 
 const TableAllocation = ({ 
@@ -67,13 +70,13 @@ const TableAllocation = ({
     { id: 2, capacity: 2, isOccupied: false, guests: [] },
     { id: 3, capacity: 2, isOccupied: false, guests: [] },
     // Second Row - 4-seater tables (4-6)
-    { id: 4, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
-    { id: 5, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
-    { id: 6, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
+    { id: 4, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 5, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 6, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
     // Third Row - 4-seater tables (7-9)
-    { id: 7, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
-    { id: 8, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
-    { id: 9, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [] },
+    { id: 7, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 8, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 9, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
     // Back Row - 2-seater tables (10-13)
     { id: 10, capacity: 2, isOccupied: false, guests: [] },
     { id: 11, capacity: 2, isOccupied: false, guests: [] },
@@ -196,6 +199,173 @@ const TableAllocation = ({
   const waitingGuests = checkedInGuests.filter(guest => !guest.hasBeenSeated);
   const allocatedGuests = checkedInGuests.filter(guest => guest.hasTableAllocated && !guest.hasBeenSeated);
   const seatedGuests = checkedInGuests.filter(guest => guest.hasBeenSeated);
+
+  const adjustSeatCapacity = (tableId: number, position: 'front' | 'back', change: number) => {
+    setTables(prev => prev.map(table => {
+      if (table.id === tableId) {
+        const updatedTable = { ...table };
+        
+        if (position === 'front' && updatedTable.frontCapacity !== undefined) {
+          const newCapacity = Math.max(0, updatedTable.frontCapacity + change);
+          updatedTable.frontCapacity = newCapacity;
+          updatedTable.capacity = newCapacity + (updatedTable.backCapacity || 0);
+        } else if (position === 'back' && updatedTable.backCapacity !== undefined) {
+          const newCapacity = Math.max(0, updatedTable.backCapacity + change);
+          updatedTable.backCapacity = newCapacity;
+          updatedTable.capacity = (updatedTable.frontCapacity || 0) + newCapacity;
+        }
+        
+        return updatedTable;
+      }
+      return table;
+    }));
+  };
+
+  const adjustTableCapacity = (tableId: number, change: number) => {
+    setTables(prev => prev.map(table => {
+      if (table.id === tableId && (table.frontCapacity === undefined && table.backCapacity === undefined)) {
+        return {
+          ...table,
+          capacity: Math.max(1, table.capacity + change)
+        };
+      }
+      return table;
+    }));
+  };
+
+  const renderTableCard = (table: Table, rowName: string) => {
+    const has4Seats = table.frontCapacity !== undefined && table.backCapacity !== undefined;
+    
+    return (
+      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+        <CardContent className="p-4 text-center space-y-3">
+          <div className="font-bold text-lg">T{table.id}</div>
+          
+          {has4Seats ? (
+            // 4-seater table with front/back controls
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">Total: {table.capacity} seats</div>
+              
+              {/* Front seats control */}
+              <div className="flex items-center justify-between bg-blue-50 p-2 rounded">
+                <span className="text-xs font-medium">Front:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => adjustSeatCapacity(table.id, 'front', -1)}
+                    disabled={table.frontCapacity === 0}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs w-6 text-center">{table.frontCapacity}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => adjustSeatCapacity(table.id, 'front', 1)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Back seats control */}
+              <div className="flex items-center justify-between bg-purple-50 p-2 rounded">
+                <span className="text-xs font-medium">Back:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => adjustSeatCapacity(table.id, 'back', -1)}
+                    disabled={table.backCapacity === 0}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-xs w-6 text-center">{table.backCapacity}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => adjustSeatCapacity(table.id, 'back', 1)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // 2-seater table with simple capacity control
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => adjustTableCapacity(table.id, -1)}
+                  disabled={table.capacity === 1}
+                  className="h-6 w-6 p-0"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="text-sm">{table.capacity} seats</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => adjustTableCapacity(table.id, 1)}
+                  className="h-6 w-6 p-0"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {table.isOccupied && table.guests && (
+            <div className="mt-2 space-y-1">
+              <div className="text-xs font-medium text-red-800">
+                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
+              </div>
+              {has4Seats && (
+                <>
+                  {table.frontSeats && table.frontSeats.length > 0 && (
+                    <div className="text-xs text-red-700">Front: {table.frontSeats.map(g => g.name).join(', ')}</div>
+                  )}
+                  {table.backSeats && table.backSeats.length > 0 && (
+                    <div className="text-xs text-red-700">Back: {table.backSeats.map(g => g.name).join(', ')}</div>
+                  )}
+                </>
+              )}
+              {!has4Seats && table.guests.map((guest, idx) => (
+                <div key={idx} className="text-xs text-red-700">{guest.name}</div>
+              ))}
+            </div>
+          )}
+          
+          {table.isOccupied && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => clearTable(table.id)}
+              className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
+            >
+              Clear
+            </Button>
+          )}
+          
+          <div className="mt-2">
+            <Textarea
+              placeholder="Table notes..."
+              value={tableNotes.get(table.id) || ''}
+              onChange={(e) => handleTableNote(table.id, e.target.value)}
+              className="text-xs h-16 resize-none"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -494,7 +664,7 @@ const TableAllocation = ({
         <TabsContent value="layout" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Restaurant Layout</CardTitle>
+              <CardTitle>Restaurant Layout - Seat Management</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -502,42 +672,7 @@ const TableAllocation = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Front Row</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {tables.slice(0, 3).map((table) => (
-                      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
-                        <CardContent className="p-4 text-center">
-                          <div className="font-bold text-lg">T{table.id}</div>
-                          <div className="text-sm text-gray-600">{table.capacity} seats</div>
-                          {table.isOccupied && table.guests && (
-                            <div className="mt-2 space-y-1">
-                              <div className="text-xs font-medium text-red-800">
-                                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
-                              </div>
-                              {table.guests.map((guest, idx) => (
-                                <div key={idx} className="text-xs text-red-700">{guest.name}</div>
-                              ))}
-                            </div>
-                          )}
-                          {table.isOccupied && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => clearTable(table.id)}
-                              className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                          <div className="mt-2">
-                            <Textarea
-                              placeholder="Table notes..."
-                              value={tableNotes.get(table.id) || ''}
-                              onChange={(e) => handleTableNote(table.id, e.target.value)}
-                              className="text-xs h-16 resize-none"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {tables.slice(0, 3).map((table) => renderTableCard(table, 'Front'))}
                   </div>
                 </div>
 
@@ -545,45 +680,7 @@ const TableAllocation = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Second Row</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {tables.slice(3, 6).map((table) => (
-                      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
-                        <CardContent className="p-4 text-center">
-                          <div className="font-bold text-lg">T{table.id}</div>
-                          <div className="text-sm text-gray-600">{table.capacity} seats (2 front + 2 back)</div>
-                          {table.isOccupied && table.guests && (
-                            <div className="mt-2 space-y-1">
-                              <div className="text-xs font-medium text-red-800">
-                                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
-                              </div>
-                              {table.frontSeats && table.frontSeats.length > 0 && (
-                                <div className="text-xs text-red-700">Front: {table.frontSeats.map(g => g.name).join(', ')}</div>
-                              )}
-                              {table.backSeats && table.backSeats.length > 0 && (
-                                <div className="text-xs text-red-700">Back: {table.backSeats.map(g => g.name).join(', ')}</div>
-                              )}
-                            </div>
-                          )}
-                          {table.isOccupied && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => clearTable(table.id)}
-                              className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                          <div className="mt-2">
-                            <Textarea
-                              placeholder="Table notes..."
-                              value={tableNotes.get(table.id) || ''}
-                              onChange={(e) => handleTableNote(table.id, e.target.value)}
-                              className="text-xs h-16 resize-none"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {tables.slice(3, 6).map((table) => renderTableCard(table, 'Second'))}
                   </div>
                 </div>
 
@@ -591,45 +688,7 @@ const TableAllocation = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Third Row</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {tables.slice(6, 9).map((table) => (
-                      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
-                        <CardContent className="p-4 text-center">
-                          <div className="font-bold text-lg">T{table.id}</div>
-                          <div className="text-sm text-gray-600">{table.capacity} seats (2 front + 2 back)</div>
-                          {table.isOccupied && table.guests && (
-                            <div className="mt-2 space-y-1">
-                              <div className="text-xs font-medium text-red-800">
-                                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
-                              </div>
-                              {table.frontSeats && table.frontSeats.length > 0 && (
-                                <div className="text-xs text-red-700">Front: {table.frontSeats.map(g => g.name).join(', ')}</div>
-                              )}
-                              {table.backSeats && table.backSeats.length > 0 && (
-                                <div className="text-xs text-red-700">Back: {table.backSeats.map(g => g.name).join(', ')}</div>
-                              )}
-                            </div>
-                          )}
-                          {table.isOccupied && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => clearTable(table.id)}
-                              className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                          <div className="mt-2">
-                            <Textarea
-                              placeholder="Table notes..."
-                              value={tableNotes.get(table.id) || ''}
-                              onChange={(e) => handleTableNote(table.id, e.target.value)}
-                              className="text-xs h-16 resize-none"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {tables.slice(6, 9).map((table) => renderTableCard(table, 'Third'))}
                   </div>
                 </div>
 
@@ -637,42 +696,7 @@ const TableAllocation = ({
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-3">Back Row</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    {tables.slice(9, 13).map((table) => (
-                      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
-                        <CardContent className="p-4 text-center">
-                          <div className="font-bold text-lg">T{table.id}</div>
-                          <div className="text-sm text-gray-600">{table.capacity} seats</div>
-                          {table.isOccupied && table.guests && (
-                            <div className="mt-2 space-y-1">
-                              <div className="text-xs font-medium text-red-800">
-                                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
-                              </div>
-                              {table.guests.map((guest, idx) => (
-                                <div key={idx} className="text-xs text-red-700">{guest.name}</div>
-                              ))}
-                            </div>
-                          )}
-                          {table.isOccupied && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => clearTable(table.id)}
-                              className="mt-2 text-red-600 border-red-300 hover:bg-red-50"
-                            >
-                              Clear
-                            </Button>
-                          )}
-                          <div className="mt-2">
-                            <Textarea
-                              placeholder="Table notes..."
-                              value={tableNotes.get(table.id) || ''}
-                              onChange={(e) => handleTableNote(table.id, e.target.value)}
-                              className="text-xs h-16 resize-none"
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {tables.slice(9, 13).map((table) => renderTableCard(table, 'Back'))}
                   </div>
                 </div>
               </div>
