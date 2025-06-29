@@ -89,6 +89,50 @@ const TableAllocation = ({
   const [tableNotes, setTableNotes] = useState<Map<number, string>>(new Map());
   const [seatPosition, setSeatPosition] = useState<'front' | 'back' | 'any'>('any');
 
+  // Helper function to update table occupancy for both manual and smart allocation
+  const allocateGuestToTables = (guest: CheckedInGuest, tableIds: number[], position: 'front' | 'back' | 'any' = 'any') => {
+    setTables(prev => prev.map(table => {
+      if (tableIds.includes(table.id)) {
+        const updatedTable = {
+          ...table,
+          isOccupied: true,
+          guests: [...(table.guests || []), guest]
+        };
+
+        // Handle front/back seating for 4-seater tables
+        if (table.capacity === 4 && position !== 'any') {
+          if (position === 'front') {
+            updatedTable.frontSeats = [...(table.frontSeats || []), guest];
+          } else {
+            updatedTable.backSeats = [...(table.backSeats || []), guest];
+          }
+        }
+
+        return updatedTable;
+      }
+      return table;
+    }));
+
+    // Call the callback to update parent state
+    onTableAllocated(guest.originalIndex, tableIds);
+    
+    // Notify about assignment
+    onTableAssign(tableIds[0], guest.name, guest.count, guest.showTime);
+
+    toast({
+      title: "✅ Table Allocated",
+      description: `${guest.name} assigned to table${tableIds.length > 1 ? 's' : ''} ${tableIds.join(', ')}`,
+    });
+  };
+
+  // Handle smart allocation callback
+  const handleSmartAllocation = (guestIndex: number, tableIds: number[]) => {
+    const guest = checkedInGuests.find(g => g.originalIndex === guestIndex);
+    if (guest) {
+      allocateGuestToTables(guest, tableIds);
+    }
+  };
+
   const handleTableSelect = (tableId: number) => {
     setSelectedTables(prev => {
       const isSelected = prev.includes(tableId);
@@ -100,37 +144,10 @@ const TableAllocation = ({
     });
   };
 
-  const handleAssignment = () => {
+  const handleManualAssignment = () => {
     if (!selectedGuest || selectedTables.length === 0) return;
 
-    // Mark tables as occupied
-    setTables(prev => prev.map(table => {
-      if (selectedTables.includes(table.id)) {
-        const updatedTable = {
-          ...table,
-          isOccupied: true,
-          guests: [...(table.guests || []), selectedGuest]
-        };
-
-        // Handle front/back seating for 4-seater tables
-        if (table.capacity === 4 && seatPosition !== 'any') {
-          if (seatPosition === 'front') {
-            updatedTable.frontSeats = [...(table.frontSeats || []), selectedGuest];
-          } else {
-            updatedTable.backSeats = [...(table.backSeats || []), selectedGuest];
-          }
-        }
-
-        return updatedTable;
-      }
-      return table;
-    }));
-
-    // Call the callback to update parent state
-    onTableAllocated(selectedGuest.originalIndex, selectedTables);
-    
-    // Notify about assignment
-    onTableAssign(selectedTables[0], selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+    allocateGuestToTables(selectedGuest, selectedTables, seatPosition);
 
     // Reset selection
     setSelectedGuest(null);
@@ -232,6 +249,14 @@ const TableAllocation = ({
       return table;
     }));
   };
+
+  // Convert tables to format expected by SmartAllocation
+  const smartAllocationTables = tables.map(table => ({
+    id: table.id,
+    capacity: table.capacity,
+    isOccupied: table.isOccupied,
+    currentGuests: table.guests?.reduce((sum, guest) => sum + guest.count, 0) || 0
+  }));
 
   const renderTableCard = (table: Table, rowName: string) => {
     const has4Seats = table.frontCapacity !== undefined && table.backCapacity !== undefined;
@@ -425,13 +450,8 @@ const TableAllocation = ({
           <SmartAllocation
             checkedInGuests={waitingGuests}
             partyGroups={partyGroups}
-            onTableAllocated={onTableAllocated}
-            tables={tables.map(table => ({
-              id: table.id,
-              capacity: table.capacity,
-              isOccupied: table.isOccupied,
-              currentGuests: table.guests?.reduce((sum, guest) => sum + guest.count, 0)
-            }))}
+            onTableAllocated={handleSmartAllocation}
+            tables={smartAllocationTables}
           />
         </TabsContent>
 
@@ -649,7 +669,7 @@ const TableAllocation = ({
                       </div>
                     </div>
                     <Button 
-                      onClick={handleAssignment}
+                      onClick={handleManualAssignment}
                       className="w-full bg-green-600 hover:bg-green-700"
                     >
                       Allocate Tables
