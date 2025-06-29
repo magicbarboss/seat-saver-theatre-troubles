@@ -1304,6 +1304,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             onPagerRelease={handlePagerRelease}
             onGuestSeated={handleGuestSeated}
             onTableAllocated={handleTableAllocated}
+            partyGroups={partyGroups}
           />
         </TabsContent>
 
