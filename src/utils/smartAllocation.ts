@@ -1,4 +1,3 @@
-
 export interface TableInfo {
   id: number;
   capacity: number;
@@ -43,108 +42,222 @@ export class SmartTableAllocator {
     return suggestions;
   }
 
-  // Calculate best table fit for a guest group
+  // Get theatre-specific allocation suggestions
+  getTheatreSeatingStrategies(): any[] {
+    const { TheatreSeatingAnalyzer } = require('./theatreSeatingLogic');
+    const analysis = TheatreSeatingAnalyzer.analyzeGuestComposition(this.guestGroups);
+    const strategies = TheatreSeatingAnalyzer.generateSeatingStrategies(analysis, this.tables);
+    
+    return strategies;
+  }
+
+  // Enhanced calculation that considers theatre seating
   private calculateBestFit(guestGroup: GuestGroup): AllocationSuggestion {
     const availableTables = this.tables.filter(table => !table.isOccupied);
     const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
 
-    // Strategy 1: Perfect single table fit
-    const perfectFit = availableTables.find(table => table.capacity === guestCount);
-    if (perfectFit) {
+    // Theatre-specific logic for couples (2 guests)
+    if (guestCount === 2) {
+      return this.handleCoupleSeating(guestGroup, availableTables);
+    }
+
+    // Theatre-specific logic for large groups (5+ guests)
+    if (guestCount >= 5) {
+      return this.handleLargePartySeating(guestGroup, availableTables);
+    }
+
+    // Standard logic for other groups
+    return this.handleStandardSeating(guestGroup, availableTables);
+  }
+
+  private handleCoupleSeating(guestGroup: GuestGroup, availableTables: TableInfo[]): AllocationSuggestion {
+    // Prioritize front row for couples
+    const frontRowTables = availableTables.filter(table => [1, 2, 3].includes(table.id));
+    
+    if (frontRowTables.length > 0) {
+      const bestFrontTable = frontRowTables[0];
       return {
         guestGroup,
-        recommendedTables: [perfectFit.id],
+        recommendedTables: [bestFrontTable.id],
         efficiency: 'excellent',
-        reason: `Perfect fit: ${guestCount} guests for ${perfectFit.capacity}-seat table`,
-        alternatives: this.getAlternatives(guestGroup, [perfectFit.id])
+        reason: `Couple seated in front row (Table ${bestFrontTable.id}) for optimal theatre experience`,
+        alternatives: this.getCoupleAlternatives(guestGroup, availableTables, [bestFrontTable.id])
       };
     }
 
-    // Strategy 2: Best single table fit (minimal waste)
-    const bestSingleTable = availableTables
-      .filter(table => table.capacity >= guestCount)
-      .sort((a, b) => (a.capacity - guestCount) - (b.capacity - guestCount))[0];
+    // Fallback to any 2-seater table
+    const suitableTable = availableTables.find(table => table.capacity >= 2);
+    if (suitableTable) {
+      return {
+        guestGroup,
+        recommendedTables: [suitableTable.id],
+        efficiency: 'good',
+        reason: `Couple seated at Table ${suitableTable.id} (chairs can be adjusted as needed)`,
+        alternatives: this.getCoupleAlternatives(guestGroup, availableTables, [suitableTable.id])
+      };
+    }
 
-    if (bestSingleTable) {
-      const wastedSeats = bestSingleTable.capacity - guestCount;
-      const efficiency = wastedSeats <= 1 ? 'good' : wastedSeats <= 2 ? 'fair' : 'poor';
+    return this.noSuitableTablesResponse(guestGroup);
+  }
+
+  private handleLargePartySeating(guestGroup: GuestGroup, availableTables: TableInfo[]): AllocationSuggestion {
+    const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
+    
+    // Try adjacent table combinations
+    const adjacentCombination = this.findAdjacentTheatreTables(guestCount, availableTables);
+    
+    if (adjacentCombination.length > 0) {
+      const totalCapacity = adjacentCombination.reduce((sum, table) => sum + table.capacity, 0);
+      const chairsNeeded = Math.max(0, guestCount - totalCapacity);
       
       return {
         guestGroup,
-        recommendedTables: [bestSingleTable.id],
-        efficiency,
-        reason: `Single table: ${guestCount} guests, ${wastedSeats} empty seat${wastedSeats !== 1 ? 's' : ''}`,
-        alternatives: this.getAlternatives(guestGroup, [bestSingleTable.id])
+        recommendedTables: adjacentCombination.map(t => t.id),
+        efficiency: chairsNeeded <= 2 ? 'excellent' : 'good',
+        reason: `Large party (${guestCount} guests) seated together using Tables ${adjacentCombination.map(t => t.id).join(', ')}${chairsNeeded > 0 ? ` + ${chairsNeeded} extra chairs` : ''}`,
+        alternatives: this.getLargePartyAlternatives(guestGroup, availableTables, adjacentCombination.map(t => t.id))
       };
     }
 
-    // Strategy 3: Multiple table combination for large parties
-    if (guestCount > 8) {
-      const tableCombination = this.findTableCombination(guestCount, availableTables);
-      if (tableCombination.length > 0) {
-        const totalCapacity = tableCombination.reduce((sum, table) => sum + table.capacity, 0);
-        const wastedSeats = totalCapacity - guestCount;
-        const efficiency = wastedSeats <= 2 ? 'good' : wastedSeats <= 4 ? 'fair' : 'poor';
-
-        return {
-          guestGroup,
-          recommendedTables: tableCombination.map(t => t.id),
-          efficiency,
-          reason: `Large party: ${tableCombination.length} adjacent tables, ${wastedSeats} empty seats`,
-          alternatives: []
-        };
-      }
-    }
-
-    // No suitable tables found
-    return {
-      guestGroup,
-      recommendedTables: [],
-      efficiency: 'poor',
-      reason: 'No suitable tables available for this group size',
-      alternatives: []
-    };
+    return this.noSuitableTablesResponse(guestGroup);
   }
 
-  // Find best combination of tables for large groups
-  private findTableCombination(guestCount: number, availableTables: TableInfo[]): TableInfo[] {
-    // Sort tables by capacity (largest first)
-    const sortedTables = [...availableTables].sort((a, b) => b.capacity - a.capacity);
+  private handleStandardSeating(guestGroup: GuestGroup, availableTables: TableInfo[]): AllocationSuggestion {
+    const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
     
-    // Try to find combination that minimizes waste
-    for (let i = 0; i < sortedTables.length; i++) {
-      for (let j = i + 1; j < sortedTables.length; j++) {
-        const table1 = sortedTables[i];
-        const table2 = sortedTables[j];
-        const combinedCapacity = table1.capacity + table2.capacity;
+    // Find best single table (with chair flexibility)
+    const suitableTable = availableTables.find(table => 
+      table.capacity >= guestCount - 1 && table.capacity <= guestCount + 2
+    );
+    
+    if (suitableTable) {
+      const chairAdjustment = guestCount - suitableTable.capacity;
+      const efficiency = Math.abs(chairAdjustment) <= 1 ? 'excellent' : 'good';
+      
+      return {
+        guestGroup,
+        recommendedTables: [suitableTable.id],
+        efficiency,
+        reason: `Table ${suitableTable.id} for ${guestCount} guests ${chairAdjustment > 0 ? `(+${chairAdjustment} chairs needed)` : chairAdjustment < 0 ? `(${Math.abs(chairAdjustment)} fewer chairs)` : '(perfect fit)'}`,
+        alternatives: this.getStandardAlternatives(guestGroup, availableTables, [suitableTable.id])
+      };
+    }
+
+    return this.noSuitableTablesResponse(guestGroup);
+  }
+
+  private findAdjacentTheatreTables(guestCount: number, availableTables: TableInfo[]): TableInfo[] {
+    // Define theatre rows
+    const rows = [
+      { ids: [1, 2, 3], name: 'Front' },
+      { ids: [4, 5, 6], name: 'Second' },
+      { ids: [7, 8, 9], name: 'Third' },
+      { ids: [10, 11, 12, 13], name: 'Back' }
+    ];
+
+    // Try combinations within each row
+    for (const row of rows) {
+      const rowTables = availableTables.filter(table => row.ids.includes(table.id));
+      
+      // Try 2-table combinations
+      for (let i = 0; i < rowTables.length - 1; i++) {
+        const combo = rowTables.slice(i, i + 2);
+        const totalCapacity = combo.reduce((sum, t) => sum + t.capacity, 0);
         
-        if (combinedCapacity >= guestCount && combinedCapacity - guestCount <= 4) {
-          return [table1, table2];
+        if (totalCapacity >= guestCount - 2 && totalCapacity <= guestCount + 3) {
+          return combo;
+        }
+      }
+      
+      // Try 3-table combinations for very large groups
+      if (guestCount > 8) {
+        for (let i = 0; i < rowTables.length - 2; i++) {
+          const combo = rowTables.slice(i, i + 3);
+          const totalCapacity = combo.reduce((sum, t) => sum + t.capacity, 0);
+          
+          if (totalCapacity >= guestCount - 3 && totalCapacity <= guestCount + 4) {
+            return combo;
+          }
         }
       }
     }
 
-    // If no good combination found, return largest available table
-    return sortedTables.length > 0 ? [sortedTables[0]] : [];
+    // Fallback: try cross-row adjacent tables
+    const crossRowCombinations = [
+      [3, 6, 9], // Right side connection
+      [4, 7], [5, 8], [6, 9], // Vertical connections
+    ];
+
+    for (const combo of crossRowCombinations) {
+      const tables = availableTables.filter(table => combo.includes(table.id));
+      if (tables.length === combo.length) {
+        const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
+        if (totalCapacity >= guestCount - 2 && totalCapacity <= guestCount + 3) {
+          return tables;
+        }
+      }
+    }
+
+    return [];
   }
 
-  // Get alternative seating suggestions
-  private getAlternatives(guestGroup: GuestGroup, excludeTables: number[]): AllocationSuggestion['alternatives'] {
-    const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
-    const availableTables = this.tables
-      .filter(table => !table.isOccupied && !excludeTables.includes(table.id))
-      .filter(table => table.capacity >= guestCount);
-
-    return availableTables.slice(0, 2).map(table => {
-      const wastedSeats = table.capacity - guestCount;
-      const efficiency = wastedSeats <= 1 ? 'good' : wastedSeats <= 2 ? 'fair' : 'poor';
-      
-      return {
+  private getCoupleAlternatives(guestGroup: GuestGroup, availableTables: TableInfo[], exclude: number[]) {
+    return availableTables
+      .filter(table => !exclude.includes(table.id) && table.capacity >= 2)
+      .slice(0, 2)
+      .map(table => ({
         tables: [table.id],
-        reason: `Alternative: ${guestCount} guests, ${wastedSeats} empty seat${wastedSeats !== 1 ? 's' : ''}`,
-        efficiency
-      };
-    });
+        reason: `Alternative seating at Table ${table.id}`,
+        efficiency: [1, 2, 3].includes(table.id) ? 'good' as const : 'fair' as const
+      }));
+  }
+
+  private getLargePartyAlternatives(guestGroup: GuestGroup, availableTables: TableInfo[], exclude: number[]) {
+    const remaining = availableTables.filter(table => !exclude.includes(table.id));
+    const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
+    
+    // Try to find other combinations
+    const alternatives = [];
+    
+    // Single large table option
+    const largeTable = remaining.find(table => table.capacity >= guestCount - 2);
+    if (largeTable) {
+      alternatives.push({
+        tables: [largeTable.id],
+        reason: `Single table option with chair adjustments`,
+        efficiency: 'fair' as const
+      });
+    }
+
+    return alternatives.slice(0, 2);
+  }
+
+  private getStandardAlternatives(guestGroup: GuestGroup, availableTables: TableInfo[], exclude: number[]) {
+    const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
+    
+    return availableTables
+      .filter(table => !exclude.includes(table.id) && table.capacity >= guestCount - 1)
+      .slice(0, 2)
+      .map(table => {
+        const chairDiff = guestCount - table.capacity;
+        const efficiency = Math.abs(chairDiff) <= 1 ? 'good' as const : 'fair' as const;
+        
+        return {
+          tables: [table.id],
+          reason: `Table ${table.id} ${chairDiff > 0 ? `(+${chairDiff} chairs)` : chairDiff < 0 ? `(${Math.abs(chairDiff)} fewer chairs)` : '(perfect fit)'}`,
+          efficiency
+        };
+      });
+  }
+
+  private noSuitableTablesResponse(guestGroup: GuestGroup): AllocationSuggestion {
+    return {
+      guestGroup,
+      recommendedTables: [],
+      efficiency: 'poor',
+      reason: 'No suitable tables available - consider rearranging existing seating',
+      alternatives: []
+    };
   }
 
   // Get overall allocation efficiency stats
@@ -163,10 +276,10 @@ export class SmartTableAllocator {
     
     const suggestions = [];
     if (efficiency < 60) {
-      suggestions.push("Consider combining smaller groups");
+      suggestions.push("Consider combining smaller groups in adjacent seating");
     }
     if (efficiency > 85) {
-      suggestions.push("High utilization - consider larger tables");
+      suggestions.push("High utilization - consider adding extra chairs to tables");
     }
 
     return {
