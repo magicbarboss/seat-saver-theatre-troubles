@@ -660,6 +660,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.delete(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
+    
+    // Free up the pager when guest is seated
+    const newPagerAssignments = new Map(pagerAssignments);
+    const assignedPager = newPagerAssignments.get(guestIndex);
+    newPagerAssignments.delete(guestIndex);
+    setPagerAssignments(newPagerAssignments);
+    
+    const guest = guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    toast({
+      title: "🪑 Guest Seated",
+      description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
+    });
   };
 
   // New: Handle table allocation (not seated yet)
