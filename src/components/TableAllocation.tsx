@@ -31,6 +31,7 @@ interface CheckedInGuest {
   pagerNumber?: number;
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
+  allocatedTables?: number[];
 }
 
 interface TableAllocationProps {
@@ -52,6 +53,7 @@ interface Table {
   backSeats?: CheckedInGuest[];
   frontCapacity?: number;
   backCapacity?: number;
+  allocatedGuests?: CheckedInGuest[];
 }
 
 const TableAllocation = ({ 
@@ -66,22 +68,22 @@ const TableAllocation = ({
   // Front Row: 1,2,3 (2 seats), Second: 4,5,6 (4 seats), Third: 7,8,9 (4 seats), Back: 10,11,12,13 (2 seats)
   const [tables, setTables] = useState<Table[]>([
     // Front Row - 2-seater tables (1-3)
-    { id: 1, capacity: 2, isOccupied: false, guests: [] },
-    { id: 2, capacity: 2, isOccupied: false, guests: [] },
-    { id: 3, capacity: 2, isOccupied: false, guests: [] },
+    { id: 1, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
+    { id: 2, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
+    { id: 3, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
     // Second Row - 4-seater tables (4-6)
-    { id: 4, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
-    { id: 5, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
-    { id: 6, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 4, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
+    { id: 5, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
+    { id: 6, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
     // Third Row - 4-seater tables (7-9)
-    { id: 7, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
-    { id: 8, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
-    { id: 9, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2 },
+    { id: 7, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
+    { id: 8, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
+    { id: 9, capacity: 4, isOccupied: false, guests: [], frontSeats: [], backSeats: [], frontCapacity: 2, backCapacity: 2, allocatedGuests: [] },
     // Back Row - 2-seater tables (10-13)
-    { id: 10, capacity: 2, isOccupied: false, guests: [] },
-    { id: 11, capacity: 2, isOccupied: false, guests: [] },
-    { id: 12, capacity: 2, isOccupied: false, guests: [] },
-    { id: 13, capacity: 2, isOccupied: false, guests: [] }
+    { id: 10, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
+    { id: 11, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
+    { id: 12, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] },
+    { id: 13, capacity: 2, isOccupied: false, guests: [], allocatedGuests: [] }
   ]);
 
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
@@ -95,8 +97,7 @@ const TableAllocation = ({
       if (tableIds.includes(table.id)) {
         const updatedTable = {
           ...table,
-          isOccupied: true,
-          guests: [...(table.guests || []), guest]
+          allocatedGuests: [...(table.allocatedGuests || []), guest]
         };
 
         // Handle front/back seating for 4-seater tables
@@ -156,6 +157,21 @@ const TableAllocation = ({
   };
 
   const handleSeatGuest = (guest: CheckedInGuest) => {
+    // Move guest from allocated to seated in tables
+    const guestTables = guest.allocatedTables || [];
+    
+    setTables(prev => prev.map(table => {
+      if (guestTables.includes(table.id)) {
+        return {
+          ...table,
+          isOccupied: true,
+          guests: [...(table.guests || []), guest],
+          allocatedGuests: (table.allocatedGuests || []).filter(g => g.originalIndex !== guest.originalIndex)
+        };
+      }
+      return table;
+    }));
+
     onGuestSeated(guest.originalIndex);
     
     if (guest.pagerNumber) {
@@ -171,7 +187,8 @@ const TableAllocation = ({
           isOccupied: false,
           guests: [],
           frontSeats: [],
-          backSeats: []
+          backSeats: [],
+          allocatedGuests: []
         };
       }
       return table;
@@ -199,6 +216,7 @@ const TableAllocation = ({
 
   const getTableStatusColor = (table: Table) => {
     if (table.isOccupied) return 'bg-red-100 border-red-300 text-red-800';
+    if (table.allocatedGuests && table.allocatedGuests.length > 0) return 'bg-orange-100 border-orange-300 text-orange-800';
     if (selectedTables.includes(table.id)) return 'bg-blue-100 border-blue-300 text-blue-800';
     return 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200';
   };
@@ -254,15 +272,18 @@ const TableAllocation = ({
   const smartAllocationTables = tables.map(table => ({
     id: table.id,
     capacity: table.capacity,
-    isOccupied: table.isOccupied,
-    currentGuests: table.guests?.reduce((sum, guest) => sum + guest.count, 0) || 0
+    isOccupied: table.isOccupied || (table.allocatedGuests && table.allocatedGuests.length > 0),
+    currentGuests: (table.guests?.reduce((sum, guest) => sum + guest.count, 0) || 0) + 
+                   (table.allocatedGuests?.reduce((sum, guest) => sum + guest.count, 0) || 0)
   }));
 
   const renderTableCard = (table: Table, rowName: string) => {
     const has4Seats = table.frontCapacity !== undefined && table.backCapacity !== undefined;
+    const hasAllocatedGuests = table.allocatedGuests && table.allocatedGuests.length > 0;
+    const hasSeatedGuests = table.guests && table.guests.length > 0;
     
     return (
-      <Card key={table.id} className={`${table.isOccupied ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+      <Card key={table.id} className={`${hasSeatedGuests ? 'border-red-300 bg-red-50' : hasAllocatedGuests ? 'border-orange-300 bg-orange-50' : 'border-green-300 bg-green-50'}`}>
         <CardContent className="p-4 text-center space-y-3">
           <div className="font-bold text-lg">T{table.id}</div>
           
@@ -347,10 +368,23 @@ const TableAllocation = ({
             </div>
           )}
           
-          {table.isOccupied && table.guests && (
+          {/* Show allocated guests */}
+          {hasAllocatedGuests && (
+            <div className="mt-2 space-y-1 bg-orange-100 p-2 rounded border border-orange-200">
+              <div className="text-xs font-medium text-orange-800">
+                Allocated ({table.allocatedGuests!.reduce((sum, guest) => sum + guest.count, 0)} guests)
+              </div>
+              {table.allocatedGuests!.map((guest, idx) => (
+                <div key={idx} className="text-xs text-orange-700">{guest.name}</div>
+              ))}
+            </div>
+          )}
+          
+          {/* Show seated guests */}
+          {hasSeatedGuests && (
             <div className="mt-2 space-y-1">
               <div className="text-xs font-medium text-red-800">
-                {table.guests.reduce((sum, guest) => sum + guest.count, 0)} guests
+                Seated ({table.guests!.reduce((sum, guest) => sum + guest.count, 0)} guests)
               </div>
               {has4Seats && (
                 <>
@@ -362,13 +396,13 @@ const TableAllocation = ({
                   )}
                 </>
               )}
-              {!has4Seats && table.guests.map((guest, idx) => (
+              {!has4Seats && table.guests!.map((guest, idx) => (
                 <div key={idx} className="text-xs text-red-700">{guest.name}</div>
               ))}
             </div>
           )}
           
-          {table.isOccupied && (
+          {(hasSeatedGuests || hasAllocatedGuests) && (
             <Button
               variant="outline"
               size="sm"
@@ -497,7 +531,9 @@ const TableAllocation = ({
                       </div>
                       {guest.hasTableAllocated && (
                         <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
-                          <div className="text-sm text-blue-800 font-medium">Table Allocated - Ready to Page</div>
+                          <div className="text-sm text-blue-800 font-medium">
+                            Allocated to Table{guest.allocatedTables && guest.allocatedTables.length > 1 ? 's' : ''}: {guest.allocatedTables?.join(', ') || 'N/A'}
+                          </div>
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
