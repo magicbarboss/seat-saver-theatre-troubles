@@ -21,18 +21,26 @@ const SmartAllocation = ({
 }: SmartAllocationProps) => {
   const [selectedGuest, setSelectedGuest] = useState<number | null>(null);
 
-  // Default tables if none provided (common restaurant layout)
+  // Updated table layout to match your restaurant:
+  // Tables 1,2,3 (2 people), Tables 4,5,6,7,8,9 (4 seats), Tables 10,11,12,13,14 (2 people)
   const defaultTables: TableInfo[] = [
+    // 2-seater tables (1-3)
     { id: 1, capacity: 2, isOccupied: false },
     { id: 2, capacity: 2, isOccupied: false },
-    { id: 3, capacity: 4, isOccupied: false },
+    { id: 3, capacity: 2, isOccupied: false },
+    // 4-seater tables (4-9)
     { id: 4, capacity: 4, isOccupied: false },
-    { id: 5, capacity: 6, isOccupied: false },
-    { id: 6, capacity: 6, isOccupied: false },
-    { id: 7, capacity: 8, isOccupied: false },
-    { id: 8, capacity: 8, isOccupied: false },
-    { id: 9, capacity: 10, isOccupied: false },
-    { id: 10, capacity: 12, isOccupied: false }
+    { id: 5, capacity: 4, isOccupied: false },
+    { id: 6, capacity: 4, isOccupied: false },
+    { id: 7, capacity: 4, isOccupied: false },
+    { id: 8, capacity: 4, isOccupied: false },
+    { id: 9, capacity: 4, isOccupied: false },
+    // 2-seater tables (10-14)
+    { id: 10, capacity: 2, isOccupied: false },
+    { id: 11, capacity: 2, isOccupied: false },
+    { id: 12, capacity: 2, isOccupied: false },
+    { id: 13, capacity: 2, isOccupied: false },
+    { id: 14, capacity: 2, isOccupied: false }
   ];
 
   const availableTables = tables.length > 0 ? tables : defaultTables;

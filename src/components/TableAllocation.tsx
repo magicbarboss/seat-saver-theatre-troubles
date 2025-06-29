@@ -56,17 +56,25 @@ const TableAllocation = ({
   onTableAllocated,
   partyGroups = new Map()
 }: TableAllocationProps) => {
+  // Updated table layout to match restaurant: Tables 1-3 (2 seats), 4-9 (4 seats), 10-14 (2 seats)
   const [tables, setTables] = useState<Table[]>([
+    // 2-seater tables (1-3)
     { id: 1, capacity: 2, isOccupied: false, guests: [] },
     { id: 2, capacity: 2, isOccupied: false, guests: [] },
-    { id: 3, capacity: 4, isOccupied: false, guests: [] },
+    { id: 3, capacity: 2, isOccupied: false, guests: [] },
+    // 4-seater tables (4-9)
     { id: 4, capacity: 4, isOccupied: false, guests: [] },
-    { id: 5, capacity: 6, isOccupied: false, guests: [] },
-    { id: 6, capacity: 6, isOccupied: false, guests: [] },
-    { id: 7, capacity: 8, isOccupied: false, guests: [] },
-    { id: 8, capacity: 8, isOccupied: false, guests: [] },
-    { id: 9, capacity: 10, isOccupied: false, guests: [] },
-    { id: 10, capacity: 12, isOccupied: false, guests: [] }
+    { id: 5, capacity: 4, isOccupied: false, guests: [] },
+    { id: 6, capacity: 4, isOccupied: false, guests: [] },
+    { id: 7, capacity: 4, isOccupied: false, guests: [] },
+    { id: 8, capacity: 4, isOccupied: false, guests: [] },
+    { id: 9, capacity: 4, isOccupied: false, guests: [] },
+    // 2-seater tables (10-14)
+    { id: 10, capacity: 2, isOccupied: false, guests: [] },
+    { id: 11, capacity: 2, isOccupied: false, guests: [] },
+    { id: 12, capacity: 2, isOccupied: false, guests: [] },
+    { id: 13, capacity: 2, isOccupied: false, guests: [] },
+    { id: 14, capacity: 2, isOccupied: false, guests: [] }
   ]);
 
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
