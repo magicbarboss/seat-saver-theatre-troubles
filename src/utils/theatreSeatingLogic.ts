@@ -1,4 +1,6 @@
 
+import { TableInfo, GuestGroup } from './smartAllocation';
+
 export interface TheatreSeatingAnalysis {
   couples: GuestGroup[];
   largeGroups: GuestGroup[];

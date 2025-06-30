@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Users, Target, AlertCircle, CheckCircle, Zap, Theatre, Crown } from 'lucide-react';
+import { Lightbulb, Users, Target, AlertCircle, CheckCircle, Zap, Theater, Crown } from 'lucide-react';
 import { SmartTableAllocator, detectPartyGroups, TableInfo, GuestGroup, AllocationSuggestion } from '@/utils/smartAllocation';
 
 interface SmartAllocationProps {
@@ -127,7 +126,7 @@ const SmartAllocation = ({
     return (
       <Card>
         <CardContent className="p-6 text-center">
-          <Theatre className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <Theater className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-500">No guests waiting for theatre seating</p>
         </CardContent>
       </Card>
@@ -145,7 +144,7 @@ const SmartAllocation = ({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Theatre className="h-5 w-5 text-purple-600" />
+            <Theater className="h-5 w-5 text-purple-600" />
             Theatre Seating Analysis
           </CardTitle>
         </CardHeader>
@@ -203,7 +202,7 @@ const SmartAllocation = ({
       {theatreStrategies.length > 0 ? (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <Theatre className="h-5 w-5 text-purple-500" />
+            <Theater className="h-5 w-5 text-purple-500" />
             Theatre Seating Strategies
           </h3>
           
