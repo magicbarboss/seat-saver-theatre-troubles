@@ -375,7 +375,10 @@ const TableAllocation = ({
                 Allocated ({table.allocatedGuests!.reduce((sum, guest) => sum + guest.count, 0)} guests)
               </div>
               {table.allocatedGuests!.map((guest, idx) => (
-                <div key={idx} className="text-xs text-orange-700">{guest.name}</div>
+                <div key={idx} className="text-xs text-orange-700">
+                  {guest.name}
+                  {guest.pagerNumber && ` (Pager #${guest.pagerNumber})`}
+                </div>
               ))}
             </div>
           )}
@@ -389,15 +392,22 @@ const TableAllocation = ({
               {has4Seats && (
                 <>
                   {table.frontSeats && table.frontSeats.length > 0 && (
-                    <div className="text-xs text-red-700">Front: {table.frontSeats.map(g => g.name).join(', ')}</div>
+                    <div className="text-xs text-red-700">
+                      Front: {table.frontSeats.map(g => `${g.name}${g.pagerNumber ? ` (Pager #${g.pagerNumber})` : ''}`).join(', ')}
+                    </div>
                   )}
                   {table.backSeats && table.backSeats.length > 0 && (
-                    <div className="text-xs text-red-700">Back: {table.backSeats.map(g => g.name).join(', ')}</div>
+                    <div className="text-xs text-red-700">
+                      Back: {table.backSeats.map(g => `${g.name}${g.pagerNumber ? ` (Pager #${g.pagerNumber})` : ''}`).join(', ')}
+                    </div>
                   )}
                 </>
               )}
               {!has4Seats && table.guests!.map((guest, idx) => (
-                <div key={idx} className="text-xs text-red-700">{guest.name}</div>
+                <div key={idx} className="text-xs text-red-700">
+                  {guest.name}
+                  {guest.pagerNumber && ` (Pager #${guest.pagerNumber})`}
+                </div>
               ))}
             </div>
           )}
@@ -720,7 +730,7 @@ const TableAllocation = ({
         <TabsContent value="layout" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Restaurant Layout - Seat Management</CardTitle>
+              <CardTitle>Theatre Layout - Seat Management</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
