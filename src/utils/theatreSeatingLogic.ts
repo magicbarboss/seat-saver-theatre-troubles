@@ -35,15 +35,29 @@ const THEATRE_LAYOUT = {
   backRow: { ids: [10, 11, 12, 13], baseCapacity: 2, maxCapacity: 4 }
 };
 
-// Adjacency groups for keeping parties together
+// Enhanced adjacency groups for keeping parties together - now includes vertical and strategic connections
 const ADJACENCY_GROUPS = [
+  // Row groupings (existing)
   [1, 2, 3], // Front row
   [4, 5, 6], // Second row
   [7, 8, 9], // Third row
   [10, 11, 12, 13], // Back row
-  [4, 5], [5, 6], [7, 8], [8, 9], // Adjacent pairs
+  
+  // Horizontal adjacent pairs (existing)
+  [4, 5], [5, 6], [7, 8], [8, 9], 
+  
+  // NEW: Vertical adjacent pairs - key for large groups
+  [4, 7], [5, 8], [6, 9], [7, 10],
+  
+  // Cross-row connections (existing)
   [3, 6, 9], // Right side vertical
-  [1, 4], [2, 5], [3, 6], [6, 9] // Cross-row connections
+  [1, 4], [2, 5], [3, 6], [6, 9], // Cross-row connections
+  
+  // NEW: Strategic three-table combinations for very large parties
+  [4, 5, 7], // L-shape around T4-T5-T7
+  [5, 6, 8], // L-shape around T5-T6-T8
+  [4, 7, 8], // Vertical strip T4-T7-T8
+  [7, 8, 10], // Back area connection T7-T8-T10
 ];
 
 export class TheatreSeatingAnalyzer {
@@ -324,15 +338,52 @@ export class TheatreSeatingAnalyzer {
           if (extraChairs <= 3 && totalCapacity >= guestCount - 1) {
             const efficiency = Math.round((Math.min(guestCount, totalCapacity) / totalCapacity) * 100);
             const isAdjacent = this.areTablesAdjacent([table1.id, table2.id]);
+            const isVerticalAdjacent = this.areTablesVerticallyAdjacent([table1.id, table2.id]);
+            
+            // Boost priority for vertical adjacencies, especially for large groups
+            const adjacencyBonus = isVerticalAdjacent ? 3 : (isAdjacent ? 1 : 0);
+            const largeGroupBonus = guestCount >= 7 && isVerticalAdjacent ? 2 : 0;
             
             options.push({
               tableIds: [table1.id, table2.id],
               baseCapacity: totalCapacity,
               extraChairs,
               efficiency,
-              reason: `Tables ${table1.id}+${table2.id} (${totalCapacity} seats)${extraChairs > 0 ? ` + ${extraChairs} chairs` : ''}${isAdjacent ? ' - adjacent' : ''}`,
-              wasteScore: Math.max(0, totalCapacity - guestCount) + (extraChairs * 2) + (isAdjacent ? 0 : 1)
+              reason: `Tables ${table1.id}+${table2.id} (${totalCapacity} seats)${extraChairs > 0 ? ` + ${extraChairs} chairs` : ''}${isVerticalAdjacent ? ' - vertical adjacency' : isAdjacent ? ' - adjacent' : ''}`,
+              wasteScore: Math.max(0, totalCapacity - guestCount) + (extraChairs * 2) - adjacencyBonus - largeGroupBonus
             });
+          }
+        }
+      }
+    }
+    
+    // Three table combinations for very large groups (10+ guests)
+    if (guestCount >= 10) {
+      for (let i = 0; i < unusedTables.length - 2; i++) {
+        for (let j = i + 1; j < unusedTables.length - 1; j++) {
+          for (let k = j + 1; k < unusedTables.length; k++) {
+            const table1 = unusedTables[i];
+            const table2 = unusedTables[j];
+            const table3 = unusedTables[k];
+            const totalCapacity = table1.capacity + table2.capacity + table3.capacity;
+            const extraChairs = Math.max(0, guestCount - totalCapacity);
+            
+            // Only consider strategic three-table combinations
+            const tableIds = [table1.id, table2.id, table3.id];
+            const isStrategicCombo = this.isStrategicThreeTableCombo(tableIds);
+            
+            if (isStrategicCombo && extraChairs <= 4 && totalCapacity >= guestCount - 2) {
+              const efficiency = Math.round((Math.min(guestCount, totalCapacity) / totalCapacity) * 100);
+              
+              options.push({
+                tableIds,
+                baseCapacity: totalCapacity,
+                extraChairs,
+                efficiency,
+                reason: `Tables ${tableIds.join('+')} (${totalCapacity} seats)${extraChairs > 0 ? ` + ${extraChairs} chairs` : ''} - strategic layout`,
+                wasteScore: Math.max(0, totalCapacity - guestCount) + (extraChairs * 2) - 2 // Bonus for strategic combo
+              });
+            }
           }
         }
       }
@@ -358,6 +409,24 @@ export class TheatreSeatingAnalyzer {
   private static areTablesAdjacent(tableIds: number[]): boolean {
     return ADJACENCY_GROUPS.some(group => 
       tableIds.every(id => group.includes(id))
+    );
+  }
+  
+  // NEW: Check for vertical adjacency specifically (key for large groups)
+  private static areTablesVerticallyAdjacent(tableIds: number[]): boolean {
+    const verticalPairs = [[4, 7], [5, 8], [6, 9], [7, 10]];
+    return verticalPairs.some(pair => 
+      tableIds.length === 2 && tableIds.every(id => pair.includes(id))
+    );
+  }
+  
+  // NEW: Check if three tables form a strategic combination
+  private static isStrategicThreeTableCombo(tableIds: number[]): boolean {
+    const strategicCombos = [[4, 5, 7], [5, 6, 8], [4, 7, 8], [7, 8, 10]];
+    return strategicCombos.some(combo => 
+      tableIds.length === 3 && 
+      tableIds.every(id => combo.includes(id)) &&
+      combo.every(id => tableIds.includes(id))
     );
   }
   
