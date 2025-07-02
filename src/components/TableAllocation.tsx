@@ -368,16 +368,25 @@ const TableAllocation = ({
             </div>
           )}
           
-          {/* Show allocated guests */}
+          {/* Show allocated guests with Mark as Seated buttons */}
           {hasAllocatedGuests && (
             <div className="mt-2 space-y-1 bg-orange-100 p-2 rounded border border-orange-200">
               <div className="text-xs font-medium text-orange-800">
                 Allocated ({table.allocatedGuests!.reduce((sum, guest) => sum + guest.count, 0)} guests)
               </div>
               {table.allocatedGuests!.map((guest, idx) => (
-                <div key={idx} className="text-xs text-orange-700">
-                  {guest.name}
-                  {guest.pagerNumber && ` (Pager #${guest.pagerNumber})`}
+                <div key={idx} className="flex items-center justify-between text-xs text-orange-700 bg-orange-50 p-1 rounded">
+                  <span>
+                    {guest.name}
+                    {guest.pagerNumber && ` (Pager #${guest.pagerNumber})`}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => handleSeatGuest(guest)}
+                    className="h-5 px-2 text-xs bg-green-600 hover:bg-green-700"
+                  >
+                    Seat
+                  </Button>
                 </div>
               ))}
             </div>
