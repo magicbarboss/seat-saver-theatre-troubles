@@ -678,16 +678,31 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     });
   };
 
-  // Handle table allocation with database updates
-  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
+  // Handle table allocation with database updates - FIXED INDEX MAPPING
+  const handleTableAllocated = async (guestOriginalIndex: number, tableIds: number[]) => {
     try {
-      const guest = guests[guestIndex];
+      console.log(`Attempting to allocate tables ${tableIds.join(', ')} to guest with originalIndex: ${guestOriginalIndex}`);
+      
+      // FIXED: Find guest by originalIndex instead of using array index
+      const guest = guests.find(g => g.id && g.hasOwnProperty('originalIndex') && 
+        (g as any).originalIndex === guestOriginalIndex);
+      
       if (!guest) {
-        console.error('Guest not found at index:', guestIndex);
+        console.error('Guest not found with originalIndex:', guestOriginalIndex);
+        console.log('Available guests with originalIndex:', guests.map(g => ({ 
+          id: g.id, 
+          name: g.booker_name,
+          originalIndex: (g as any).originalIndex 
+        })));
+        toast({
+          title: "Error",
+          description: "Guest not found for table allocation",
+          variant: "destructive",
+        });
         return;
       }
 
-      console.log(`Allocating tables ${tableIds.join(', ')} to guest ${guest.id} (${guest.booker_name})`);
+      console.log(`Found guest: ${guest.booker_name} (ID: ${guest.id}) for table allocation`);
 
       // Update the database
       const { error } = await supabase
@@ -708,15 +723,21 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         return;
       }
 
-      // Update local state
-      const newAllocatedGuests = new Set(allocatedGuests);
-      newAllocatedGuests.add(guestIndex);
-      setAllocatedGuests(newAllocatedGuests);
-      
-      // Store the table allocation for this guest
-      const newGuestTableAllocations = new Map(guestTableAllocations);
-      newGuestTableAllocations.set(guestIndex, tableIds);
-      setGuestTableAllocations(newGuestTableAllocations);
+      console.log(`Successfully updated database for guest ${guest.id} with tables: ${tableIds.join(', ')}`);
+
+      // Find the array index for local state updates
+      const arrayIndex = guests.findIndex(g => g.id === guest.id);
+      if (arrayIndex !== -1) {
+        // Update local state
+        const newAllocatedGuests = new Set(allocatedGuests);
+        newAllocatedGuests.add(arrayIndex);
+        setAllocatedGuests(newAllocatedGuests);
+        
+        // Store the table allocation for this guest
+        const newGuestTableAllocations = new Map(guestTableAllocations);
+        newGuestTableAllocations.set(arrayIndex, tableIds);
+        setGuestTableAllocations(newGuestTableAllocations);
+      }
       
       const guestName = extractGuestName(guest.booker_name || '');
       
@@ -727,7 +748,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
 
       // Call parent callback if provided
       if (onTableAllocated) {
-        onTableAllocated(guestIndex, tableIds);
+        onTableAllocated(guestOriginalIndex, tableIds);
       }
     } catch (error) {
       console.error('Error in handleTableAllocated:', error);
