@@ -103,7 +103,7 @@ export class SmartTableAllocator {
   private handleLargePartySeating(guestGroup: GuestGroup, availableTables: TableInfo[]): AllocationSuggestion {
     const guestCount = guestGroup.isParty ? guestGroup.partySize! : guestGroup.count;
     
-    // Try adjacent table combinations
+    // Try adjacent table combinations with enhanced logic
     const adjacentCombination = this.findAdjacentTheatreTables(guestCount, availableTables);
     
     if (adjacentCombination.length > 0) {
@@ -147,12 +147,45 @@ export class SmartTableAllocator {
   }
 
   private findAdjacentTheatreTables(guestCount: number, availableTables: TableInfo[]): TableInfo[] {
-    // Define theatre rows
+    // Enhanced theatre adjacency logic - prioritize vertical and strategic combinations for large groups
+    
+    // Define enhanced adjacency combinations
+    const adjacencyOptions = [];
+    
+    // NEW: Prioritize vertical adjacencies for large groups (7+ guests)
+    if (guestCount >= 7) {
+      const verticalPairs = [
+        { ids: [4, 7], priority: 10, reason: 'vertical main seating' },
+        { ids: [5, 8], priority: 10, reason: 'vertical main seating' },
+        { ids: [6, 9], priority: 9, reason: 'vertical main seating' },
+        { ids: [7, 10], priority: 8, reason: 'vertical back seating' }
+      ];
+      
+      for (const pair of verticalPairs) {
+        const tables = availableTables.filter(table => pair.ids.includes(table.id));
+        if (tables.length === 2) {
+          const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
+          const extraChairs = Math.max(0, guestCount - totalCapacity);
+          
+          if (extraChairs <= 3) {
+            adjacencyOptions.push({
+              tables,
+              totalCapacity,
+              extraChairs,
+              priority: pair.priority - extraChairs,
+              reason: pair.reason
+            });
+          }
+        }
+      }
+    }
+    
+    // Row-based combinations (existing logic with reduced priority for large groups)
     const rows = [
-      { ids: [1, 2, 3], name: 'Front' },
-      { ids: [4, 5, 6], name: 'Second' },
-      { ids: [7, 8, 9], name: 'Third' },
-      { ids: [10, 11, 12, 13], name: 'Back' }
+      { ids: [4, 5, 6], name: 'Second', priority: guestCount >= 7 ? 7 : 9 }, // Lower priority for large groups
+      { ids: [7, 8, 9], name: 'Third', priority: guestCount >= 7 ? 7 : 9 },
+      { ids: [1, 2, 3], name: 'Front', priority: guestCount >= 7 ? 3 : 8 }, // Very low priority for large groups
+      { ids: [10, 11, 12, 13], name: 'Back', priority: 6 }
     ];
 
     // Try combinations within each row
@@ -163,9 +196,16 @@ export class SmartTableAllocator {
       for (let i = 0; i < rowTables.length - 1; i++) {
         const combo = rowTables.slice(i, i + 2);
         const totalCapacity = combo.reduce((sum, t) => sum + t.capacity, 0);
+        const extraChairs = Math.max(0, guestCount - totalCapacity);
         
-        if (totalCapacity >= guestCount - 2 && totalCapacity <= guestCount + 3) {
-          return combo;
+        if (extraChairs <= 3) {
+          adjacencyOptions.push({
+            tables: combo,
+            totalCapacity,
+            extraChairs,
+            priority: row.priority - extraChairs,
+            reason: `${row.name} row adjacent`
+          });
         }
       }
       
@@ -174,31 +214,29 @@ export class SmartTableAllocator {
         for (let i = 0; i < rowTables.length - 2; i++) {
           const combo = rowTables.slice(i, i + 3);
           const totalCapacity = combo.reduce((sum, t) => sum + t.capacity, 0);
+          const extraChairs = Math.max(0, guestCount - totalCapacity);
           
-          if (totalCapacity >= guestCount - 3 && totalCapacity <= guestCount + 4) {
-            return combo;
+          if (extraChairs <= 4) {
+            adjacencyOptions.push({
+              tables: combo,
+              totalCapacity,
+              extraChairs,
+              priority: row.priority - extraChairs - 1, // Slight penalty for 3-table combos
+              reason: `${row.name} row three-table`
+            });
           }
         }
       }
     }
 
-    // Fallback: try cross-row adjacent tables
-    const crossRowCombinations = [
-      [3, 6, 9], // Right side connection
-      [4, 7], [5, 8], [6, 9], // Vertical connections
-    ];
+    // Sort by priority (higher is better), then by fewer extra chairs
+    adjacencyOptions.sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      return a.extraChairs - b.extraChairs;
+    });
 
-    for (const combo of crossRowCombinations) {
-      const tables = availableTables.filter(table => combo.includes(table.id));
-      if (tables.length === combo.length) {
-        const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
-        if (totalCapacity >= guestCount - 2 && totalCapacity <= guestCount + 3) {
-          return tables;
-        }
-      }
-    }
-
-    return [];
+    // Return the best option
+    return adjacencyOptions.length > 0 ? adjacencyOptions[0].tables : [];
   }
 
   private getCoupleAlternatives(guestGroup: GuestGroup, availableTables: TableInfo[], exclude: number[]) {
