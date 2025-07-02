@@ -178,7 +178,7 @@ const GuestManager = () => {
       
       // Add allocation information based on table_assignments
       const hasTableAllocated = guest.table_assignments && guest.table_assignments.length > 0 && !guest.is_seated;
-      const allocatedTables = hasTableAllocated ? guest.table_assignments : [];
+      const allocatedTables = guest.table_assignments || []; // Fix: use actual table_assignments, not empty array
       
       return {
         ...(isValidObject ? ticketData : {}),

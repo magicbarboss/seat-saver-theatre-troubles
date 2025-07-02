@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
@@ -25,6 +26,7 @@ interface CheckInSystemProps {
   guests: Guest[];
   headers: string[];
   showTimes: string[];
+  onTableAllocated?: (guestOriginalIndex: number, tableIds: number[]) => void;
 }
 
 interface BookingGroup {
@@ -52,7 +54,7 @@ interface PartyGroup {
   connectionType: 'mutual' | 'one-way';
 }
 
-const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
+const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
@@ -676,24 +678,65 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
-  // New: Handle table allocation (not seated yet)
-  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
-    const newAllocatedGuests = new Set(allocatedGuests);
-    newAllocatedGuests.add(guestIndex);
-    setAllocatedGuests(newAllocatedGuests);
-    
-    // Store the table allocation for this guest
-    const newGuestTableAllocations = new Map(guestTableAllocations);
-    newGuestTableAllocations.set(guestIndex, tableIds);
-    setGuestTableAllocations(newGuestTableAllocations);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "📍 Table Allocated",
-      description: `${guestName} allocated to Table(s) ${tableIds.join(', ')}. Page when ready.`,
-    });
+  // Handle table allocation with database updates
+  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
+    try {
+      const guest = guests[guestIndex];
+      if (!guest) {
+        console.error('Guest not found at index:', guestIndex);
+        return;
+      }
+
+      console.log(`Allocating tables ${tableIds.join(', ')} to guest ${guest.id} (${guest.booker_name})`);
+
+      // Update the database
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          table_assignments: tableIds,
+          is_allocated: true
+        })
+        .eq('id', guest.id);
+
+      if (error) {
+        console.error('Error updating table allocation in database:', error);
+        toast({
+          title: "Database Error",
+          description: "Failed to save table allocation. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      const newAllocatedGuests = new Set(allocatedGuests);
+      newAllocatedGuests.add(guestIndex);
+      setAllocatedGuests(newAllocatedGuests);
+      
+      // Store the table allocation for this guest
+      const newGuestTableAllocations = new Map(guestTableAllocations);
+      newGuestTableAllocations.set(guestIndex, tableIds);
+      setGuestTableAllocations(newGuestTableAllocations);
+      
+      const guestName = extractGuestName(guest.booker_name || '');
+      
+      toast({
+        title: "📍 Table Allocated",
+        description: `${guestName} allocated to Table(s) ${tableIds.join(', ')}. Database updated.`,
+      });
+
+      // Call parent callback if provided
+      if (onTableAllocated) {
+        onTableAllocated(guestIndex, tableIds);
+      }
+    } catch (error) {
+      console.error('Error in handleTableAllocated:', error);
+      toast({
+        title: "Error",
+        description: "Failed to allocate table. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getShowTimeBadgeStyle = (showTime: string) => {
