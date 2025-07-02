@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,6 +141,16 @@ const GuestManager = () => {
     setShowUpload(false);
   };
 
+  // Handle table allocation updates
+  const handleTableAllocated = (guestOriginalIndex: number, tableIds: number[]) => {
+    console.log(`Handling table allocation for guest ${guestOriginalIndex} to tables:`, tableIds);
+    
+    // Note: Since we're using real-time subscriptions, the guest data will be automatically 
+    // updated when the database changes. The CheckInSystem component handles the actual
+    // database updates, so we don't need to manually update state here.
+    // The real-time subscription will trigger fetchGuests() which will get the updated data.
+  };
+
   if (showUpload) {
     return (
       <div className="space-y-4">
@@ -167,6 +176,10 @@ const GuestManager = () => {
       const ticketData = guest.ticket_data;
       const isValidObject = ticketData && typeof ticketData === 'object' && !Array.isArray(ticketData);
       
+      // Add allocation information based on table_assignments
+      const hasTableAllocated = guest.table_assignments && guest.table_assignments.length > 0 && !guest.is_seated;
+      const allocatedTables = hasTableAllocated ? guest.table_assignments : [];
+      
       return {
         ...(isValidObject ? ticketData : {}),
         id: guest.id,
@@ -176,7 +189,11 @@ const GuestManager = () => {
         is_checked_in: guest.is_checked_in,
         pager_number: guest.pager_number,
         table_assignments: guest.table_assignments,
-        show_time: guest.show_time
+        is_seated: guest.is_seated,
+        show_time: guest.show_time,
+        // Add allocation status for Manual Assignment display
+        hasTableAllocated,
+        allocatedTables
       };
     });
 
@@ -214,6 +231,7 @@ const GuestManager = () => {
           guests={transformedGuests}
           headers={headers}
           showTimes={showTimes}
+          onTableAllocated={handleTableAllocated}
         />
       </div>
     );
