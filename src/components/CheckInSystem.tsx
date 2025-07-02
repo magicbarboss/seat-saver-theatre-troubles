@@ -20,6 +20,7 @@ interface Guest {
   is_checked_in: boolean;
   pager_number: number | null;
   table_assignments: number[] | null;
+  original_row_index: number | null;
 }
 
 interface CheckInSystemProps {
@@ -678,21 +679,20 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     });
   };
 
-  // Handle table allocation with database updates - FIXED INDEX MAPPING
+  // Handle table allocation with database updates - FIXED DATABASE FIELD NAME
   const handleTableAllocated = async (guestOriginalIndex: number, tableIds: number[]) => {
     try {
       console.log(`Attempting to allocate tables ${tableIds.join(', ')} to guest with originalIndex: ${guestOriginalIndex}`);
       
-      // FIXED: Find guest by originalIndex instead of using array index
-      const guest = guests.find(g => g.id && g.hasOwnProperty('originalIndex') && 
-        (g as any).originalIndex === guestOriginalIndex);
+      // FIXED: Use the correct database field name 'original_row_index'
+      const guest = guests.find(g => g.id && g.original_row_index === guestOriginalIndex);
       
       if (!guest) {
         console.error('Guest not found with originalIndex:', guestOriginalIndex);
-        console.log('Available guests with originalIndex:', guests.map(g => ({ 
+        console.log('Available guests with original_row_index:', guests.map(g => ({ 
           id: g.id, 
           name: g.booker_name,
-          originalIndex: (g as any).originalIndex 
+          original_row_index: g.original_row_index
         })));
         toast({
           title: "Error",
