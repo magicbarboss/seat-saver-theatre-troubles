@@ -45,7 +45,6 @@ interface CheckedInGuest {
   pagerNumber?: number;
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
-  allocatedTables?: number[];
 }
 
 interface PartyGroup {
@@ -808,7 +807,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // FIXED: Add function to get checked-in guests data for table allocation - includes allocated tables
+  // Add function to get checked-in guests data for table allocation
   const getCheckedInGuestsData = (): CheckedInGuest[] => {
     const checkedInData = Array.from(checkedInGuests).map(guestIndex => {
       const guest = guests[guestIndex];
@@ -820,7 +819,6 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
       const hasTableAllocated = allocatedGuests.has(guestIndex);
-      const allocatedTables = guestTableAllocations.get(guestIndex) || []; // FIXED: Include allocated tables
       
       return {
         name: guestName,
@@ -829,8 +827,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         originalIndex: guestIndex,
         pagerNumber: pagerNumber,
         hasBeenSeated: hasBeenSeated,
-        hasTableAllocated: hasTableAllocated,
-        allocatedTables: allocatedTables // FIXED: Pass allocated tables to the component
+        hasTableAllocated: hasTableAllocated
       };
     }).filter(Boolean) as CheckedInGuest[];
 
@@ -844,7 +841,6 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
         const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index));
         const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
-        const allocatedTables = guestTableAllocations.get(party.bookingIndices[0]) || []; // FIXED: Include party allocated tables
 
         partyData.push({
           name: `${party.guestNames.join(' & ')} (Party)`,
@@ -853,8 +849,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
           originalIndex: party.bookingIndices[0], // Use first guest's index as reference
           pagerNumber: pagerNumber,
           hasBeenSeated: hasBeenSeated,
-          hasTableAllocated: hasTableAllocated,
-          allocatedTables: allocatedTables // FIXED: Pass party allocated tables to the component
+          hasTableAllocated: hasTableAllocated
         });
 
         // Remove individual entries for party members
