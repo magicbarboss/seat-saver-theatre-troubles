@@ -1,699 +1,286 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Users, 
+  Search, 
+  Radio, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle,
+  Utensils,
+  UserCheck,
+  MapPin,
+  Filter,
+  X
+} from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
+  id?: string;
   [key: string]: any;
-  id: string;
-  booking_code: string;
-  booker_name: string;
-  total_quantity: number;
-  is_checked_in: boolean;
-  pager_number: number | null;
-  table_assignments: number[] | null;
-  original_row_index: number | null;
+  booker_name?: string;
+  total_quantity?: number;
+  show_time?: string;
+  is_checked_in?: boolean;
+  pager_number?: number;
+  table_assignments?: number[];
+  is_seated?: boolean;
+  original_row_index?: number;
+  hasTableAllocated?: boolean;
+  allocatedTables?: number[];
 }
 
 interface CheckInSystemProps {
   guests: Guest[];
   headers: string[];
   showTimes: string[];
-  onTableAllocated?: (guestOriginalIndex: number, tableIds: number[]) => void;
-}
-
-interface BookingGroup {
-  mainBooking: Guest;
-  addOns: Guest[];
-  originalIndex: number;
-  addOnIndices: number[];
-}
-
-interface CheckedInGuest {
-  name: string;
-  count: number;
-  showTime: string;
-  originalIndex: number;
-  pagerNumber?: number;
-  hasBeenSeated?: boolean;
-  hasTableAllocated?: boolean;
-}
-
-interface PartyGroup {
-  id: string;
-  bookingIndices: number[];
-  totalGuests: number;
-  guestNames: string[];
-  connectionType: 'mutual' | 'one-way';
+  onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
 }
 
 const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState('all');
-  const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
-  const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
-  const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
-  const [seatedGuests, setSeatedGuests] = useState<Set<number>>(new Set()); // Track seated guests
-  const [allocatedGuests, setAllocatedGuests] = useState<Set<number>>(new Set()); // Track guests with allocated tables
-  const [guestTableAllocations, setGuestTableAllocations] = useState<Map<number, number[]>>(new Map()); // guestIndex -> tableIds
-  const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  const [selectedGuestForPager, setSelectedGuestForPager] = useState<number | null>(null);
-  const [lastSaved, setLastSaved] = useState<Date>(new Date());
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
-  const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
-  const [sessionDate, setSessionDate] = useState<string>('');
-  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [pagerNumber, setPagerNumber] = useState('');
+  const [usedPagers, setUsedPagers] = useState<Set<number>>(new Set());
+  const [notes, setNotes] = useState('');
+  const [activeTab, setActiveTab] = useState('checkin');
+  const [showTimeFilter, setShowTimeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [partyGroups, setPartyGroups] = useState<Map<string, Guest[]>>(new Map());
 
-  // Auto-filter to first show time on component mount
+  // Initialize used pagers from existing guest data
   useEffect(() => {
-    if (showTimes && showTimes.length > 0 && showFilter === 'all') {
-      setShowFilter(showTimes[0]);
-      console.log(`Auto-filtering to first show time: ${showTimes[0]}`);
-    }
-  }, [showTimes]);
-
-  // Generate session key based on current date
-  const getSessionKey = () => {
-    const today = new Date().toDateString();
-    return `checkin-system-state-${today}`;
-  };
-
-  // Clear all data and start fresh
-  const clearAllData = () => {
-    setCheckedInGuests(new Set());
-    setPagerAssignments(new Map());
-    setSeatedGuests(new Set());
-    setAllocatedGuests(new Set());
-    setGuestTableAllocations(new Map());
-    setPartyGroups(new Map());
-    setBookingComments(new Map());
-    
-    // Clear from localStorage
-    localStorage.removeItem(getSessionKey());
-    
-    // Clear old session keys (cleanup)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('checkin-system-state-')) {
-        localStorage.removeItem(key);
+    const pagers = new Set<number>();
+    guests.forEach(guest => {
+      if (guest.pager_number && guest.is_checked_in && !guest.is_seated) {
+        pagers.add(guest.pager_number);
       }
-    }
-    
-    setSessionDate(new Date().toDateString());
-    setShowClearDialog(false);
-    
-    toast({
-      title: "🗑️ All Data Cleared",
-      description: "Started fresh session for today",
     });
-  };
-
-  // Load state on component mount (only once)
-  useEffect(() => {
-    const loadState = () => {
-      try {
-        const today = new Date().toDateString();
-        const todaySessionKey = getSessionKey();
-        const savedState = localStorage.getItem(todaySessionKey);
-        
-        if (savedState) {
-          const state = JSON.parse(savedState);
-          const savedDate = new Date(state.timestamp).toDateString();
-          
-          // Only load if it's from today
-          if (savedDate === today) {
-            setCheckedInGuests(new Set(state.checkedInGuests || []));
-            setPagerAssignments(new Map(state.pagerAssignments || []));
-            setSeatedGuests(new Set(state.seatedGuests || []));
-            setAllocatedGuests(new Set(state.allocatedGuests || []));
-            setGuestTableAllocations(new Map(state.guestTableAllocations || []));
-            setPartyGroups(new Map(state.partyGroups || []));
-            setBookingComments(new Map(state.bookingComments || []));
-            setSessionDate(savedDate);
-            console.log('Loaded saved state from', state.timestamp);
-            
-            toast({
-              title: "🔄 Today's Session Restored",
-              description: `Previous data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
-            });
-          } else {
-            // Different day - start fresh but keep the old data visible
-            setSessionDate(today);
-            toast({
-              title: "🌅 New Day Started",
-              description: "Starting fresh session for today. Previous day's data has been cleared.",
-            });
-          }
-        } else {
-          setSessionDate(today);
-        }
-      } catch (error) {
-        console.error('Failed to load saved state:', error);
-        setSessionDate(new Date().toDateString());
-      }
-      setIsInitialized(true);
-    };
-
-    loadState();
-  }, []);
-
-  // Auto-save functionality - separate effect that only runs after initialization
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    const saveState = () => {
-      const state = {
-        checkedInGuests: Array.from(checkedInGuests),
-        pagerAssignments: Array.from(pagerAssignments.entries()),
-        seatedGuests: Array.from(seatedGuests),
-        allocatedGuests: Array.from(allocatedGuests),
-        guestTableAllocations: Array.from(guestTableAllocations.entries()),
-        partyGroups: Array.from(partyGroups.entries()),
-        bookingComments: Array.from(bookingComments.entries()),
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem(getSessionKey(), JSON.stringify(state));
-      setLastSaved(new Date());
-      console.log('Auto-saved state at', new Date().toLocaleTimeString());
-    };
-
-    const interval = setInterval(saveState, 30000);
-    return () => {
-      clearInterval(interval);
-      saveState();
-    };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments]);
-
-  // Debug: Log headers to see what we're working with
-  console.log('Available headers:', headers);
-  console.log('Sample guest data:', guests[0]);
-  console.log('All guests:', guests);
-
-  // Extract guest name from booker field
-  const extractGuestName = (bookerName: string) => {
-    if (!bookerName) return 'Unknown Guest';
-    return bookerName.trim();
-  };
-
-  // Party detection logic - Fixed variable initialization
-  const detectPartyConnections = useMemo(() => {
-    if (!guests || guests.length === 0) return new Map<string, PartyGroup>();
-    
-    const connections = new Map<string, PartyGroup>();
-    
-    guests.forEach((guest, index) => {
-      if (!guest || !guest.Friends) return;
-      
-      const friendsField = guest.Friends.toString().toLowerCase();
-      const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-      
-      // Find other guests whose names are mentioned in this guest's Friends field
-      guests.forEach((otherGuest, otherIndex) => {
-        if (index === otherIndex || !otherGuest) return;
-        
-        const otherGuestName = extractGuestName(otherGuest.booker_name || '').toLowerCase();
-        const otherFriendsField = otherGuest.Friends ? otherGuest.Friends.toString().toLowerCase() : '';
-        
-        // Check if guest mentions otherGuest
-        if (friendsField.includes(otherGuestName) || otherFriendsField.includes(guestName)) {
-          const partyId = [index, otherIndex].sort().join('-');
-          
-          if (!connections.has(partyId)) {
-            const isMutual = friendsField.includes(otherGuestName) && otherFriendsField.includes(guestName);
-            const totalGuests = (guest.total_quantity || 1) + (otherGuest.total_quantity || 1);
-            
-            connections.set(partyId, {
-              id: partyId,
-              bookingIndices: [index, otherIndex],
-              totalGuests: totalGuests,
-              guestNames: [
-                extractGuestName(guest.booker_name || ''),
-                extractGuestName(otherGuest.booker_name || '')
-              ],
-              connectionType: isMutual ? 'mutual' : 'one-way'
-            });
-          }
-        }
-      });
-    });
-    
-    return connections;
+    setUsedPagers(pagers);
   }, [guests]);
 
-  // Update party groups when connections change
+  // Group guests by booker name for party management
   useEffect(() => {
-    setPartyGroups(detectPartyConnections);
-  }, [detectPartyConnections]);
-
-  // Group bookings by booking code to identify add-ons
-  const groupedBookings = useMemo(() => {
-    console.log('Processing guests for grouping:', guests.length);
-    const groups = new Map<string, BookingGroup>();
+    const groups = new Map<string, Guest[]>();
+    guests.forEach(guest => {
+      const bookerName = guest.booker_name || 'Unknown';
+      if (!groups.has(bookerName)) {
+        groups.set(bookerName, []);
+      }
+      groups.get(bookerName)!.push(guest);
+    });
     
-    guests.forEach((guest, index) => {
-      if (!guest || typeof guest !== 'object') {
-        console.warn(`Invalid guest at index ${index}:`, guest);
-        return;
-      }
-
-      // Use the booking_code directly from the guest object since it's already structured
-      const bookingCode = guest.booking_code || '';
-      console.log(`Guest ${index}: booking_code = "${bookingCode}"`);
-      
-      if (!bookingCode) {
-        console.warn(`No booking code for guest at index ${index}:`, guest);
-        return;
-      }
-      
-      if (!groups.has(bookingCode)) {
-        // First occurrence - this is the main booking
-        console.log(`Creating new group for booking code: ${bookingCode}`);
-        groups.set(bookingCode, {
-          mainBooking: guest,
-          addOns: [],
-          originalIndex: index,
-          addOnIndices: []
-        });
-      } else {
-        // Subsequent occurrence - this is an add-on
-        console.log(`Adding to existing group for booking code: ${bookingCode}`);
-        const group = groups.get(bookingCode)!;
-        group.addOns.push(guest);
-        group.addOnIndices.push(index);
+    // Only keep groups with more than one guest
+    const partyGroupsOnly = new Map<string, Guest[]>();
+    groups.forEach((guestList, bookerName) => {
+      if (guestList.length > 1) {
+        partyGroupsOnly.set(bookerName, guestList);
       }
     });
     
-    const result = Array.from(groups.values());
-    console.log(`Created ${result.length} booking groups from ${guests.length} guests`);
-    console.log('Sample booking group:', result[0]);
-    return result;
+    setPartyGroups(partyGroupsOnly);
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED LOGIC
-  const getPackageInfo = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Show Only';
-    
-    const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla');
-    
-    if (isTargetGuest) {
-      console.log('=== PACKAGE INFO DEBUG ===');
-      console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-      console.log('Full guest data:', guest);
-    }
-    
-    // Check all possible ticket fields that might contain package information
-    const ticketFields = [
-      'House Magicians Show Ticket & 2 Drinks',
-      'House Magicians Show Ticket & 2 soft drinks',
-      'House Magicians Show Ticket & 2 Drinks + 9 Pizza',
-      'House Magicians Show Ticket & 2 soft drinks + 9 PIzza',
-      'House Magicians Show Ticket',
-      'House Magicians Show ticket',
-      'Groupon Magic & Pints Package (per person)',
-      'Groupon Magic & Cocktails Package (per person)',
-      'Wowcher Magic & Cocktails Package (per person)',
-      'Smoke Offer Ticket includes Drink (minimum x2)',
-      'OLD Groupon Offer (per person - extras are already included)'
-    ];
-    
-    // Find which ticket type this guest has
-    for (const field of ticketFields) {
-      const value = guest[field];
-      if (isTargetGuest) {
-        console.log(`Checking field "${field}": value = "${value}", type = ${typeof value}`);
-      }
-      
-      if (value && String(value).trim() !== '' && String(value) !== '0') {
-        const numValue = parseInt(String(value));
-        if (numValue > 0) {
-          if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
-          
-          // Return the appropriate package based on the field name
-          if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
-            return '2 Drinks + 9" Pizza';
-          } else if (field.includes('& 2 Drinks')) {
-            return '2 Drinks';
-          } else if (field.includes('& 2 soft drinks + 9')) {
-            return '2 Soft Drinks + 9" Pizza';
-          } else if (field.includes('& 2 soft drinks')) {
-            return '2 Soft Drinks';
-          } else if (field.includes('Magic & Pints Package')) {
-            return 'Pints Package';
-          } else if (field.includes('Magic & Cocktails Package')) {
-            return 'Cocktails Package';
-          } else if (field.includes('Wowcher')) {
-            return 'Wowcher Package';
-          } else if (field.includes('Smoke Offer')) {
-            return 'Drinks (min x2)';
-          } else if (field.includes('OLD Groupon')) {
-            return 'Groupon Package';
-          } else {
-            return 'Show Only';
-          }
-        }
-      }
-    }
-    
-    if (isTargetGuest) console.log('No active ticket types found, defaulting to Show Only');
-    return 'Show Only';
-  };
-
-  // Calculate total package quantities based on guest count
-  const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
-    const quantities = [];
-    
-    // Extract drink quantities
-    if (packageInfo.includes('2 Drinks') || packageInfo.includes('2 soft drinks')) {
-      const totalDrinks = 2 * guestCount;
-      const drinkType = packageInfo.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
-      quantities.push(`${totalDrinks} ${drinkType}`);
-    } else if (packageInfo.includes('Pints Package')) {
-      const totalPints = 2 * guestCount; // Assuming 2 pints per person
-      quantities.push(`${totalPints} Pint Tokens`);
-    } else if (packageInfo.includes('Cocktails Package')) {
-      const totalCocktails = 2 * guestCount; // Assuming 2 cocktails per person
-      quantities.push(`${totalCocktails} Cocktail Tokens`);
-    } else if (packageInfo.includes('Drinks (min x2)')) {
-      const totalDrinks = Math.max(2, 2 * guestCount);
-      quantities.push(`${totalDrinks} Drink Tokens`);
-    }
-    
-    // Extract pizza quantities
-    if (packageInfo.includes('9" Pizza')) {
-      const totalPizzas = 1 * guestCount; // 1 pizza per person
-      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
-    }
-    
-    // Handle special packages
-    if (packageInfo === 'Groupon Package') {
-      quantities.push('Groupon Items Included');
-    } else if (packageInfo === 'Wowcher Package') {
-      quantities.push('Wowcher Items Included');
-    } else if (packageInfo === 'Show Only') {
-      quantities.push('Show Ticket Only');
-    }
-    
-    return quantities.length > 0 ? quantities : ['Show Ticket Only'];
-  };
-
-  // Extract ticket type - focus on package information (drinks + pizza)
-  const getTicketType = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Show Ticket';
-    
-    // All the possible ticket type fields from the data
-    const ticketTypeFields = [
-      'Adult Show Ticket includes 2 Drinks',
-      'Comedy ticket plus 9" Pizza', 
-      'OLD Groupon Offer (per person - extras are already included)',
-      'Adult Comedy & Magic Show Ticket + 9" Pizza',
-      'Adult Show Ticket includes 2 Drinks + 9" Pizza',
-      'Adult Show Ticket induces 2 soft drinks',
-      'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
-      'Adult Comedy Magic Show ticket',
-      'Smoke Offer Ticket includes Drink (minimum x2)',
-      'Groupon Magic & Pints Package (per person)',
-      'Groupon Magic & Cocktails Package (per person)',
-      'Wowcher Magic & Cocktails Package (per person)'
-    ];
-    
-    // Debug: Log guest data to see what fields are available
-    console.log('Checking ticket type for guest:', guest.booker_name, Object.keys(guest));
-    
-    // Find the ticket type and extract package info
-    for (const field of ticketTypeFields) {
-      const value = guest[field];
-      console.log(`Checking field "${field}": value = "${value}"`);
-      if (value && value !== '' && value !== '0' && parseInt(value) > 0) {
-        console.log(`Found ticket type: ${field} with value: ${value}`);
-        
-        // Extract the package information from the field name
-        let packageInfo = 'Show Ticket';
-        
-        if (field.includes('includes 2 Drinks + 9" Pizza') || field.includes('+ 9" Pizza')) {
-          packageInfo = 'Show + 2 Drinks + 9" Pizza';
-        } else if (field.includes('includes 2 Drinks')) {
-          packageInfo = 'Show + 2 Drinks';
-        } else if (field.includes('includes 2 soft drinks + 9" PIzza')) {
-          packageInfo = 'Show + 2 Soft Drinks + 9" Pizza';
-        } else if (field.includes('includes 2 soft drinks')) {
-          packageInfo = 'Show + 2 Soft Drinks';
-        } else if (field.includes('plus 9" Pizza')) {
-          packageInfo = 'Show + 9" Pizza';
-        } else if (field.includes('Magic & Pints Package')) {
-          packageInfo = 'Magic Show + Pints';
-        } else if (field.includes('Magic & Cocktails Package')) {
-          packageInfo = 'Magic Show + Cocktails';
-        } else if (field.includes('Comedy Magic Show')) {
-          packageInfo = 'Comedy Magic Show';
-        } else if (field.includes('Groupon') || field.includes('OLD Groupon')) {
-          packageInfo = 'Groupon Package';
-        } else if (field.includes('Smoke Offer')) {
-          packageInfo = 'Show + Drinks (min x2)';
-        }
-        
-        return packageInfo;
-      }
-    }
-    
-    return 'Show Ticket';
-  };
-
-  // Get all addon information for a guest
-  const getAddons = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return [];
-    
-    const addons = [];
-    
-    // Addon fields
-    const addonFields = [
-      'Prosecco add on',
-      'Bottle of Wine',
-      'GlutenBase',
-      'Salt & Pepper Fries',
-      'Vegan'
-    ];
-    
-    addonFields.forEach(field => {
-      const value = guest[field];
-      if (value && value !== '' && value !== '0') {
-        addons.push(`${field}: ${value}`);
-      }
-    });
-    
-    return addons;
-  };
-
-  // Consolidate all notes for a booking group
-  const getAllNotes = (booking: BookingGroup) => {
-    const notes = [];
-    
-    // Main booking notes
-    const mainGuest = booking.mainBooking;
-    if (mainGuest.Note) notes.push(`Note: ${mainGuest.Note}`);
-    if (mainGuest.Magic) notes.push(`Magic: ${mainGuest.Magic}`);
-    if (mainGuest.DIET) notes.push(`Diet: ${mainGuest.DIET}`);
-    if (mainGuest.Friends) notes.push(`Party: ${mainGuest.Friends}`);
-    if (mainGuest.TERMS) notes.push(`Terms: ${mainGuest.TERMS}`);
-    if (mainGuest.Booking) notes.push(`Occasion: ${mainGuest.Booking}`);
-    
-    // Add-on notes (if any)
-    booking.addOns.forEach(addon => {
-      if (addon.Note) notes.push(`Add-on Note: ${addon.Note}`);
-      if (addon.Magic) notes.push(`Add-on Magic: ${addon.Magic}`);
-    });
-    
-    return notes.filter(note => note && note.trim() !== '').join(' | ');
-  };
-
-  // Get show time from item field - UPDATED to normalize show times
-  const getShowTime = (guest: Guest) => {
-    if (!guest || typeof guest !== 'object') return 'Unknown';
-    const itemField = guest.Item || guest.item_details || guest.show_time || '';
-    
-    // Look for time patterns in square brackets like [7:00pm] or [9:00pm]
-    const timeMatch = itemField.match(/\[(\d{1,2}:\d{2}(?:am|pm))\]/i);
-    if (timeMatch) {
-      const time = timeMatch[1].toLowerCase();
-      // Normalize to standard format
-      if (time.includes('7:00pm') || time.includes('7pm')) return '7pm';
-      if (time.includes('9:00pm') || time.includes('9pm')) return '9pm';
-      return timeMatch[1];
-    }
-    
-    // Fallback patterns - normalize to simple format
-    if (itemField.includes('7:00pm') || itemField.includes('7pm')) return '7pm';
-    if (itemField.includes('9:00pm') || itemField.includes('9pm')) return '9pm';
-    if (itemField.includes('8:00pm') || itemField.includes('8pm')) return '8pm';
-    
-    return 'Unknown';
-  };
-
-  // Filter bookings based on search and show time
-  const filteredBookings = useMemo(() => {
-    const result = groupedBookings.filter((booking) => {
-      if (!booking || !booking.mainBooking) return false;
-
-      const guestName = extractGuestName(booking.mainBooking.booker_name || '');
-      const showTime = getShowTime(booking.mainBooking);
-      
-      const matchesSearch = searchTerm === '' || 
-        guestName.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
-      
-      return matchesSearch && matchesShow;
-    });
-    
-    console.log(`Filtered bookings: ${result.length} from ${groupedBookings.length} total`);
-    return result;
-  }, [groupedBookings, searchTerm, showFilter]);
-
-  // Get available pagers (not currently assigned)
-  const getAvailablePagers = () => {
-    const assignedPagers = new Set(Array.from(pagerAssignments.values()));
-    return availablePagers.filter(pager => !assignedPagers.has(pager));
-  };
-
-  const assignPager = (guestIndex: number, pagerId: number) => {
-    const newAssignments = new Map(pagerAssignments);
-    newAssignments.set(guestIndex, pagerId);
-    setPagerAssignments(newAssignments);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "📟 Pager Assigned",
-      description: `Pager ${pagerId} assigned to ${guestName}`,
-    });
-    
-    setSelectedGuestForPager(null);
-  };
-
-  const bypassPager = (guestIndex: number) => {
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "✅ Pager Bypassed",
-      description: `${guestName} seated without pager`,
-    });
-    
-    setSelectedGuestForPager(null);
-  };
-
-  const handleCheckIn = (mainIndex: number) => {
-    const newCheckedIn = new Set(checkedInGuests);
-    const guest = guests[mainIndex];
-    if (!guest) return;
-
-    const guestName = extractGuestName(guest.booker_name || '');
-    
-    if (newCheckedIn.has(mainIndex)) {
-      // Check out - remove pager assignment, allocated status and seated status
-      newCheckedIn.delete(mainIndex);
-      const newPagerAssignments = new Map(pagerAssignments);
-      newPagerAssignments.delete(mainIndex);
-      setPagerAssignments(newPagerAssignments);
-      
-      const newSeatedGuests = new Set(seatedGuests);
-      newSeatedGuests.delete(mainIndex);
-      setSeatedGuests(newSeatedGuests);
-      
-      const newAllocatedGuests = new Set(allocatedGuests);
-      newAllocatedGuests.delete(mainIndex);
-      setAllocatedGuests(newAllocatedGuests);
-
-      const newGuestTableAllocations = new Map(guestTableAllocations);
-      newGuestTableAllocations.delete(mainIndex);
-      setGuestTableAllocations(newGuestTableAllocations);
-      
+  const handleCheckIn = async (guest: Guest) => {
+    if (!guest.id) {
       toast({
-        title: "✅ Checked Out",
-        description: `${guestName} has been checked out and pager freed.`,
+        title: "Error",
+        description: "Guest ID not found",
+        variant: "destructive",
       });
-    } else {
-      // Check in - need to assign pager
-      newCheckedIn.add(mainIndex);
-      setSelectedGuestForPager(mainIndex);
+      return;
     }
-    setCheckedInGuests(newCheckedIn);
-  };
 
-  const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
-    toast({
-      title: "🪑 Table Assigned",
-      description: `${guestName} (${guestCount} guests) assigned to Table ${tableId}`,
-    });
-  };
-
-  const handlePagerRelease = (pagerNumber: number) => {
-    // Find the guest with this pager and remove the assignment
-    const newPagerAssignments = new Map(pagerAssignments);
-    for (const [guestIndex, assignedPager] of pagerAssignments) {
-      if (assignedPager === pagerNumber) {
-        newPagerAssignments.delete(guestIndex);
-        break;
-      }
-    }
-    setPagerAssignments(newPagerAssignments);
-    
-    toast({
-      title: "📟 Pager Released",
-      description: `Pager ${pagerNumber} is now available`,
-    });
-  };
-
-  const handleGuestSeated = (guestIndex: number) => {
-    const newSeatedGuests = new Set(seatedGuests);
-    newSeatedGuests.add(guestIndex);
-    setSeatedGuests(newSeatedGuests);
-    
-    // Remove from allocated when seated
-    const newAllocatedGuests = new Set(allocatedGuests);
-    newAllocatedGuests.delete(guestIndex);
-    setAllocatedGuests(newAllocatedGuests);
-    
-    // Free up the pager when guest is seated
-    const newPagerAssignments = new Map(pagerAssignments);
-    const assignedPager = newPagerAssignments.get(guestIndex);
-    newPagerAssignments.delete(guestIndex);
-    setPagerAssignments(newPagerAssignments);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "🪑 Guest Seated",
-      description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
-    });
-  };
-
-  // Handle table allocation with database updates - FIXED DATABASE FIELD NAME
-  const handleTableAllocated = async (guestOriginalIndex: number, tableIds: number[]) => {
     try {
-      console.log(`Attempting to allocate tables ${tableIds.join(', ')} to guest with originalIndex: ${guestOriginalIndex}`);
+      let assignedPager = null;
       
-      // FIXED: Use the correct database field name 'original_row_index'
+      if (pagerNumber.trim()) {
+        const pagerNum = parseInt(pagerNumber.trim());
+        if (isNaN(pagerNum) || pagerNum <= 0) {
+          toast({
+            title: "Invalid Pager Number",
+            description: "Please enter a valid pager number",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (usedPagers.has(pagerNum)) {
+          toast({
+            title: "Pager Already in Use",
+            description: `Pager #${pagerNum} is already assigned to another guest`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        assignedPager = pagerNum;
+      }
+
+      const updateData: any = {
+        is_checked_in: true,
+        checked_in_at: new Date().toISOString(),
+      };
+
+      if (assignedPager) {
+        updateData.pager_number = assignedPager;
+      }
+
+      if (notes.trim()) {
+        updateData.notes = notes.trim();
+      }
+
+      const { error } = await supabase
+        .from('guests')
+        .update(updateData)
+        .eq('id', guest.id);
+
+      if (error) {
+        console.error('Error checking in guest:', error);
+        toast({
+          title: "Check-in Failed",
+          description: "Failed to check in guest. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (assignedPager) {
+        setUsedPagers(prev => new Set([...prev, assignedPager]));
+      }
+
+      toast({
+        title: "✅ Guest Checked In",
+        description: `${guest.booker_name} has been checked in${assignedPager ? ` with pager #${assignedPager}` : ''}`,
+      });
+
+      setSelectedGuest(null);
+      setPagerNumber('');
+      setNotes('');
+    } catch (error) {
+      console.error('Unexpected error during check-in:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePagerRelease = async (pagerNum: number) => {
+    try {
+      // Find the guest with this pager and clear it
+      const guestWithPager = guests.find(g => g.pager_number === pagerNum);
+      if (guestWithPager && guestWithPager.id) {
+        const { error } = await supabase
+          .from('guests')
+          .update({ pager_number: null })
+          .eq('id', guestWithPager.id);
+
+        if (error) {
+          console.error('Error releasing pager:', error);
+          return;
+        }
+      }
+
+      setUsedPagers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pagerNum);
+        return newSet;
+      });
+
+      toast({
+        title: "📟 Pager Released",
+        description: `Pager #${pagerNum} is now available`,
+      });
+    } catch (error) {
+      console.error('Error releasing pager:', error);
+    }
+  };
+
+  // Handle guest seating with database updates
+  const handleGuestSeated = async (guestOriginalIndex: number) => {
+    try {
+      console.log(`Attempting to seat guest with originalIndex: ${guestOriginalIndex}`);
+      
+      // Find guest by original_row_index
       const guest = guests.find(g => g.id && g.original_row_index === guestOriginalIndex);
       
       if (!guest) {
         console.error('Guest not found with originalIndex:', guestOriginalIndex);
-        console.log('Available guests with original_row_index:', guests.map(g => ({ 
-          id: g.id, 
-          name: g.booker_name,
-          original_row_index: g.original_row_index
-        })));
+        toast({
+          title: "Error",
+          description: "Guest not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`Seating guest: ${guest.booker_name} (ID: ${guest.id})`);
+
+      // Update the database to mark guest as seated
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          is_seated: true,
+          seated_at: new Date().toISOString()
+          // Keep table_assignments - don't clear them
+        })
+        .eq('id', guest.id);
+
+      if (error) {
+        console.error('Error seating guest:', error);
+        toast({
+          title: "Error",
+          description: "Failed to seat guest",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`Successfully seated guest: ${guest.booker_name}`);
+
+      // Release pager if guest has one
+      if (guest.pager_number) {
+        await handlePagerRelease(guest.pager_number);
+      }
+
+      toast({
+        title: "✅ Guest Seated",
+        description: `${guest.booker_name} has been seated`,
+      });
+
+      // The real-time subscription in GuestManager will handle UI updates
+      
+    } catch (error) {
+      console.error('Unexpected error seating guest:', error);
+      toast({
+        title: "Error",
+        description: "Failed to seat guest",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTableAllocated = async (guestOriginalIndex: number, tableIds: number[]) => {
+    try {
+      console.log(`Allocating tables ${tableIds.join(', ')} to guest with originalIndex: ${guestOriginalIndex}`);
+      
+      // Find guest by original_row_index
+      const guest = guests.find(g => g.id && g.original_row_index === guestOriginalIndex);
+      
+      if (!guest) {
+        console.error('Guest not found with originalIndex:', guestOriginalIndex);
         toast({
           title: "Error",
           description: "Guest not found for table allocation",
@@ -702,9 +289,9 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         return;
       }
 
-      console.log(`Found guest: ${guest.booker_name} (ID: ${guest.id}) for table allocation`);
+      console.log(`Allocating tables to guest: ${guest.booker_name} (ID: ${guest.id})`);
 
-      // Update the database
+      // Update the database with table assignments
       const { error } = await supabase
         .from('guests')
         .update({
@@ -714,755 +301,387 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         .eq('id', guest.id);
 
       if (error) {
-        console.error('Error updating table allocation in database:', error);
+        console.error('Error allocating tables:', error);
         toast({
-          title: "Database Error",
-          description: "Failed to save table allocation. Please try again.",
+          title: "Error",
+          description: "Failed to allocate tables",
           variant: "destructive",
         });
         return;
       }
 
-      console.log(`Successfully updated database for guest ${guest.id} with tables: ${tableIds.join(', ')}`);
+      console.log(`Successfully allocated tables ${tableIds.join(', ')} to guest: ${guest.booker_name}`);
 
-      // Find the array index for local state updates
-      const arrayIndex = guests.findIndex(g => g.id === guest.id);
-      if (arrayIndex !== -1) {
-        // Update local state
-        const newAllocatedGuests = new Set(allocatedGuests);
-        newAllocatedGuests.add(arrayIndex);
-        setAllocatedGuests(newAllocatedGuests);
-        
-        // Store the table allocation for this guest
-        const newGuestTableAllocations = new Map(guestTableAllocations);
-        newGuestTableAllocations.set(arrayIndex, tableIds);
-        setGuestTableAllocations(newGuestTableAllocations);
-      }
-      
-      const guestName = extractGuestName(guest.booker_name || '');
-      
-      toast({
-        title: "📍 Table Allocated",
-        description: `${guestName} allocated to Table(s) ${tableIds.join(', ')}. Database updated.`,
-      });
+      // Call the parent callback
+      onTableAllocated(guestOriginalIndex, tableIds);
 
-      // Call parent callback if provided
-      if (onTableAllocated) {
-        onTableAllocated(guestOriginalIndex, tableIds);
-      }
     } catch (error) {
-      console.error('Error in handleTableAllocated:', error);
+      console.error('Unexpected error allocating tables:', error);
       toast({
         title: "Error",
-        description: "Failed to allocate table. Please try again.",
+        description: "Failed to allocate tables",
         variant: "destructive",
       });
     }
   };
 
-  const getShowTimeBadgeStyle = (showTime: string) => {
+  // Filter functions
+  const filteredGuests = guests.filter(guest => {
+    const matchesSearch = !searchTerm || 
+      (guest.booker_name && guest.booker_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      Object.values(guest).some(value => 
+        value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    
+    const matchesShowTime = showTimeFilter === 'all' || guest.show_time === showTimeFilter;
+    
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'checked-in' && guest.is_checked_in) ||
+      (statusFilter === 'not-checked-in' && !guest.is_checked_in) ||
+      (statusFilter === 'seated' && guest.is_seated) ||
+      (statusFilter === 'allocated' && guest.hasTableAllocated && !guest.is_seated);
+    
+    return matchesSearch && matchesShowTime && matchesStatus;
+  });
+
+  const checkedInGuests = guests.filter(guest => guest.is_checked_in && !guest.is_seated);
+  const seatedGuests = guests.filter(guest => guest.is_seated);
+  const totalGuests = guests.length;
+  const checkedInCount = guests.filter(guest => guest.is_checked_in).length;
+
+  const getNextAvailablePager = () => {
+    for (let i = 1; i <= 50; i++) {
+      if (!usedPagers.has(i)) {
+        return i.toString();
+      }
+    }
+    return '';
+  };
+
+  const getShowTimeColor = (showTime: string) => {
     if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (showTime === '8pm') return 'bg-blue-100 text-blue-800 border-blue-200';
     if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
-    return 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  // Add function to get checked-in guests data for table allocation
-  const getCheckedInGuestsData = (): CheckedInGuest[] => {
-    const checkedInData = Array.from(checkedInGuests).map(guestIndex => {
-      const guest = guests[guestIndex];
-      if (!guest) return null;
-
-      const guestName = extractGuestName(guest.booker_name || '');
-      const totalQty = guest.total_quantity || 1;
-      const showTime = getShowTime(guest);
-      const pagerNumber = pagerAssignments.get(guestIndex);
-      const hasBeenSeated = seatedGuests.has(guestIndex);
-      const hasTableAllocated = allocatedGuests.has(guestIndex);
-      
-      return {
-        name: guestName,
-        count: totalQty,
-        showTime: showTime,
-        originalIndex: guestIndex,
-        pagerNumber: pagerNumber,
-        hasBeenSeated: hasBeenSeated,
-        hasTableAllocated: hasTableAllocated
-      };
-    }).filter(Boolean) as CheckedInGuest[];
-
-    // Add party groups to the checked-in data
-    const partyData: CheckedInGuest[] = [];
-    for (const [, party] of partyGroups) {
-      const allCheckedIn = party.bookingIndices.every(index => checkedInGuests.has(index));
-      if (allCheckedIn) {
-        const firstGuest = guests[party.bookingIndices[0]];
-        const showTime = getShowTime(firstGuest);
-        const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
-        const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index));
-        const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
-
-        partyData.push({
-          name: `${party.guestNames.join(' & ')} (Party)`,
-          count: party.totalGuests,
-          showTime: showTime,
-          originalIndex: party.bookingIndices[0], // Use first guest's index as reference
-          pagerNumber: pagerNumber,
-          hasBeenSeated: hasBeenSeated,
-          hasTableAllocated: hasTableAllocated
-        });
-
-        // Remove individual entries for party members
-        party.bookingIndices.forEach(index => {
-          const individualIndex = checkedInData.findIndex(guest => guest.originalIndex === index);
-          if (individualIndex !== -1) {
-            checkedInData.splice(individualIndex, 1);
-          }
-        });
-      }
-    }
-
-    return [...checkedInData, ...partyData];
-  };
-
-  // Calculate total guests for filtered bookings (respects show filter)
-  const getTotalGuestsCount = () => {
-    return filteredBookings.reduce((total, booking) => {
-      if (!booking || !booking.mainBooking) return total;
-      const totalQty = booking.mainBooking.total_quantity || 1;
-      return total + totalQty;
-    }, 0);
-  };
-
-  // Calculate checked-in guests count for filtered bookings
-  const getCheckedInGuestsCount = () => {
-    return Array.from(checkedInGuests).reduce((total, guestIndex) => {
-      if (guestIndex >= guests.length || !guests[guestIndex]) return total;
-      
-      const guest = guests[guestIndex];
-      const showTime = getShowTime(guest);
-      
-      // Only count if matches current show filter
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
-      if (!matchesShow) return total;
-      
-      const totalQty = guest.total_quantity || 1;
-      return total + totalQty;
-    }, 0);
-  };
-
-  // Calculate allocated guests count for filtered bookings
-  const getAllocatedGuestsCount = () => {
-    return Array.from(allocatedGuests).reduce((total, guestIndex) => {
-      if (guestIndex >= guests.length || !guests[guestIndex]) return total;
-      
-      const guest = guests[guestIndex];
-      const showTime = getShowTime(guest);
-      
-      // Only count if matches current show filter
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
-      if (!matchesShow) return total;
-      
-      const totalQty = guest.total_quantity || 1;
-      return total + totalQty;
-    }, 0);
-  };
-
-  const getShowTimeStats = () => {
-    const stats = { '7pm': 0, '8pm': 0, '9pm': 0, 'Unknown': 0 };
-    
-    groupedBookings.forEach(booking => {
-      if (!booking || !booking.mainBooking) return;
-      
-      const showTime = getShowTime(booking.mainBooking);
-      const totalQty = booking.mainBooking.total_quantity || 1;
-      
-      if (showTime === '7pm') {
-        stats['7pm'] += totalQty;
-      } else if (showTime === '8pm') {
-        stats['8pm'] += totalQty;
-      } else if (showTime === '9pm') {
-        stats['9pm'] += totalQty;
-      } else {
-        stats['Unknown'] += totalQty;
-      }
-    });
-    
-    return stats;
-  };
-
-  const handleCommentChange = (guestIndex: number, comment: string) => {
-    const newComments = new Map(bookingComments);
-    if (comment.trim() === '') {
-      newComments.delete(guestIndex);
-    } else {
-      newComments.set(guestIndex, comment);
-    }
-    setBookingComments(newComments);
+    return 'bg-gray-100 border-gray-200 text-gray-800';
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
-      {/* Session Management Controls */}
-      <div className="bg-yellow-50 p-4 rounded border border-yellow-200">
-        <div className="flex justify-between items-center">
-          <div>
-            <h4 className="font-semibold text-sm text-yellow-800">Session Information</h4>
-            <p className="text-xs text-yellow-700">
-              Current session: {sessionDate} | Last saved: {lastSaved.toLocaleTimeString()}
-            </p>
-            <p className="text-xs text-yellow-600">
-              Total Guests: {guests.length} | Grouped Bookings: {groupedBookings.length} | 
-              Checked In: {checkedInGuests.size} | Seated: {seatedGuests.size}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowClearDialog(true)}
-              className="text-red-600 border-red-300 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Clear All Data
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Users className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-800">{totalGuests}</div>
+            <div className="text-sm text-gray-600">Total Guests</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-800">{checkedInCount}</div>
+            <div className="text-sm text-gray-600">Checked In</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <Radio className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-800">{usedPagers.size}</div>
+            <div className="text-sm text-gray-600">Pagers in Use</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <UserCheck className="h-8 w-8 text-indigo-600 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-gray-800">{seatedGuests.length}</div>
+            <div className="text-sm text-gray-600">Seated</div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Clear Data Confirmation Dialog */}
-      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              Clear All Session Data
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-gray-700">
-              This will clear all check-in data, pager assignments, table allocations, and comments for the current session.
-            </p>
-            <div className="bg-red-50 p-3 rounded border border-red-200">
-              <p className="text-red-800 text-sm font-medium">
-                ⚠️ This action cannot be undone!
-              </p>
-              <p className="text-red-700 text-sm">
-                All guests will appear as not checked in and all pagers will be available.
-              </p>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowClearDialog(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={clearAllData}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear All Data
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-800">🎭 Theatre Check-In</h2>
-            <p className="text-gray-600 mt-1">Simple guest management with pager assignment</p>
-          </div>
-          <div className="flex items-center space-x-6 text-lg">
-            <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
-              <Users className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-gray-700">{getTotalGuestsCount()}</span>
-              <span className="text-gray-500">Total Guests</span>
-            </div>
-            <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <span className="font-semibold text-gray-700">{getCheckedInGuestsCount()}</span>
-              <span className="text-gray-500">Checked In</span>
-            </div>
-            <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
-              <MapPin className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-gray-700">{getAllocatedGuestsCount()}</span>
-              <span className="text-gray-500">Allocated</span>
-            </div>
-            <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
-              <Radio className="h-5 w-5 text-purple-600" />
-              <span className="font-semibold text-gray-700">{getAvailablePagers().length}</span>
-              <span className="text-gray-500">Pagers Free</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Pager Assignment Dialog */}
-      <Dialog open={selectedGuestForPager !== null} onOpenChange={() => setSelectedGuestForPager(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Pager</DialogTitle>
-          </DialogHeader>
-          {selectedGuestForPager !== null && (
-            <div className="space-y-4">
-              <p className="text-gray-700">
-                Assign a pager to <strong>{extractGuestName(guests[selectedGuestForPager] && guests[selectedGuestForPager].booker_name ? guests[selectedGuestForPager].booker_name : '')}</strong>
-              </p>
-              
-              <div className="space-y-3">
-                <h4 className="font-medium">Available Pagers:</h4>
-                <div className="grid grid-cols-4 gap-2">
-                  {getAvailablePagers().map(pagerId => (
-                    <Button
-                      key={pagerId}
-                      variant="outline"
-                      onClick={() => assignPager(selectedGuestForPager, pagerId)}
-                      className="h-12 text-lg font-bold"
-                    >
-                      #{pagerId}
-                    </Button>
-                  ))}
-                </div>
-                
-                {getAvailablePagers().length === 0 && (
-                  <p className="text-red-600 text-sm">No pagers available</p>
-                )}
-                
-                <div className="pt-4 border-t">
-                  <Button
-                    variant="secondary"
-                    onClick={() => bypassPager(selectedGuestForPager)}
-                    className="w-full"
-                  >
-                    Bypass Pager (Seated Together)
-                  </Button>
-                </div>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search guests..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <div className="flex gap-2">
+              <Select value={showTimeFilter} onValueChange={setShowTimeFilter}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Show Time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Times</SelectItem>
+                  {showTimes.map(time => (
+                    <SelectItem key={time} value={time}>{time}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="not-checked-in">Not Checked In</SelectItem>
+                  <SelectItem value="checked-in">Checked In</SelectItem>
+                  <SelectItem value="allocated">Table Allocated</SelectItem>
+                  <SelectItem value="seated">Seated</SelectItem>
+                </SelectContent>
+              </Select>
+              {(searchTerm || showTimeFilter !== 'all' || statusFilter !== 'all') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setShowTimeFilter('all');
+                    setStatusFilter('all');
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <Tabs defaultValue="checkin" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
-          <TabsTrigger value="checkin" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="checkin" className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
             Check-In System
           </TabsTrigger>
-          <TabsTrigger value="tables" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-            Table Management
-          </TabsTrigger>
-          <TabsTrigger value="stats" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">
-            Show Statistics
+          <TabsTrigger value="allocation" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Table Allocation
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="checkin" className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex space-x-4 items-end">
-              <div className="flex-1">
-                <Label htmlFor="search" className="text-base font-medium text-gray-700">Search by Booker Name</Label>
-                <div className="relative mt-2">
-                  <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="search"
-                    placeholder="Search by booker name..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 h-12 text-base"
-                  />
-                </div>
-              </div>
-              <div className="w-72">
-                <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilter('all')}
-                    className={`flex-1 text-sm ${showFilter === 'all' ? 'bg-gray-200' : ''}`}
-                  >
-                    All Shows
-                  </Button>
-                  <Button
-                    variant={showFilter === '7pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('7pm')}
-                    className="flex-1 text-sm"
-                  >
-                    7pm
-                  </Button>
-                  <Button
-                    variant={showFilter === '9pm' ? 'default' : 'outline'}
-                    onClick={() => setShowFilter('9pm')}
-                    className="flex-1 text-sm"
-                  >
-                    9pm
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold text-gray-700">Action</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
-                  <TableHead className="font-semibold text-gray-700 min-w-[200px]">Package & Totals</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Addons</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Pager</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Table</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-700 w-96 min-w-96">Notes</TableHead>
-                  <TableHead className="font-semibold text-gray-700">
-                    <div className="flex items-center gap-1">
-                      <MessageSquare className="h-4 w-4" />
-                      Comments
+          {/* Party Groups Alert */}
+          {partyGroups.size > 0 && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-blue-800 flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Party Groups Detected ({partyGroups.size})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Array.from(partyGroups.entries()).map(([bookerName, groupGuests]) => (
+                    <div key={bookerName} className="p-3 bg-blue-100 rounded border border-blue-200">
+                      <div className="font-medium text-blue-800">{bookerName}</div>
+                      <div className="text-sm text-blue-700">
+                        {groupGuests.length} guests • Total: {groupGuests.reduce((sum, g) => sum + (g.total_quantity || 1), 0)} people
+                      </div>
+                      <div className="text-xs text-blue-600 mt-1">
+                        Consider checking in all guests from this party together
+                      </div>
                     </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBookings.map((booking) => {
-                  if (!booking || !booking.mainBooking) return null;
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-                  const isCheckedIn = checkedInGuests.has(booking.originalIndex);
-                  const isSeated = seatedGuests.has(booking.originalIndex);
-                  const isAllocated = allocatedGuests.has(booking.originalIndex);
-                  const assignedPager = pagerAssignments.get(booking.originalIndex);
-                  const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
-                  const partyGroup = (() => {
-                    for (const [, party] of partyGroups) {
-                      if (party.bookingIndices.includes(booking.originalIndex)) {
-                        return party;
-                      }
-                    }
-                    return null;
-                  })();
-                  const currentComment = bookingComments.get(booking.originalIndex) || '';
-                  
-                  const booker = extractGuestName(booking.mainBooking.booker_name || '');
-                  const totalQty = booking.mainBooking.total_quantity || 1;
-                  const packageInfo = getPackageInfo(booking.mainBooking);
-                  const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
-                  const addons = getAddons(booking.mainBooking);
-                  const showTime = getShowTime(booking.mainBooking);
-                  const allNotes = getAllNotes(booking);
-                  
-                  return (
-                    <TableRow key={booking.originalIndex} className={`${isSeated ? 'bg-green-50 border-green-200' : isAllocated ? 'bg-blue-50 border-blue-200' : isCheckedIn ? 'bg-yellow-50 border-yellow-200' : partyGroup ? 'bg-pink-50 border-pink-200' : 'hover:bg-gray-50'} transition-colors`}>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            onClick={() => handleCheckIn(booking.originalIndex)}
-                            variant={isCheckedIn ? "destructive" : "default"}
-                            size="sm"
-                            className={isCheckedIn ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700"}
-                            disabled={isSeated}
-                          >
-                            {isSeated ? '✅ Seated' : isCheckedIn ? '✓ Check Out' : 'Check In'}
-                          </Button>
-                          {partyGroup && (
-                            <Button
-                              onClick={() => {
-                                let allCheckedIn = true;
-                                partyGroup.bookingIndices.forEach(index => {
-                                  if (!checkedInGuests.has(index)) {
-                                    allCheckedIn = false;
-                                  }
-                                });
-                                if (allCheckedIn) {
-                                  // Check out entire party
-                                  const newCheckedIn = new Set(checkedInGuests);
-                                  const newPagerAssignments = new Map(pagerAssignments);
-                                  const newSeatedGuests = new Set(seatedGuests);
-                                  const newAllocatedGuests = new Set(allocatedGuests);
-                                  const newGuestTableAllocations = new Map(guestTableAllocations);
-
-                                  partyGroup.bookingIndices.forEach(index => {
-                                    newCheckedIn.delete(index);
-                                    newPagerAssignments.delete(index);
-                                    newSeatedGuests.delete(index);
-                                    newAllocatedGuests.delete(index);
-                                    newGuestTableAllocations.delete(index);
-                                  });
-
-                                  setCheckedInGuests(newCheckedIn);
-                                  setPagerAssignments(newPagerAssignments);
-                                  setSeatedGuests(newSeatedGuests);
-                                  setAllocatedGuests(newAllocatedGuests);
-                                  setGuestTableAllocations(newGuestTableAllocations);
-
-                                  toast({
-                                    title: "✅ Party Checked Out",
-                                    description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked out`,
-                                  });
-                                } else {
-                                  // Check in entire party
-                                  const newCheckedIn = new Set(checkedInGuests);
-                                  partyGroup.bookingIndices.forEach(index => {
-                                    newCheckedIn.add(index);
-                                  });
-                                  setCheckedInGuests(newCheckedIn);
-                                  
-                                  // Assign pager to first guest in party
-                                  setSelectedGuestForPager(partyGroup.bookingIndices[0]);
-                                  
-                                  toast({
-                                    title: "🎉 Party Checked In",
-                                    description: `${partyGroup.guestNames.join(' & ')} party (${partyGroup.totalGuests} guests) checked in together`,
-                                  });
-                                }
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="text-xs bg-pink-100 hover:bg-pink-200 border-pink-300"
-                            >
-                              <UserPlus className="h-3 w-3 mr-1" />
-                              Party ({partyGroup.totalGuests})
-                            </Button>
+          {/* Guest List */}
+          <div className="grid gap-4">
+            {filteredGuests.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">No guests found</h3>
+                  <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredGuests.map((guest, index) => (
+                <Card key={index} className={`transition-all hover:shadow-md ${
+                  guest.is_seated ? 'border-green-300 bg-green-50' :
+                  guest.is_checked_in ? 'border-blue-300 bg-blue-50' : 
+                  'border-gray-200'
+                }`}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-lg">{guest.booker_name || 'Unknown'}</h3>
+                          {guest.show_time && (
+                            <Badge className={getShowTimeColor(guest.show_time)}>
+                              {guest.show_time}
+                            </Badge>
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-semibold text-gray-900">
-                          {booker}
-                          {partyGroup && (
-                            <div className="text-xs text-pink-600 font-medium mt-1">
-                              🔗 Connected to: {partyGroup.guestNames.filter(name => name !== booker).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          <span className="font-bold text-gray-900 text-xl">{totalQty}</span>
-                          {partyGroup && (
-                            <div className="text-xs text-pink-600 font-medium">
-                              Party: {partyGroup.totalGuests}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="min-w-[200px]">
-                        <div className="space-y-2">
-                          <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
-                            <div className="text-sm font-medium text-purple-800 mb-1">
-                              {packageInfo}
-                            </div>
-                            <div className="space-y-1">
-                              {packageQuantities.map((quantity, idx) => (
-                                <div key={idx} className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
-                                  {quantity}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-xs text-gray-600 max-w-xs">
-                          {addons.length > 0 ? (
-                            <div className="space-y-1">
-                              {addons.slice(0, 2).map((addon, idx) => (
-                                <div key={idx} className="bg-green-50 px-2 py-1 rounded text-xs">
-                                  {addon.length > 30 ? addon.substring(0, 30) + '...' : addon}
-                                </div>
-                              ))}
-                              {addons.length > 2 && (
-                                <div className="text-xs text-gray-500">+{addons.length - 2} more</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">None</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getShowTimeBadgeStyle(showTime)}`}>
-                          {showTime}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          {assignedPager ? (
-                            <div className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-sm font-bold">
-                              #{assignedPager}
-                            </div>
-                          ) : isCheckedIn ? (
-                            <div className="text-gray-500 text-sm">Bypassed</div>
-                          ) : (
-                            <div className="text-gray-400 text-sm">-</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          {allocatedTables.length > 0 ? (
-                            <div className="space-y-1">
-                              {allocatedTables.map((tableId, idx) => (
-                                <div key={idx} className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">
-                                  T{tableId}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-gray-400 text-sm">-</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-center">
-                          {isSeated ? (
-                            <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-bold">
+                          {guest.is_seated && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                              <UserCheck className="h-3 w-3 mr-1" />
                               Seated
-                            </div>
-                          ) : isAllocated ? (
-                            <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold flex items-center justify-center">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              Allocated
-                            </div>
-                          ) : isCheckedIn ? (
-                            <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">
+                            </Badge>
+                          )}
+                          {guest.is_checked_in && !guest.is_seated && (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
                               Checked In
-                            </div>
-                          ) : (
-                            <div className="text-gray-400 text-sm">Waiting</div>
+                            </Badge>
+                          )}
+                          {guest.hasTableAllocated && !guest.is_seated && (
+                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Table Allocated
+                            </Badge>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="w-96 min-w-96">
-                        <div className="text-sm text-gray-600">
-                          {allNotes}
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                          {headers.slice(0, 4).map(header => (
+                            <div key={header}>
+                              <span className="font-medium">{header}:</span>
+                              <span className="ml-1">{guest[header] || 'N/A'}</span>
+                            </div>
+                          ))}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="w-40">
-                          <Textarea
-                            placeholder="Add comments..."
-                            value={currentComment}
-                            onChange={(e) => handleCommentChange(booking.originalIndex, e.target.value)}
-                            className="min-h-[60px] text-xs resize-none"
-                            rows={2}
-                          />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            {filteredBookings.length === 0 && (
-              <div className="text-center py-12">
-                <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <div className="text-lg text-gray-500 mb-2">No bookings found</div>
-                <div className="text-gray-400">Try adjusting your search or filter criteria</div>
-              </div>
+
+                        {guest.pager_number && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Radio className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm text-purple-600 font-medium">
+                              Pager #{guest.pager_number}
+                            </span>
+                          </div>
+                        )}
+
+                        {guest.allocatedTables && guest.allocatedTables.length > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Utensils className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm text-blue-600 font-medium">
+                              Table{guest.allocatedTables.length > 1 ? 's' : ''}: {guest.allocatedTables.join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {!guest.is_checked_in && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button 
+                                onClick={() => {
+                                  setSelectedGuest(guest);
+                                  setPagerNumber(getNextAvailablePager());
+                                }}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                Check In
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Check In Guest</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <h3 className="font-semibold">{selectedGuest?.booker_name}</h3>
+                                  <p className="text-sm text-gray-600">
+                                    {selectedGuest?.total_quantity || 1} guests • {selectedGuest?.show_time}
+                                  </p>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  <Label htmlFor="pager">Pager Number (Optional)</Label>
+                                  <Input
+                                    id="pager"
+                                    type="number"
+                                    placeholder="Enter pager number"
+                                    value={pagerNumber}
+                                    onChange={(e) => setPagerNumber(e.target.value)}
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Next available: #{getNextAvailablePager()}
+                                  </p>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label htmlFor="notes">Notes (Optional)</Label>
+                                  <Textarea
+                                    id="notes"
+                                    placeholder="Any special notes or requests..."
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                  />
+                                </div>
+
+                                <div className="flex gap-2">
+                                  <Button 
+                                    onClick={() => selectedGuest && handleCheckIn(selectedGuest)}
+                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                  >
+                                    Confirm Check-In
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    onClick={() => {
+                                      setSelectedGuest(null);
+                                      setPagerNumber('');
+                                      setNotes('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                        
+                        {guest.pager_number && guest.is_checked_in && !guest.is_seated && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePagerRelease(guest.pager_number!)}
+                            className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                          >
+                            Release Pager
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="tables" className="space-y-6">
-          <TableAllocation 
-            onTableAssign={handleTableAssign} 
-            checkedInGuests={getCheckedInGuestsData()}
+        <TabsContent value="allocation" className="space-y-6">
+          <TableAllocation
+            onTableAssign={(tableId, guestName, guestCount, showTime) => {
+              console.log(`Table ${tableId} assigned to ${guestName}`);
+            }}
+            checkedInGuests={checkedInGuests.map(guest => ({
+              name: guest.booker_name || 'Unknown',
+              count: guest.total_quantity || 1,
+              showTime: guest.show_time || '',
+              originalIndex: guest.original_row_index || 0,
+              pagerNumber: guest.pager_number || undefined,
+              hasBeenSeated: guest.is_seated || false,
+              hasTableAllocated: !!(guest.table_assignments && guest.table_assignments.length > 0),
+              allocatedTables: guest.table_assignments || []
+            }))}
             onPagerRelease={handlePagerRelease}
             onGuestSeated={handleGuestSeated}
-            onTableAllocated={handleTableAllocated}
+            onTableAllocated={onTableAllocated}
             partyGroups={partyGroups}
           />
-        </TabsContent>
-
-        <TabsContent value="stats" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
-                <Clock className="h-5 w-5 mr-2 text-blue-600" />
-                Show Times (Total Guests)
-              </h3>
-              <div className="space-y-3">
-                {Object.entries(getShowTimeStats()).map(([time, guestCount]) => {
-                  if (time === 'Unknown' && guestCount === 0) return null;
-                  const bookingCount = groupedBookings.filter(booking => {
-                    if (!booking || !booking.mainBooking) return false;
-                    const showTime = getShowTime(booking.mainBooking);
-                    return (time === '7pm' && (showTime === '7pm' || showTime === '7pm')) ||
-                           (time === '8pm' && (showTime === '8pm' || showTime === '8pm')) ||
-                           (time === '9pm' && (showTime === '9pm' || showTime === '9pm'));
-                  }).length;
-                  
-                  const totalGuests = Object.values(getShowTimeStats()).reduce((sum, count) => sum + count, 0);
-                  const percentage = totalGuests > 0 ? Math.round((guestCount / totalGuests) * 100) : 0;
-                  
-                  return (
-                    <div key={time} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                      <span className="font-medium text-gray-700">{time} Show</span>
-                      <div className="text-right">
-                        <span className="font-bold text-gray-900">{guestCount}</span>
-                        <span className="text-sm text-gray-500 ml-2">guests</span>
-                        <div className="text-xs text-gray-400">({bookingCount} bookings, {percentage}%)</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
-                <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                Check-In Progress
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                  <span className="font-medium text-gray-700">Checked In</span>
-                  <span className="font-bold text-green-600 text-xl">{getCheckedInGuestsCount()}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                  <span className="font-medium text-gray-700">Table Allocated</span>
-                  <span className="font-bold text-blue-600 text-xl">{getAllocatedGuestsCount()}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
-                  <span className="font-medium text-gray-700">Seated</span>
-                  <span className="font-bold text-purple-600 text-xl">{seatedGuests.size}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-pink-50 rounded">
-                  <span className="font-medium text-gray-700">Party Connections</span>
-                  <span className="font-bold text-pink-600 text-xl">{partyGroups.size}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-red-50 rounded">
-                  <span className="font-medium text-gray-700">Waiting</span>
-                  <span className="font-bold text-red-600 text-xl">{groupedBookings.length - getCheckedInGuestsCount()}</span>
-                </div>
-                <div className="text-center pt-4">
-                  <div className="text-3xl font-bold text-gray-800">
-                    {groupedBookings.length > 0 ? Math.round((getCheckedInGuestsCount() / groupedBookings.length) * 100) : 0}%
-                  </div>
-                  <div className="text-gray-600">Check-in Rate</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="font-semibold text-lg text-gray-800 mb-4 flex items-center">
-                <Radio className="h-5 w-5 mr-2 text-purple-600" />
-                Pager Status
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded">
-                  <span className="font-medium text-gray-700">In Use</span>
-                  <span className="font-bold text-purple-600 text-xl">{pagerAssignments.size}</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                  <span className="font-medium text-gray-700">Available</span>
-                  <span className="font-bold text-green-600 text-xl">{getAvailablePagers().length}</span>
-                </div>
-                <div className="text-center pt-4">
-                  <div className="text-3xl font-bold text-gray-800">12</div>
-                  <div className="text-gray-600">Total Pagers</div>
-                </div>
-              </div>
-            </div>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
