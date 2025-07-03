@@ -24,6 +24,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
+import { extractPackageInfo, getGuestCount, getShowTimeDisplay, getPriorityHeaders } from '@/utils/guestDataUtils';
 
 interface Guest {
   id?: string;
@@ -359,8 +360,9 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
   };
 
   const getShowTimeColor = (showTime: string) => {
-    if (showTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
-    if (showTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
+    const displayTime = getShowTimeDisplay(showTime);
+    if (displayTime === '7pm') return 'bg-orange-100 text-orange-800 border-orange-200';
+    if (displayTime === '9pm') return 'bg-purple-100 text-purple-800 border-purple-200';
     return 'bg-gray-100 border-gray-200 text-gray-800';
   };
 
@@ -421,7 +423,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
                 <SelectContent>
                   <SelectItem value="all">All Times</SelectItem>
                   {showTimes.map(time => (
-                    <SelectItem key={time} value={time}>{time}</SelectItem>
+                    <SelectItem key={time} value={time}>{getShowTimeDisplay(time)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -483,7 +485,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
                     <div key={bookerName} className="p-3 bg-blue-100 rounded border border-blue-200">
                       <div className="font-medium text-blue-800">{bookerName}</div>
                       <div className="text-sm text-blue-700">
-                        {groupGuests.length} guests • Total: {groupGuests.reduce((sum, g) => sum + (g.total_quantity || 1), 0)} people
+                        {groupGuests.length} guests • Total: {groupGuests.reduce((sum, g) => sum + getGuestCount(g), 0)} people
                       </div>
                       <div className="text-xs text-blue-600 mt-1">
                         Consider checking in all guests from this party together
@@ -506,158 +508,173 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
                 </CardContent>
               </Card>
             ) : (
-              filteredGuests.map((guest, index) => (
-                <Card key={index} className={`transition-all hover:shadow-md ${
-                  guest.is_seated ? 'border-green-300 bg-green-50' :
-                  guest.is_checked_in ? 'border-blue-300 bg-blue-50' : 
-                  'border-gray-200'
-                }`}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{guest.booker_name || 'Unknown'}</h3>
-                          {guest.show_time && (
-                            <Badge className={getShowTimeColor(guest.show_time)}>
-                              {guest.show_time}
-                            </Badge>
-                          )}
-                          {guest.is_seated && (
-                            <Badge className="bg-green-100 text-green-800 border-green-200">
-                              <UserCheck className="h-3 w-3 mr-1" />
-                              Seated
-                            </Badge>
-                          )}
-                          {guest.is_checked_in && !guest.is_seated && (
+              filteredGuests.map((guest, index) => {
+                const packageInfo = extractPackageInfo(guest.ticket_data);
+                const guestCount = getGuestCount(guest);
+                const displayShowTime = getShowTimeDisplay(guest.show_time || '');
+                const priorityHeaders = getPriorityHeaders(guest.ticket_data);
+
+                return (
+                  <Card key={index} className={`transition-all hover:shadow-md ${
+                    guest.is_seated ? 'border-green-300 bg-green-50' :
+                    guest.is_checked_in ? 'border-blue-300 bg-blue-50' : 
+                    'border-gray-200'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-semibold text-lg">{guest.booker_name || 'Unknown'}</h3>
                             <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Checked In
+                              {guestCount} {guestCount === 1 ? 'guest' : 'guests'}
                             </Badge>
-                          )}
-                          {guest.hasTableAllocated && !guest.is_seated && (
-                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              Table Allocated
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-                          {headers.slice(0, 4).map(header => (
-                            <div key={header}>
-                              <span className="font-medium">{header}:</span>
-                              <span className="ml-1">{guest[header] || 'N/A'}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {guest.pager_number && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <Radio className="h-4 w-4 text-purple-600" />
-                            <span className="text-sm text-purple-600 font-medium">
-                              Pager #{guest.pager_number}
-                            </span>
+                            {packageInfo && (
+                              <Badge className={packageInfo.color}>
+                                {packageInfo.name}
+                              </Badge>
+                            )}
+                            {displayShowTime && (
+                              <Badge className={getShowTimeColor(guest.show_time || '')}>
+                                {displayShowTime}
+                              </Badge>
+                            )}
+                            {guest.is_seated && (
+                              <Badge className="bg-green-100 text-green-800 border-green-200">
+                                <UserCheck className="h-3 w-3 mr-1" />
+                                Seated
+                              </Badge>
+                            )}
+                            {guest.is_checked_in && !guest.is_seated && (
+                              <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Checked In
+                              </Badge>
+                            )}
+                            {guest.hasTableAllocated && !guest.is_seated && (
+                              <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                Table Allocated
+                              </Badge>
+                            )}
                           </div>
-                        )}
-
-                        {guest.allocatedTables && guest.allocatedTables.length > 0 && (
-                          <div className="mt-2 flex items-center gap-2">
-                            <Utensils className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm text-blue-600 font-medium">
-                              Table{guest.allocatedTables.length > 1 ? 's' : ''}: {guest.allocatedTables.join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        {!guest.is_checked_in && (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                onClick={() => {
-                                  setSelectedGuest(guest);
-                                  setPagerNumber(getNextAvailablePager());
-                                }}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                Check In
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Check In Guest</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <h3 className="font-semibold">{selectedGuest?.booker_name}</h3>
-                                  <p className="text-sm text-gray-600">
-                                    {selectedGuest?.total_quantity || 1} guests • {selectedGuest?.show_time}
-                                  </p>
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <Label htmlFor="pager">Pager Number (Optional)</Label>
-                                  <Input
-                                    id="pager"
-                                    type="number"
-                                    placeholder="Enter pager number"
-                                    value={pagerNumber}
-                                    onChange={(e) => setPagerNumber(e.target.value)}
-                                  />
-                                  <p className="text-xs text-gray-500">
-                                    Next available: #{getNextAvailablePager()}
-                                  </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label htmlFor="notes">Notes (Optional)</Label>
-                                  <Textarea
-                                    id="notes"
-                                    placeholder="Any special notes or requests..."
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                  />
-                                </div>
-
-                                <div className="flex gap-2">
-                                  <Button 
-                                    onClick={() => selectedGuest && handleCheckIn(selectedGuest)}
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                  >
-                                    Confirm Check-In
-                                  </Button>
-                                  <Button 
-                                    variant="outline" 
-                                    onClick={() => {
-                                      setSelectedGuest(null);
-                                      setPagerNumber('');
-                                      setNotes('');
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                            {priorityHeaders.map(({ header, value }) => (
+                              <div key={header}>
+                                <span className="font-medium">{header}:</span>
+                                <span className="ml-1">{value}</span>
                               </div>
-                            </DialogContent>
-                          </Dialog>
-                        )}
-                        
-                        {guest.pager_number && guest.is_checked_in && !guest.is_seated && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePagerRelease(guest.pager_number!)}
-                            className="text-purple-600 border-purple-300 hover:bg-purple-50"
-                          >
-                            Release Pager
-                          </Button>
-                        )}
+                            ))}
+                          </div>
+
+                          {guest.pager_number && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Radio className="h-4 w-4 text-purple-600" />
+                              <span className="text-sm text-purple-600 font-medium">
+                                Pager #{guest.pager_number}
+                              </span>
+                            </div>
+                          )}
+
+                          {guest.allocatedTables && guest.allocatedTables.length > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <Utensils className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm text-blue-600 font-medium">
+                                Table{guest.allocatedTables.length > 1 ? 's' : ''}: {guest.allocatedTables.join(', ')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          {!guest.is_checked_in && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  onClick={() => {
+                                    setSelectedGuest(guest);
+                                    setPagerNumber(getNextAvailablePager());
+                                  }}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Check In
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Check In Guest</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div>
+                                    <h3 className="font-semibold">{selectedGuest?.booker_name}</h3>
+                                    <p className="text-sm text-gray-600">
+                                      {getGuestCount(selectedGuest || {})} guests • {getShowTimeDisplay(selectedGuest?.show_time || '')}
+                                    </p>
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <Label htmlFor="pager">Pager Number (Optional)</Label>
+                                    <Input
+                                      id="pager"
+                                      type="number"
+                                      placeholder="Enter pager number"
+                                      value={pagerNumber}
+                                      onChange={(e) => setPagerNumber(e.target.value)}
+                                    />
+                                    <p className="text-xs text-gray-500">
+                                      Next available: #{getNextAvailablePager()}
+                                    </p>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label htmlFor="notes">Notes (Optional)</Label>
+                                    <Textarea
+                                      id="notes"
+                                      placeholder="Any special notes or requests..."
+                                      value={notes}
+                                      onChange={(e) => setNotes(e.target.value)}
+                                    />
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <Button 
+                                      onClick={() => selectedGuest && handleCheckIn(selectedGuest)}
+                                      className="flex-1 bg-green-600 hover:bg-green-700"
+                                    >
+                                      Confirm Check-In
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      onClick={() => {
+                                        setSelectedGuest(null);
+                                        setPagerNumber('');
+                                        setNotes('');
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                          
+                          {guest.pager_number && guest.is_checked_in && !guest.is_seated && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePagerRelease(guest.pager_number!)}
+                              className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                            >
+                              Release Pager
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </TabsContent>
@@ -669,8 +686,8 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
             }}
             checkedInGuests={checkedInGuests.map(guest => ({
               name: guest.booker_name || 'Unknown',
-              count: guest.total_quantity || 1,
-              showTime: guest.show_time || '',
+              count: getGuestCount(guest),
+              showTime: getShowTimeDisplay(guest.show_time || ''),
               originalIndex: guest.original_row_index || 0,
               pagerNumber: guest.pager_number || undefined,
               hasBeenSeated: guest.is_seated || false,
@@ -679,7 +696,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
             }))}
             onPagerRelease={handlePagerRelease}
             onGuestSeated={handleGuestSeated}
-            onTableAllocated={onTableAllocated}
+            onTableAllocated={handleTableAllocated}
             partyGroups={partyGroups}
           />
         </TabsContent>
