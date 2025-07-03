@@ -28,6 +28,7 @@ interface Guest {
   pager_number: number;
   is_seated: boolean;
   table_assignments: number[];
+  original_row_index: number;
 }
 
 const GuestManager = () => {
