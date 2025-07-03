@@ -45,6 +45,7 @@ interface CheckedInGuest {
   pagerNumber?: number;
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
+  allocatedTables?: number[];
 }
 
 interface PartyGroup {
@@ -87,6 +88,55 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return `checkin-system-state-${today}`;
   };
 
+  // Load table allocations from database
+  const loadTableAllocationsFromDatabase = async () => {
+    try {
+      console.log('Loading table allocations from database...');
+      const { data: guestsWithTables, error } = await supabase
+        .from('guests')
+        .select('id, original_row_index, table_assignments, is_allocated, is_seated')
+        .not('table_assignments', 'is', null)
+        .eq('is_allocated', true);
+
+      if (error) {
+        console.error('Error loading table allocations:', error);
+        return;
+      }
+
+      if (guestsWithTables && guestsWithTables.length > 0) {
+        console.log('Found guests with table allocations:', guestsWithTables);
+        
+        const newAllocatedGuests = new Set(allocatedGuests);
+        const newGuestTableAllocations = new Map(guestTableAllocations);
+        const newSeatedGuests = new Set(seatedGuests);
+        
+        guestsWithTables.forEach(guest => {
+          const arrayIndex = guests.findIndex(g => g.id === guest.id);
+          if (arrayIndex !== -1 && guest.table_assignments) {
+            console.log(`Loading allocation for guest ${arrayIndex}: tables ${guest.table_assignments.join(', ')}`);
+            newAllocatedGuests.add(arrayIndex);
+            newGuestTableAllocations.set(arrayIndex, guest.table_assignments);
+            
+            // Also load seated status
+            if (guest.is_seated) {
+              newSeatedGuests.add(arrayIndex);
+            }
+          }
+        });
+        
+        setAllocatedGuests(newAllocatedGuests);
+        setGuestTableAllocations(newGuestTableAllocations);
+        setSeatedGuests(newSeatedGuests);
+        
+        console.log(`Loaded ${newAllocatedGuests.size} allocated guests and ${newSeatedGuests.size} seated guests from database`);
+      } else {
+        console.log('No table allocations found in database');
+      }
+    } catch (error) {
+      console.error('Failed to load table allocations from database:', error);
+    }
+  };
+
   // Clear all data and start fresh
   const clearAllData = () => {
     setCheckedInGuests(new Set());
@@ -119,7 +169,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
 
   // Load state on component mount (only once)
   useEffect(() => {
-    const loadState = () => {
+    const loadState = async () => {
       try {
         const today = new Date().toDateString();
         const todaySessionKey = getSessionKey();
@@ -156,6 +206,10 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         } else {
           setSessionDate(today);
         }
+        
+        // Load table allocations from database after loading localStorage
+        await loadTableAllocationsFromDatabase();
+        
       } catch (error) {
         console.error('Failed to load saved state:', error);
         setSessionDate(new Date().toDateString());
@@ -298,7 +352,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED TO SHOW "Old Groupon"
+  // Extract package information from ticket type fields - UPDATED to normalize show times
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
@@ -824,7 +878,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  // Add function to get checked-in guests data for table allocation
+  // Add function to get checked-in guests data for table allocation - FIXED to include allocatedTables
   const getCheckedInGuestsData = (): CheckedInGuest[] => {
     const checkedInData = Array.from(checkedInGuests).map(guestIndex => {
       const guest = guests[guestIndex];
@@ -836,6 +890,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
       const hasTableAllocated = allocatedGuests.has(guestIndex);
+      const allocatedTables = guestTableAllocations.get(guestIndex) || [];
       
       return {
         name: guestName,
@@ -844,7 +899,8 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         originalIndex: guestIndex,
         pagerNumber: pagerNumber,
         hasBeenSeated: hasBeenSeated,
-        hasTableAllocated: hasTableAllocated
+        hasTableAllocated: hasTableAllocated,
+        allocatedTables: allocatedTables
       };
     }).filter(Boolean) as CheckedInGuest[];
 
@@ -858,6 +914,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
         const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index));
         const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
+        const allocatedTables = guestTableAllocations.get(party.bookingIndices[0]) || [];
 
         partyData.push({
           name: `${party.guestNames.join(' & ')} (Party)`,
@@ -866,7 +923,8 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
           originalIndex: party.bookingIndices[0], // Use first guest's index as reference
           pagerNumber: pagerNumber,
           hasBeenSeated: hasBeenSeated,
-          hasTableAllocated: hasTableAllocated
+          hasTableAllocated: hasTableAllocated,
+          allocatedTables: allocatedTables
         });
 
         // Remove individual entries for party members
