@@ -88,8 +88,12 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return `checkin-system-state-${today}`;
   };
 
-  // Load table allocations from database
-  const loadTableAllocationsFromDatabase = async () => {
+  // FIXED: Load table allocations from database - accepts existing state as parameters
+  const loadTableAllocationsFromDatabase = async (
+    existingAllocatedGuests: Set<number>,
+    existingGuestTableAllocations: Map<number, number[]>,
+    existingSeatedGuests: Set<number>
+  ) => {
     try {
       console.log('Loading table allocations from database...');
       const { data: guestsWithTables, error } = await supabase
@@ -100,15 +104,16 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
 
       if (error) {
         console.error('Error loading table allocations:', error);
-        return;
+        return { allocatedGuests: existingAllocatedGuests, guestTableAllocations: existingGuestTableAllocations, seatedGuests: existingSeatedGuests };
       }
 
       if (guestsWithTables && guestsWithTables.length > 0) {
         console.log('Found guests with table allocations:', guestsWithTables);
         
-        const newAllocatedGuests = new Set(allocatedGuests);
-        const newGuestTableAllocations = new Map(guestTableAllocations);
-        const newSeatedGuests = new Set(seatedGuests);
+        // FIXED: Start with existing state instead of current state
+        const newAllocatedGuests = new Set(existingAllocatedGuests);
+        const newGuestTableAllocations = new Map(existingGuestTableAllocations);
+        const newSeatedGuests = new Set(existingSeatedGuests);
         
         guestsWithTables.forEach(guest => {
           const arrayIndex = guests.findIndex(g => g.id === guest.id);
@@ -124,16 +129,15 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
           }
         });
         
-        setAllocatedGuests(newAllocatedGuests);
-        setGuestTableAllocations(newGuestTableAllocations);
-        setSeatedGuests(newSeatedGuests);
-        
         console.log(`Loaded ${newAllocatedGuests.size} allocated guests and ${newSeatedGuests.size} seated guests from database`);
+        return { allocatedGuests: newAllocatedGuests, guestTableAllocations: newGuestTableAllocations, seatedGuests: newSeatedGuests };
       } else {
         console.log('No table allocations found in database');
+        return { allocatedGuests: existingAllocatedGuests, guestTableAllocations: existingGuestTableAllocations, seatedGuests: existingSeatedGuests };
       }
     } catch (error) {
       console.error('Failed to load table allocations from database:', error);
+      return { allocatedGuests: existingAllocatedGuests, guestTableAllocations: existingGuestTableAllocations, seatedGuests: existingSeatedGuests };
     }
   };
 
@@ -175,19 +179,27 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         const todaySessionKey = getSessionKey();
         const savedState = localStorage.getItem(todaySessionKey);
         
+        let loadedCheckedIn = new Set<number>();
+        let loadedPagerAssignments = new Map<number, number>();
+        let loadedSeatedGuests = new Set<number>();
+        let loadedAllocatedGuests = new Set<number>();
+        let loadedGuestTableAllocations = new Map<number, number[]>();
+        let loadedPartyGroups = new Map<string, PartyGroup>();
+        let loadedBookingComments = new Map<number, string>();
+        
         if (savedState) {
           const state = JSON.parse(savedState);
           const savedDate = new Date(state.timestamp).toDateString();
           
           // Only load if it's from today
           if (savedDate === today) {
-            setCheckedInGuests(new Set(state.checkedInGuests || []));
-            setPagerAssignments(new Map(state.pagerAssignments || []));
-            setSeatedGuests(new Set(state.seatedGuests || []));
-            setAllocatedGuests(new Set(state.allocatedGuests || []));
-            setGuestTableAllocations(new Map(state.guestTableAllocations || []));
-            setPartyGroups(new Map(state.partyGroups || []));
-            setBookingComments(new Map(state.bookingComments || []));
+            loadedCheckedIn = new Set(state.checkedInGuests || []);
+            loadedPagerAssignments = new Map(state.pagerAssignments || []);
+            loadedSeatedGuests = new Set(state.seatedGuests || []);
+            loadedAllocatedGuests = new Set(state.allocatedGuests || []);
+            loadedGuestTableAllocations = new Map(state.guestTableAllocations || []);
+            loadedPartyGroups = new Map(state.partyGroups || []);
+            loadedBookingComments = new Map(state.bookingComments || []);
             setSessionDate(savedDate);
             console.log('Loaded saved state from', state.timestamp);
             
@@ -207,8 +219,21 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
           setSessionDate(today);
         }
         
-        // Load table allocations from database after loading localStorage
-        await loadTableAllocationsFromDatabase();
+        // FIXED: Load table allocations from database with existing state
+        const databaseState = await loadTableAllocationsFromDatabase(
+          loadedAllocatedGuests,
+          loadedGuestTableAllocations,
+          loadedSeatedGuests
+        );
+        
+        // Set all state at once
+        setCheckedInGuests(loadedCheckedIn);
+        setPagerAssignments(loadedPagerAssignments);
+        setSeatedGuests(databaseState.seatedGuests);
+        setAllocatedGuests(databaseState.allocatedGuests);
+        setGuestTableAllocations(databaseState.guestTableAllocations);
+        setPartyGroups(loadedPartyGroups);
+        setBookingComments(loadedBookingComments);
         
       } catch (error) {
         console.error('Failed to load saved state:', error);
