@@ -91,29 +91,6 @@ const TableAllocation = ({
   const [tableNotes, setTableNotes] = useState<Map<number, string>>(new Map());
   const [seatPosition, setSeatPosition] = useState<'front' | 'back' | 'any'>('any');
 
-  // Initialize table state with seated guests from database
-  useEffect(() => {
-    const seatedGuests = checkedInGuests.filter(guest => guest.hasBeenSeated);
-    
-    setTables(prev => prev.map(table => {
-      // Find seated guests for this table
-      const tableSeatedGuests = seatedGuests.filter(guest => 
-        guest.allocatedTables && guest.allocatedTables.includes(table.id)
-      );
-      
-      if (tableSeatedGuests.length > 0) {
-        return {
-          ...table,
-          isOccupied: true,
-          guests: tableSeatedGuests,
-          allocatedGuests: [] // Clear allocated since they're now seated
-        };
-      }
-      
-      return table;
-    }));
-  }, [checkedInGuests]);
-
   // Helper function to update table occupancy for both manual and smart allocation
   const allocateGuestToTables = (guest: CheckedInGuest, tableIds: number[], position: 'front' | 'back' | 'any' = 'any') => {
     setTables(prev => prev.map(table => {
@@ -180,11 +157,26 @@ const TableAllocation = ({
   };
 
   const handleSeatGuest = (guest: CheckedInGuest) => {
-    // Call the parent's handleGuestSeated which now updates the database
+    // Move guest from allocated to seated in tables
+    const guestTables = guest.allocatedTables || [];
+    
+    setTables(prev => prev.map(table => {
+      if (guestTables.includes(table.id)) {
+        return {
+          ...table,
+          isOccupied: true,
+          guests: [...(table.guests || []), guest],
+          allocatedGuests: (table.allocatedGuests || []).filter(g => g.originalIndex !== guest.originalIndex)
+        };
+      }
+      return table;
+    }));
+
     onGuestSeated(guest.originalIndex);
     
-    // Note: We don't update local state here anymore because the database
-    // update will trigger a refresh through the real-time subscription
+    if (guest.pagerNumber) {
+      onPagerRelease(guest.pagerNumber);
+    }
   };
 
   const clearTable = (tableId: number) => {
@@ -810,14 +802,6 @@ const TableAllocation = ({
                             <Badge className={getShowTimeColor(guest.showTime)}>
                               {guest.showTime}
                             </Badge>
-                            {guest.allocatedTables && guest.allocatedTables.length > 0 && (
-                              <div className="flex items-center gap-1">
-                                <Utensils className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm text-blue-600">
-                                  Table{guest.allocatedTables.length > 1 ? 's' : ''}: {guest.allocatedTables.join(', ')}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         </div>
                         <CheckCircle className="h-6 w-6 text-green-600" />
