@@ -298,7 +298,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED LOGIC
+  // Extract package information from ticket type fields - FIXED TO SHOW "Old Groupon"
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
@@ -338,7 +338,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
         if (numValue > 0) {
           if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
           
-          // Return the appropriate package based on the field name
+          // Return the appropriate package based on the field name - FIXED OLD GROUPON
           if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
             return '2 Drinks + 9" Pizza';
           } else if (field.includes('& 2 Drinks')) {
@@ -356,7 +356,7 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
           } else if (field.includes('Smoke Offer')) {
             return 'Drinks (min x2)';
           } else if (field.includes('OLD Groupon')) {
-            return 'Groupon Package';
+            return 'Old Groupon';  // FIXED: Now returns "Old Groupon" instead of "Groupon Package"
           } else {
             return 'Show Only';
           }
@@ -395,8 +395,8 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     }
     
     // Handle special packages
-    if (packageInfo === 'Groupon Package') {
-      quantities.push('Groupon Items Included');
+    if (packageInfo === 'Old Groupon') {
+      quantities.push('Old Groupon Items Included');
     } else if (packageInfo === 'Wowcher Package') {
       quantities.push('Wowcher Items Included');
     } else if (packageInfo === 'Show Only') {
@@ -654,29 +654,69 @@ const CheckInSystem = ({ guests, headers, showTimes, onTableAllocated }: CheckIn
     });
   };
 
-  const handleGuestSeated = (guestIndex: number) => {
-    const newSeatedGuests = new Set(seatedGuests);
-    newSeatedGuests.add(guestIndex);
-    setSeatedGuests(newSeatedGuests);
-    
-    // Remove from allocated when seated
-    const newAllocatedGuests = new Set(allocatedGuests);
-    newAllocatedGuests.delete(guestIndex);
-    setAllocatedGuests(newAllocatedGuests);
-    
-    // Free up the pager when guest is seated
-    const newPagerAssignments = new Map(pagerAssignments);
-    const assignedPager = newPagerAssignments.get(guestIndex);
-    newPagerAssignments.delete(guestIndex);
-    setPagerAssignments(newPagerAssignments);
-    
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    toast({
-      title: "🪑 Guest Seated",
-      description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
-    });
+  // FIXED: Updated handleGuestSeated to persist to database and preserve table assignments
+  const handleGuestSeated = async (guestIndex: number) => {
+    try {
+      const guest = guests[guestIndex];
+      if (!guest) {
+        console.error('Guest not found for seating:', guestIndex);
+        return;
+      }
+
+      const guestName = extractGuestName(guest.booker_name || '');
+      const allocatedTables = guestTableAllocations.get(guestIndex) || [];
+      
+      // Update the database with seated status and preserve table assignments
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          is_seated: true,
+          seated_at: new Date().toISOString(),
+          // Keep the existing table assignments when seating
+          table_assignments: allocatedTables.length > 0 ? allocatedTables : guest.table_assignments
+        })
+        .eq('id', guest.id);
+
+      if (error) {
+        console.error('Error updating seated status in database:', error);
+        toast({
+          title: "Database Error",
+          description: "Failed to save seated status. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log(`Successfully updated database for seated guest ${guest.id} with tables: ${allocatedTables.join(', ')}`);
+      
+      // Update local state
+      const newSeatedGuests = new Set(seatedGuests);
+      newSeatedGuests.add(guestIndex);
+      setSeatedGuests(newSeatedGuests);
+      
+      // Remove from allocated when seated
+      const newAllocatedGuests = new Set(allocatedGuests);
+      newAllocatedGuests.delete(guestIndex);
+      setAllocatedGuests(newAllocatedGuests);
+      
+      // Free up the pager when guest is seated
+      const newPagerAssignments = new Map(pagerAssignments);
+      const assignedPager = newPagerAssignments.get(guestIndex);
+      newPagerAssignments.delete(guestIndex);
+      setPagerAssignments(newPagerAssignments);
+      
+      toast({
+        title: "🪑 Guest Seated",
+        description: `${guestName} has been seated${allocatedTables.length > 0 ? ` at Table(s) ${allocatedTables.join(', ')}` : ''}${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
+      });
+    } catch (error) {
+      console.error('Error in handleGuestSeated:', error);
+      toast({
+        title: "Error",
+        description: "Failed to seat guest. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle table allocation with database updates - FIXED DATABASE FIELD NAME
