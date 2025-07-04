@@ -195,12 +195,22 @@ const GuestManager = () => {
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowCheckIn(false)}
-          >
-            ← Back to Dashboard
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCheckIn(false)}
+            >
+              ← Back to Dashboard
+            </Button>
+            <div className="flex items-center gap-2">
+              <img 
+                src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+                alt="Smoke & Mirrors Logo" 
+                className="h-6 w-auto"
+              />
+              <span className="text-sm font-medium text-muted-foreground">Smoke & Mirrors</span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
               {activeGuestList.name}
@@ -223,11 +233,18 @@ const GuestManager = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Theatre Seating Dashboard</h1>
-            <p className="text-xl text-muted-foreground">
-              Welcome back, {user?.user_metadata?.full_name || user?.user_metadata?.username}
-            </p>
+          <div className="flex items-center gap-4">
+            <img 
+              src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+              alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
+              className="h-12 w-auto"
+            />
+            <div>
+              <h1 className="text-4xl font-bold mb-2">Smoke & Mirrors Comedy & Magic Theatre</h1>
+              <p className="text-xl text-muted-foreground">
+                Welcome back, {user?.user_metadata?.full_name || user?.user_metadata?.username}
+              </p>
+            </div>
           </div>
           <Button variant="outline" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />

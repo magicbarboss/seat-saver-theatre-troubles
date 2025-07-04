@@ -34,8 +34,15 @@ const AuthForm = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Theatre Seating System</CardTitle>
-          <CardDescription>Staff Access Portal</CardDescription>
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+              alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
+              className="h-16 w-auto"
+            />
+          </div>
+          <CardTitle className="text-2xl">Smoke & Mirrors</CardTitle>
+          <CardDescription>Comedy & Magic Theatre - Staff Portal</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">
