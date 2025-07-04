@@ -36,7 +36,7 @@ const AuthForm = () => {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+              src="/smoke-mirrors-logo.png" 
               alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
               className="h-16 w-auto"
             />

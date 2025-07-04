@@ -204,7 +204,7 @@ const GuestManager = () => {
             </Button>
             <div className="flex items-center gap-2">
               <img 
-                src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+                src="/smoke-mirrors-logo.png" 
                 alt="Smoke & Mirrors Logo" 
                 className="h-6 w-auto"
               />
@@ -235,7 +235,7 @@ const GuestManager = () => {
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <img 
-              src="/lovable-uploads/f05e8319-03a8-4a37-9ac0-17585a0abf07.png" 
+              src="/smoke-mirrors-logo.png" 
               alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
               className="h-12 w-auto"
             />
