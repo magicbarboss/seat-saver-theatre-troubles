@@ -308,6 +308,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log('Full guest data:', guest);
     }
     
+    // Check for "PAID in GYD" field first - classify as OLD Groupon
+    if (guest['PAID in GYD'] && String(guest['PAID in GYD']).trim() !== '' && String(guest['PAID in GYD']) !== '0') {
+      const numValue = parseInt(String(guest['PAID in GYD']));
+      if (numValue > 0) {
+        if (isTargetGuest) console.log('SUCCESS: Found PAID in GYD, classifying as Groupon Package');
+        return 'Groupon Package';
+      }
+    }
+    
     // Check all possible ticket fields that might contain package information
     const ticketFields = [
       'House Magicians Show Ticket & 2 Drinks',
@@ -369,25 +378,36 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
     const quantities = [];
     
-    // Extract drink quantities
+    // Extract drink quantities with updated logic
     if (packageInfo.includes('2 Drinks') || packageInfo.includes('2 soft drinks')) {
       const totalDrinks = 2 * guestCount;
       const drinkType = packageInfo.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
       quantities.push(`${totalDrinks} ${drinkType}`);
     } else if (packageInfo.includes('Pints Package')) {
-      const totalPints = 2 * guestCount; // Assuming 2 pints per person
-      quantities.push(`${totalPints} Pint Tokens`);
+      // 1 pint per person + pizzas and fries per couple
+      const totalPints = guestCount;
+      const totalPizzas = Math.ceil(guestCount / 2);
+      const totalFries = Math.ceil(guestCount / 2);
+      quantities.push(`${totalPints} Pint Token${totalPints > 1 ? 's' : ''}`);
+      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      quantities.push(`${totalFries} × Loaded Fries`);
     } else if (packageInfo.includes('Cocktails Package')) {
-      const totalCocktails = 2 * guestCount; // Assuming 2 cocktails per person
-      quantities.push(`${totalCocktails} Cocktail Tokens`);
+      // 1 cocktail per person + pizzas and fries per couple
+      const totalCocktails = guestCount;
+      const totalPizzas = Math.ceil(guestCount / 2);
+      const totalFries = Math.ceil(guestCount / 2);
+      quantities.push(`${totalCocktails} Cocktail Token${totalCocktails > 1 ? 's' : ''}`);
+      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      quantities.push(`${totalFries} × Loaded Fries`);
     } else if (packageInfo.includes('Drinks (min x2)')) {
-      const totalDrinks = Math.max(2, 2 * guestCount);
-      quantities.push(`${totalDrinks} Drink Tokens`);
+      // 1 drink per guest, minimum 2 total
+      const totalDrinks = Math.max(2, guestCount);
+      quantities.push(`${totalDrinks} Drink Token${totalDrinks > 1 ? 's' : ''}`);
     }
     
-    // Extract pizza quantities
-    if (packageInfo.includes('9" Pizza')) {
-      const totalPizzas = 1 * guestCount; // 1 pizza per person
+    // Extract pizza quantities (for non-Pints/Cocktails packages)
+    if (packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package')) {
+      const totalPizzas = 1 * guestCount; // 1 pizza per person for these packages
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
     }
     
