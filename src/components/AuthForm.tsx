@@ -36,9 +36,12 @@ const AuthForm = () => {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/smoke-mirrors-logo.png" 
+              src={`https://xctlqlbcsezhdulsgbzv.supabase.co/storage/v1/object/public/images/smoke-mirrors-logo.png`}
               alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
               className="h-16 w-auto"
+              onError={(e) => {
+                e.currentTarget.src = "/smoke-mirrors-logo.png";
+              }}
             />
           </div>
           <CardTitle className="text-2xl">Smoke & Mirrors</CardTitle>

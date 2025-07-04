@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import CsvUpload from './CsvUpload';
 import CheckInSystem from './CheckInSystem';
-import { LogOut, Users } from 'lucide-react';
+import LogoUpload from './LogoUpload';
+import { LogOut, Users, Settings } from 'lucide-react';
 
 interface GuestList {
   id: string;
@@ -37,6 +38,7 @@ const GuestManager = () => {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [showUpload, setShowUpload] = useState(false);
   const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showLogoUpload, setShowLogoUpload] = useState(false);
   const { signOut, user } = useAuth();
   const { toast } = useToast();
 
@@ -142,6 +144,27 @@ const GuestManager = () => {
     setShowUpload(false);
   };
 
+  if (showLogoUpload) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="flex justify-between items-center">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLogoUpload(false)}
+            >
+              ← Back to Dashboard
+            </Button>
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
+          <LogoUpload />
+        </div>
+      </div>
+    );
+  }
+
   if (showUpload) {
     return (
       <div className="space-y-4">
@@ -204,9 +227,12 @@ const GuestManager = () => {
             </Button>
             <div className="flex items-center gap-2">
               <img 
-                src="/smoke-mirrors-logo.png" 
+                src={`https://xctlqlbcsezhdulsgbzv.supabase.co/storage/v1/object/public/images/smoke-mirrors-logo.png`}
                 alt="Smoke & Mirrors Logo" 
                 className="h-6 w-auto"
+                onError={(e) => {
+                  e.currentTarget.src = "/smoke-mirrors-logo.png";
+                }}
               />
               <span className="text-sm font-medium text-muted-foreground">Smoke & Mirrors</span>
             </div>
@@ -235,9 +261,12 @@ const GuestManager = () => {
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
             <img 
-              src="/smoke-mirrors-logo.png" 
+              src={`https://xctlqlbcsezhdulsgbzv.supabase.co/storage/v1/object/public/images/smoke-mirrors-logo.png`}
               alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
               className="h-12 w-auto"
+              onError={(e) => {
+                e.currentTarget.src = "/smoke-mirrors-logo.png";
+              }}
             />
             <div>
               <h1 className="text-4xl font-bold mb-2">Smoke & Mirrors Comedy & Magic Theatre</h1>
@@ -246,10 +275,16 @@ const GuestManager = () => {
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowLogoUpload(true)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Upload Logo
+            </Button>
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         {/* Quick Actions Section */}
