@@ -308,13 +308,10 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log('Full guest data:', guest);
     }
     
-    // Check for "PAID in GYD" field first - classify as OLD Groupon
-    if (guest['PAID in GYD'] && String(guest['PAID in GYD']).trim() !== '' && String(guest['PAID in GYD']) !== '0') {
-      const numValue = parseInt(String(guest['PAID in GYD']));
-      if (numValue > 0) {
-        if (isTargetGuest) console.log('SUCCESS: Found PAID in GYD, classifying as Groupon Package');
-        return 'Groupon Package';
-      }
+    // Check for "PAID in GYG" status first - classify as OLD Groupon
+    if (guest['Status'] === 'Paid in GYG') {
+      if (isTargetGuest) console.log('SUCCESS: Found "Paid in GYG" status, classifying as OLD Groupon Package');
+      return 'OLD Groupon Package';
     }
     
     // Check all possible ticket fields that might contain package information
@@ -387,22 +384,27 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       // 1 pint per person + pizzas and fries per couple
       const totalPints = guestCount;
       const totalPizzas = Math.ceil(guestCount / 2);
-      const totalFries = Math.ceil(guestCount / 2);
+      const friesType = guestCount === 2 ? 'Salt & Pepper Fries' : 'Loaded Fries';
       quantities.push(`${totalPints} Pint Token${totalPints > 1 ? 's' : ''}`);
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
-      quantities.push(`${totalFries} × Loaded Fries`);
+      quantities.push(`1 × ${friesType}`);
     } else if (packageInfo.includes('Cocktails Package')) {
       // 1 cocktail per person + pizzas and fries per couple
       const totalCocktails = guestCount;
       const totalPizzas = Math.ceil(guestCount / 2);
-      const totalFries = Math.ceil(guestCount / 2);
+      const friesType = guestCount === 2 ? 'Salt & Pepper Fries' : 'Loaded Fries';
       quantities.push(`${totalCocktails} Cocktail Token${totalCocktails > 1 ? 's' : ''}`);
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
-      quantities.push(`${totalFries} × Loaded Fries`);
+      quantities.push(`1 × ${friesType}`);
     } else if (packageInfo.includes('Drinks (min x2)')) {
       // 1 drink per guest, minimum 2 total
       const totalDrinks = Math.max(2, guestCount);
       quantities.push(`${totalDrinks} Drink Token${totalDrinks > 1 ? 's' : ''}`);
+    } else if (packageInfo === 'OLD Groupon Package') {
+      // 1 Glass Prosecco per guest + 1 Pizza + 1 Salt & Pepper Fries to share
+      quantities.push(`${guestCount} Glass${guestCount > 1 ? 'es' : ''} Prosecco`);
+      quantities.push(`1 × 9" Pizza`);
+      quantities.push(`1 × Salt & Pepper Fries`);
     }
     
     // Extract pizza quantities (for non-Pints/Cocktails packages)
