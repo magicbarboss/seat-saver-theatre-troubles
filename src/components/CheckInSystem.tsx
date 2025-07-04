@@ -308,14 +308,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log('Full guest data:', guest);
     }
     
-    // Check for "OLD Groupon Offer" field first - classify as OLD Groupon Package
+    // Check for "OLD Groupon Offer" field OR "PAID in GYG" status - classify as OLD Groupon Package
     const oldGrouponField = guest['OLD Groupon Offer (per person - extras are already included)'];
-    if (oldGrouponField && String(oldGrouponField).trim() !== '' && String(oldGrouponField) !== '0') {
-      const numValue = parseInt(String(oldGrouponField));
-      if (numValue > 0) {
-        if (isTargetGuest) console.log('SUCCESS: Found OLD Groupon Offer, classifying as OLD Groupon Package');
-        return 'OLD Groupon Package';
+    const isPaidInGYG = guest['Status'] === 'Paid in GYG';
+    
+    if (isPaidInGYG || (oldGrouponField && String(oldGrouponField).trim() !== '' && String(oldGrouponField) !== '0' && parseInt(String(oldGrouponField)) > 0)) {
+      if (isTargetGuest) {
+        console.log('SUCCESS: Found OLD Groupon Package -', isPaidInGYG ? 'Paid in GYG status' : 'OLD Groupon Offer field');
       }
+      return 'OLD Groupon Package';
     }
     
     // Check all possible ticket fields that might contain package information
