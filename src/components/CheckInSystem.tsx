@@ -308,10 +308,14 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log('Full guest data:', guest);
     }
     
-    // Check for "PAID in GYG" status first - classify as OLD Groupon
-    if (guest['Status'] === 'Paid in GYG') {
-      if (isTargetGuest) console.log('SUCCESS: Found "Paid in GYG" status, classifying as OLD Groupon Package');
-      return 'OLD Groupon Package';
+    // Check for "OLD Groupon Offer" field first - classify as OLD Groupon Package
+    const oldGrouponField = guest['OLD Groupon Offer (per person - extras are already included)'];
+    if (oldGrouponField && String(oldGrouponField).trim() !== '' && String(oldGrouponField) !== '0') {
+      const numValue = parseInt(String(oldGrouponField));
+      if (numValue > 0) {
+        if (isTargetGuest) console.log('SUCCESS: Found OLD Groupon Offer, classifying as OLD Groupon Package');
+        return 'OLD Groupon Package';
+      }
     }
     
     // Check all possible ticket fields that might contain package information
@@ -401,10 +405,12 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const totalDrinks = Math.max(2, guestCount);
       quantities.push(`${totalDrinks} Drink Token${totalDrinks > 1 ? 's' : ''}`);
     } else if (packageInfo === 'OLD Groupon Package') {
-      // 1 Glass Prosecco per guest + 1 Pizza + 1 Salt & Pepper Fries to share
+      // 1 Glass Prosecco per guest + pizzas and fries scale for groups (1 per 2 people)
+      const totalPizzas = Math.ceil(guestCount / 2);
+      const totalFries = Math.ceil(guestCount / 2);
       quantities.push(`${guestCount} Glass${guestCount > 1 ? 'es' : ''} Prosecco`);
-      quantities.push(`1 × 9" Pizza`);
-      quantities.push(`1 × Salt & Pepper Fries`);
+      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      quantities.push(`${totalFries} × Salt & Pepper Fries`);
     }
     
     // Extract pizza quantities (for non-Pints/Cocktails packages)
