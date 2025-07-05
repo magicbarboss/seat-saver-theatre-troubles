@@ -300,17 +300,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla');
+    const isTargetGuest = guestName.includes('josh') || guestName.includes('thompson');
     
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG ===');
       console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-      console.log('Full guest data:', guest);
+      console.log('Ticket data:', guest.ticket_data);
     }
     
+    // Access ticket data from the nested JSON field
+    const ticketData = guest.ticket_data || {};
+    
     // Check for "OLD Groupon Offer" field OR "PAID in GYG" status - classify as OLD Groupon Package
-    const oldGrouponField = guest['OLD Groupon Offer (per person - extras are already included)'];
-    const isPaidInGYG = guest['Status'] === 'Paid in GYG';
+    const oldGrouponField = ticketData['OLD Groupon Offer (per person - extras are already included)'];
+    const isPaidInGYG = ticketData['Status'] === 'Paid in GYG';
     
     if (isPaidInGYG || (oldGrouponField && String(oldGrouponField).trim() !== '' && String(oldGrouponField) !== '0' && parseInt(String(oldGrouponField)) > 0)) {
       if (isTargetGuest) {
@@ -325,6 +328,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       'House Magicians Show Ticket & 2 soft drinks',
       'House Magicians Show Ticket & 2 Drinks + 9 Pizza',
       'House Magicians Show Ticket & 2 soft drinks + 9 PIzza',
+      'House Magicians Show Ticket & 9 Pizza',
       'House Magicians Show Ticket',
       'House Magicians Show ticket',
       'Groupon Magic & Pints Package (per person)',
@@ -336,7 +340,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     
     // Find which ticket type this guest has
     for (const field of ticketFields) {
-      const value = guest[field];
+      const value = ticketData[field];
       if (isTargetGuest) {
         console.log(`Checking field "${field}": value = "${value}", type = ${typeof value}`);
       }
@@ -349,6 +353,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           // Return the appropriate package based on the field name
           if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
             return '2 Drinks + 9" Pizza';
+          } else if (field.includes('& 9 Pizza')) {
+            return '9" Pizza';
           } else if (field.includes('& 2 Drinks')) {
             return '2 Drinks';
           } else if (field.includes('& 2 soft drinks + 9')) {
@@ -414,9 +420,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       quantities.push(`${totalFries} × Salt & Pepper Fries`);
     }
     
-    // Extract pizza quantities (for non-Pints/Cocktails packages)
+    // Extract pizza quantities (for packages that include pizza)
     if (packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package')) {
       const totalPizzas = 1 * guestCount; // 1 pizza per person for these packages
+      quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+    } else if (packageInfo === '9" Pizza') {
+      // Handle standalone 9" Pizza package
+      const totalPizzas = 1 * guestCount;
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
     }
     
