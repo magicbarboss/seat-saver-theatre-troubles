@@ -34,8 +34,18 @@ const AuthForm = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Theatre Seating System</CardTitle>
-          <CardDescription>Staff Access Portal</CardDescription>
+          <div className="flex justify-center mb-4">
+            <img 
+              src={`https://xctlqlbcsezhdulsgbzv.supabase.co/storage/v1/object/public/images/smoke-mirrors-logo.png`}
+              alt="Smoke & Mirrors Comedy & Magic Theatre Logo" 
+              className="h-16 w-auto"
+              onError={(e) => {
+                e.currentTarget.src = "/smoke-mirrors-logo.png";
+              }}
+            />
+          </div>
+          <CardTitle className="text-2xl">Smoke & Mirrors</CardTitle>
+          <CardDescription>Comedy & Magic Theatre - Staff Portal</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin" className="space-y-4">
