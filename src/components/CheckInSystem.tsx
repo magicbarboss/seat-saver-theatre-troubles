@@ -494,13 +494,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return 'Show Ticket';
   };
 
-  // Get all addon information for a booking group (both field-based and separate records)
-  const getAddons = (guest: Guest, bookingGroup?: BookingGroup) => {
+  // Get all addon information for a guest
+  const getAddons = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return [];
     
     const addons = [];
     
-    // Field-based addons (existing functionality)
+    // Addon fields
     const addonFields = [
       'Prosecco add on',
       'Bottle of Wine',
@@ -515,31 +515,6 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         addons.push(`${field}: ${value}`);
       }
     });
-    
-    // Separate addon records (new functionality)
-    if (bookingGroup && bookingGroup.addOns && bookingGroup.addOns.length > 0) {
-      bookingGroup.addOns.forEach(addon => {
-        if (addon && addon.item_details) {
-          // Extract addon info from item_details
-          const itemDetails = addon.item_details;
-          const quantity = addon.total_quantity || 1;
-          
-          // Common addon patterns to look for
-          if (itemDetails.toLowerCase().includes('prosecco')) {
-            addons.push(`${quantity}x Prosecco Bottles`);
-          } else if (itemDetails.toLowerCase().includes('wine')) {
-            addons.push(`${quantity}x Wine Bottles`);
-          } else {
-            // Generic addon display
-            addons.push(`${quantity}x ${itemDetails}`);
-          }
-        } else if (addon && addon.booker_name) {
-          // If no item_details, use booker_name as fallback
-          const quantity = addon.total_quantity || 1;
-          addons.push(`${quantity}x ${addon.booker_name}`);
-        }
-      });
-    }
     
     return addons;
   };
@@ -1134,7 +1109,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
                   const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
-                  const addons = getAddons(booking.mainBooking, booking);
+                  const addons = getAddons(booking.mainBooking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
                   
