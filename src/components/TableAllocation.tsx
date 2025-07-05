@@ -182,7 +182,7 @@ const TableAllocation = ({
   const [showWalkInDialog, setShowWalkInDialog] = useState(false);
   const [walkInForm, setWalkInForm] = useState({
     name: '',
-    count: 1,
+    count: 1 as number | string,
     showTime: '7:00 PM',
     notes: ''
   });
@@ -1329,7 +1329,8 @@ const TableAllocation = ({
       return;
     }
 
-    if (walkInForm.count < 1) {
+    const guestCount = typeof walkInForm.count === 'string' ? parseInt(walkInForm.count) || 1 : walkInForm.count;
+    if (guestCount < 1) {
       toast({
         title: "❌ Invalid Guest Count",
         description: "Guest count must be at least 1.",
@@ -1342,7 +1343,7 @@ const TableAllocation = ({
     if (onAddWalkIn) {
       onAddWalkIn({
         name: walkInForm.name,
-        count: walkInForm.count,
+        count: guestCount,
         showTime: walkInForm.showTime,
         notes: walkInForm.notes || undefined
       });
@@ -1350,13 +1351,13 @@ const TableAllocation = ({
 
     toast({
       title: "🚶 Walk-In Added",
-      description: `${walkInForm.name} (${walkInForm.count} guests) added as walk-in for ${walkInForm.showTime}`,
+      description: `${walkInForm.name} (${guestCount} guests) added as walk-in for ${walkInForm.showTime}`,
     });
 
     // Reset form and close dialog
     setWalkInForm({
       name: '',
-      count: 1,
+      count: 1 as number | string,
       showTime: '7:00 PM',
       notes: ''
     });
@@ -1576,7 +1577,23 @@ const TableAllocation = ({
                 min="1"
                 max="12"
                 value={walkInForm.count}
-                onChange={(e) => setWalkInForm(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    setWalkInForm(prev => ({ ...prev, count: '' as any }));
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue >= 1) {
+                      setWalkInForm(prev => ({ ...prev, count: numValue }));
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || isNaN(parseInt(value)) || parseInt(value) < 1) {
+                    setWalkInForm(prev => ({ ...prev, count: 1 }));
+                  }
+                }}
               />
             </div>
 
