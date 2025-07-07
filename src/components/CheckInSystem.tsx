@@ -404,7 +404,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       } else if (field.includes('Smoke Offer')) {
         return 'Drinks (min x2)';
       } else if (field.includes('OLD Groupon')) {
-        return 'Groupon Package';
+        return 'OLD Groupon Package';
       } else {
         return 'Show Only';
       }
@@ -542,6 +542,16 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     // Handle special packages
     if (packageInfo === 'Groupon Package') {
       quantities.push('Groupon Items Included');
+    } else if (packageInfo === 'OLD Groupon Package') {
+      // OLD Groupon package includes:
+      // - 1x Show Ticket per person
+      // - 1x Glass of Prosecco per person  
+      // - 1x Pizza to share per booking
+      // - 1x Salt & Pepper Fried to share per booking
+      quantities.push(`${guestCount} × Show Tickets`);
+      quantities.push(`${guestCount} × Prosecco`);
+      quantities.push(`1 × Pizza (shared)`);
+      quantities.push(`1 × Salt & Pepper Fried (shared)`);
     } else if (packageInfo === 'Wowcher Package') {
       quantities.push('Wowcher Items Included');
     } else if (packageInfo === 'Show Only') {
