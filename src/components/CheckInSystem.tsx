@@ -69,6 +69,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
   const [sessionDate, setSessionDate] = useState<string>('');
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [walkInGuests, setWalkInGuests] = useState<Guest[]>([]); // Store walk-in guests
 
   // Auto-filter to first show time on component mount
   useEffect(() => {
@@ -93,6 +94,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     setGuestTableAllocations(new Map());
     setPartyGroups(new Map());
     setBookingComments(new Map());
+    setWalkInGuests([]);
     
     // Clear from localStorage
     localStorage.removeItem(getSessionKey());
@@ -135,6 +137,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             setGuestTableAllocations(new Map(state.guestTableAllocations || []));
             setPartyGroups(new Map(state.partyGroups || []));
             setBookingComments(new Map(state.bookingComments || []));
+            setWalkInGuests(state.walkInGuests || []);
             setSessionDate(savedDate);
             console.log('Loaded saved state from', state.timestamp);
             
@@ -176,6 +179,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         guestTableAllocations: Array.from(guestTableAllocations.entries()),
         partyGroups: Array.from(partyGroups.entries()),
         bookingComments: Array.from(bookingComments.entries()),
+        walkInGuests: walkInGuests,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(getSessionKey(), JSON.stringify(state));
@@ -188,7 +192,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -919,12 +923,42 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
     
-    const guest = guests[guestIndex];
+    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
     const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "📍 Table Allocated",
       description: `${guestName} allocated to Table(s) ${tableIds.join(', ')}. Page when ready.`,
+    });
+  };
+
+  // Add walk-in handler
+  const handleAddWalkIn = (walkInData: { name: string; count: number; showTime: string; notes?: string }) => {
+    const walkInIndex = 10000 + walkInGuests.length; // Start walk-ins at index 10000
+    
+    const newWalkIn: Guest = {
+      id: `walkin-${Date.now()}`,
+      booking_code: `WALKIN-${walkInIndex}`,
+      booker_name: walkInData.name,
+      total_quantity: walkInData.count,
+      is_checked_in: true, // Walk-ins are checked in immediately
+      pager_number: null,
+      table_assignments: null,
+      show_time: walkInData.showTime,
+      notes: walkInData.notes || ''
+    };
+    
+    const newWalkInGuests = [...walkInGuests, newWalkIn];
+    setWalkInGuests(newWalkInGuests);
+    
+    // Add to checked-in guests
+    const newCheckedInGuests = new Set(checkedInGuests);
+    newCheckedInGuests.add(walkInIndex);
+    setCheckedInGuests(newCheckedInGuests);
+    
+    toast({
+      title: "🚶 Walk-in Added",
+      description: `${walkInData.name} (${walkInData.count} guests) checked in for ${walkInData.showTime} show`,
     });
   };
 
@@ -938,12 +972,21 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   // Add function to get checked-in guests data for table allocation
   const getCheckedInGuestsData = (): CheckedInGuest[] => {
     const checkedInData = Array.from(checkedInGuests).map(guestIndex => {
-      const guest = guests[guestIndex];
+      let guest: Guest | null = null;
+      
+      // Check if it's a walk-in (index >= 10000) or regular guest
+      if (guestIndex >= 10000) {
+        const walkInIndex = guestIndex - 10000;
+        guest = walkInGuests[walkInIndex] || null;
+      } else {
+        guest = guests[guestIndex] || null;
+      }
+      
       if (!guest) return null;
 
       const guestName = extractGuestName(guest.booker_name || '');
       const totalQty = guest.total_quantity || 1;
-      const showTime = getShowTime(guest);
+      const showTime = guest.show_time || getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
       const hasTableAllocated = allocatedGuests.has(guestIndex);
@@ -1568,6 +1611,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             onGuestSeated={handleGuestSeated}
             onTableAllocated={handleTableAllocated}
             currentShowTime={showFilter}
+            onAddWalkIn={handleAddWalkIn}
           />
         </TabsContent>
 
