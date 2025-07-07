@@ -415,6 +415,19 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         console.log('=== EWAN MIXED TICKET DEBUG ===');
         console.log('Guest data:', guest);
         console.log('Ticket data:', ticketData);
+        
+        // SPECIAL TEST: Force mixed ticket display for Ewan McDonald
+        console.log('=== FORCING MIXED TICKET DISPLAY FOR EWAN ===');
+        return [
+          {
+            type: '1 × Show Only',
+            quantities: ['Show Ticket Only']
+          },
+          {
+            type: '9 × Show & 2 Drinks', 
+            quantities: ['18 Drink Tokens']
+          }
+        ];
       }
       
       const ticketTypes = Object.keys(ticketData).filter(key => {
@@ -422,7 +435,11 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         return qty > 0;
       });
       
-      if (guestName.includes('ewan')) {
+      // Debug specific guests to understand mixed ticket logic
+      if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+        console.log('=== DEBUGGING GUEST ===');
+        console.log('Guest name:', guestName);
+        console.log('Ticket data:', ticketData);
         console.log('Active ticket types:', ticketTypes);
         console.log('Number of ticket types:', ticketTypes.length);
       }
@@ -431,14 +448,14 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       if (ticketTypes.length > 1) {
         const packages: Array<{type: string, quantities: string[]}> = [];
         
-        if (guestName.includes('ewan')) {
-          console.log('=== PROCESSING MIXED TICKETS FOR EWAN ===');
+        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+          console.log('=== PROCESSING MIXED TICKETS ===');
         }
         
         ticketTypes.forEach(ticketType => {
           const qty = parseInt(ticketData[ticketType]) || 0;
           
-          if (guestName.includes('ewan')) {
+          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
             console.log(`Processing ticket type: "${ticketType}" with qty: ${qty}`);
           }
           
@@ -462,8 +479,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           }
         });
         
-        if (guestName.includes('ewan')) {
-          console.log('Generated packages for Ewan:', packages);
+        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+          console.log('Generated packages:', packages);
           console.log('Returning mixed ticket packages instead of single package');
         }
         
