@@ -404,7 +404,21 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   };
 
   // Calculate total package quantities based on guest count
-  const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
+  const calculatePackageQuantities = (packageInfo: string, guestCount: number, guest?: Guest) => {
+    // Check if this guest has mixed ticket types in ticket_data - if so, skip old logic
+    if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
+      const ticketData = guest.ticket_data as { [key: string]: string };
+      const ticketTypes = Object.keys(ticketData).filter(key => {
+        const qty = parseInt(ticketData[key]) || 0;
+        return qty > 0;
+      });
+      
+      // If multiple different ticket types, let the enhanced display handle it
+      if (ticketTypes.length > 1) {
+        return [];
+      }
+    }
+    
     const quantities = [];
     
     // Extract drink quantities with updated logic
@@ -1206,7 +1220,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                   const booker = extractGuestName(booking.mainBooking.booker_name || '');
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
-                  const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
+                  const packageQuantities = calculatePackageQuantities(packageInfo, totalQty, booking.mainBooking);
                   const addons = getAddons(booking.mainBooking, booking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
