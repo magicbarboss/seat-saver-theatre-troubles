@@ -409,26 +409,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as { [key: string]: string };
       
-      // Debug logging for Ewan
+      // Debug logging for mixed ticket detection
       const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-      if (guestName.includes('ewan')) {
-        console.log('=== EWAN MIXED TICKET DEBUG ===');
-        console.log('Guest data:', guest);
-        console.log('Ticket data:', ticketData);
-        
-        // SPECIAL TEST: Force mixed ticket display for Ewan McDonald
-        console.log('=== FORCING MIXED TICKET DISPLAY FOR EWAN ===');
-        return [
-          {
-            type: '1 × Show Only',
-            quantities: ['Show Ticket Only']
-          },
-          {
-            type: '9 × Show & 2 Drinks', 
-            quantities: ['18 Drink Tokens']
-          }
-        ];
-      }
       
       const ticketTypes = Object.keys(ticketData).filter(key => {
         const qty = parseInt(ticketData[key]) || 0;
