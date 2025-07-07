@@ -320,12 +320,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     // Check all possible ticket fields that might contain package information
     const ticketFields = [
       'House Magicians Show Ticket & 2 Drinks',
+      'House Magicians Show Ticket & 9" Pizza',
       'House Magicians Show Ticket & 2 soft drinks',
-      'House Magicians Show Ticket & 2 Drinks + 9 Pizza',
-      'House Magicians Show Ticket & 2 soft drinks + 9 PIzza',
+      'House Magicians Show Ticket & 2 Drinks + 9" Pizza',
+      'House Magicians Show Ticket & 2 soft drinks + 9" PIzza',
       'House Magicians Show Ticket',
       'House Magicians Show ticket',
-      'Comedy ticket plus 9 Pizza:',
+      'Comedy ticket plus 9" Pizza:', // This one should be ignored
       'Groupon Magic & Pints Package (per person)',
       'Groupon Magic & Cocktails Package (per person)',
       'Wowcher Magic & Cocktails Package (per person)',
@@ -340,10 +341,10 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         console.log(`Checking field "${field}": value = "${value}", type = ${typeof value}`);
       }
       
-      // Special case: Check if field exists (even with empty value) for Comedy ticket
-      if (field === 'Comedy ticket plus 9 Pizza:' && guest.hasOwnProperty(field)) {
-        if (isTargetGuest) console.log(`SUCCESS: Found Comedy ticket field (even if empty)`);
-        return 'Comedy & Pizza';
+      // Special case: Ignore Comedy ticket (as per specification)
+      if (field === 'Comedy ticket plus 9" Pizza:' && guest.hasOwnProperty(field)) {
+        if (isTargetGuest) console.log('IGNORING: Comedy ticket plus 9" Pizza as per specification');
+        continue; // Skip this field, don't return anything
       }
       
       if (value && String(value).trim() !== '' && String(value) !== '0') {
@@ -352,7 +353,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
           
           // Return the appropriate package based on the field name
-          if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
+          if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
+            return 'Show + 9" Pizza';
+          } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
             return '2 Drinks + 9" Pizza';
           } else if (field.includes('& 2 Drinks')) {
             return '2 Drinks';
@@ -412,14 +415,14 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       quantities.push(`${totalDrinks} Drink Token${totalDrinks > 1 ? 's' : ''}`);
     }
     
-    // Handle Comedy & Pizza package
-    if (packageInfo === 'Comedy & Pizza') {
+    // Handle Show + 9" Pizza package
+    if (packageInfo === 'Show + 9" Pizza') {
       const totalPizzas = 1 * guestCount; // 1 pizza per person
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
     }
     
     // Extract pizza quantities (for non-Pints/Cocktails packages)
-    if (packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Comedy & Pizza') {
+    if (packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza') {
       const totalPizzas = 1 * guestCount; // 1 pizza per person for these packages
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
     }
