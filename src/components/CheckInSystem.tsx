@@ -405,23 +405,49 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
   // Calculate total package quantities based on guest count
   const calculatePackageQuantities = (packageInfo: string, guestCount: number, guest?: Guest) => {
-    // Check if this guest has mixed ticket types in ticket_data - if so, skip old logic
+    // Check if this guest has mixed ticket types in ticket_data - if so, create separate entries
     if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as { [key: string]: string };
-      console.log('Debugging mixed ticket detection for:', guest.booker_name, ticketData);
       
       const ticketTypes = Object.keys(ticketData).filter(key => {
         const qty = parseInt(ticketData[key]) || 0;
-        console.log('Ticket type:', key, 'Quantity:', qty);
         return qty > 0;
       });
       
-      console.log('Found ticket types:', ticketTypes, 'Length:', ticketTypes.length);
-      
-      // If multiple different ticket types, let the enhanced display handle it
+      // If multiple different ticket types, create separate package entries
       if (ticketTypes.length > 1) {
-        console.log('Mixed tickets detected - returning empty array');
-        return [];
+        const packages: Array<{type: string, quantities: string[]}> = [];
+        
+        ticketTypes.forEach(ticketType => {
+          const qty = parseInt(ticketData[ticketType]) || 0;
+          const quantities = [];
+          
+          // Calculate quantities for each ticket type
+          if (ticketType.includes('Show ticket') && !ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
+            quantities.push('Show Ticket Only');
+          } else if (ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
+            const totalDrinks = 2 * qty;
+            const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
+            quantities.push(`${totalDrinks} ${drinkType}`);
+          } else if (ticketType.includes('9 Pizza') || ticketType.includes('9" Pizza')) {
+            if (ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
+              const totalDrinks = 2 * qty;
+              const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
+              quantities.push(`${totalDrinks} ${drinkType}`);
+            }
+            const totalPizzas = 1 * qty;
+            quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+          }
+          
+          if (quantities.length > 0) {
+            packages.push({
+              type: `${qty} × ${ticketType.replace('House Magicians Show ticket', 'Show & 2 Drinks').replace('House Magicians Show Ticket', 'Show Only')}`,
+              quantities
+            });
+          }
+        });
+        
+        return packages;
       }
     }
     
@@ -1328,18 +1354,37 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                       </TableCell>
                       <TableCell className="min-w-[200px]">
                         <div className="space-y-2">
-                          <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
-                            <div className="text-sm font-medium text-purple-800 mb-1">
-                              {packageInfo}
-                            </div>
-                            <div className="space-y-1">
-                              {packageQuantities.map((quantity, idx) => (
-                                <div key={idx} className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
-                                  {quantity}
+                          {Array.isArray(packageQuantities) && packageQuantities.length > 0 && typeof packageQuantities[0] === 'object' ? (
+                            // Mixed ticket types - display multiple boxes
+                            packageQuantities.map((pkg: any, idx: number) => (
+                              <div key={idx} className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                                <div className="text-sm font-medium text-purple-800 mb-1">
+                                  {pkg.type}
                                 </div>
-                              ))}
+                                <div className="space-y-1">
+                                  {pkg.quantities.map((quantity: string, qIdx: number) => (
+                                    <div key={qIdx} className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                                      {quantity}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            // Single ticket type - display single box
+                            <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                              <div className="text-sm font-medium text-purple-800 mb-1">
+                                {packageInfo}
+                              </div>
+                              <div className="space-y-1">
+                                {(packageQuantities as string[]).map((quantity, idx) => (
+                                  <div key={idx} className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-1 rounded">
+                                    {quantity}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
