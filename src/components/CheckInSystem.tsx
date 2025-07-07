@@ -405,14 +405,27 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
   // Calculate total package quantities based on guest count
   const calculatePackageQuantities = (packageInfo: string, guestCount: number, guest?: Guest) => {
-    // Check if this guest has mixed ticket types in ticket_data - if so, create separate entries
+    // Check if this guest has mixed ticket types - if so, create separate entries
     if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as { [key: string]: string };
+      
+      // Debug logging for Ewan
+      const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
+      if (guestName.includes('ewan')) {
+        console.log('=== EWAN MIXED TICKET DEBUG ===');
+        console.log('Guest data:', guest);
+        console.log('Ticket data:', ticketData);
+      }
       
       const ticketTypes = Object.keys(ticketData).filter(key => {
         const qty = parseInt(ticketData[key]) || 0;
         return qty > 0;
       });
+      
+      if (guestName.includes('ewan')) {
+        console.log('Active ticket types:', ticketTypes);
+        console.log('Number of ticket types:', ticketTypes.length);
+      }
       
       // If multiple different ticket types, create separate package entries
       if (ticketTypes.length > 1) {
@@ -422,30 +435,43 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           const qty = parseInt(ticketData[ticketType]) || 0;
           const quantities = [];
           
-          // Calculate quantities for each ticket type
-          if (ticketType.includes('Show ticket') && !ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
-            quantities.push('Show Ticket Only');
-          } else if (ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
-            const totalDrinks = 2 * qty;
-            const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
-            quantities.push(`${totalDrinks} ${drinkType}`);
-          } else if (ticketType.includes('9 Pizza') || ticketType.includes('9" Pizza')) {
-            if (ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
-              const totalDrinks = 2 * qty;
-              const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
-              quantities.push(`${totalDrinks} ${drinkType}`);
-            }
-            const totalPizzas = 1 * qty;
-            quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+          if (guestName.includes('ewan')) {
+            console.log(`Processing ticket type: "${ticketType}" with qty: ${qty}`);
           }
           
-          if (quantities.length > 0) {
+          // Calculate quantities for each ticket type
+          if (ticketType.includes('Show ticket') && !ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
+            // Show only tickets
             packages.push({
-              type: `${qty} × ${ticketType.replace('House Magicians Show ticket', 'Show & 2 Drinks').replace('House Magicians Show Ticket', 'Show Only')}`,
-              quantities
+              type: `${qty} × Show Only`,
+              quantities: ['Show Ticket Only']
+            });
+          } else if (ticketType.includes('Show ticket') && ticketType.includes('2 Drinks')) {
+            // Show + 2 drinks tickets
+            const totalDrinks = 2 * qty;
+            packages.push({
+              type: `${qty} × Show & 2 Drinks`,
+              quantities: [`${totalDrinks} Drink Tokens`]
+            });
+          } else if (ticketType.includes('Show Ticket') && !ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
+            // Show only tickets (different casing)
+            packages.push({
+              type: `${qty} × Show Only`,
+              quantities: ['Show Ticket Only']
+            });
+          } else if (ticketType.includes('Show Ticket') && ticketType.includes('2 Drinks')) {
+            // Show + 2 drinks tickets (different casing)
+            const totalDrinks = 2 * qty;
+            packages.push({
+              type: `${qty} × Show & 2 Drinks`,
+              quantities: [`${totalDrinks} Drink Tokens`]
             });
           }
         });
+        
+        if (guestName.includes('ewan')) {
+          console.log('Generated packages:', packages);
+        }
         
         return packages;
       }
