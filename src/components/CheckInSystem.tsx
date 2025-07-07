@@ -546,12 +546,14 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       // OLD Groupon package includes:
       // - 1x Show Ticket per person
       // - 1x Glass of Prosecco per person  
-      // - 1x Pizza to share per booking
-      // - 1x Salt & Pepper Fried to share per booking
+      // - Shared items scale with group size: Math.ceil(guestCount / 2)
+      const sharedItemsCount = Math.ceil(guestCount / 2);
+      console.log(`OLD Groupon shared items calculation: ${guestCount} guests = ${sharedItemsCount} shared items each`);
+      
       quantities.push(`${guestCount} × Show Tickets`);
       quantities.push(`${guestCount} × Prosecco`);
-      quantities.push(`1 × Pizza (shared)`);
-      quantities.push(`1 × Salt & Pepper Fried (shared)`);
+      quantities.push(`${sharedItemsCount} × Pizza (shared)`);
+      quantities.push(`${sharedItemsCount} × Salt & Pepper Fried (shared)`);
     } else if (packageInfo === 'Wowcher Package') {
       quantities.push('Wowcher Items Included');
     } else if (packageInfo === 'Show Only') {
