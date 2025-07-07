@@ -570,56 +570,41 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         addons.push(`${proseccoCount} Btls Prosecco`);
       }
       
-      // Calculate drinks from ticket_data parsing for accurate calculation
-      const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-      const isTargetGuest = guestName.includes('ewan');
-      
+      // Calculate drinks and build ticket breakdown from ticket_data
       if (guest.ticket_data && typeof guest.ticket_data === 'object') {
         let calculatedDrinks = 0;
         const ticketData = guest.ticket_data as { [key: string]: string };
+        const ticketBreakdown: string[] = [];
         
-        if (isTargetGuest) {
-          console.log('=== EWAN DRINK CALCULATION DEBUG ===');
-          console.log('Guest name:', guest.booker_name);
-          console.log('ticket_data:', ticketData);
-        }
-        
-        // Parse specific ticket types that include drinks
+        // Parse all ticket types and build breakdown
         Object.entries(ticketData).forEach(([ticketType, quantity]) => {
           const qty = parseInt(quantity) || 0;
-          if (isTargetGuest) {
-            console.log(`Checking ticket type: "${ticketType}" = "${quantity}" (parsed: ${qty})`);
-          }
           
           if (qty > 0) {
+            // Add to ticket breakdown
             if (ticketType.includes('& 2 Drinks')) {
               calculatedDrinks += qty * 2; // qty people × 2 drinks each
-              if (isTargetGuest) {
-                console.log(`Found drink ticket: ${qty} people × 2 drinks = ${qty * 2} drinks`);
-              }
+              ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
             } else if (ticketType.includes('& 2 soft drinks')) {
               calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
-              if (isTargetGuest) {
-                console.log(`Found soft drink ticket: ${qty} people × 2 drinks = ${qty * 2} drinks`);
-              }
+              ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
+            } else if (ticketType.includes('House Magicians Show Ticket')) {
+              // Show-only tickets (no drinks)
+              ticketBreakdown.push(`${qty}x Show Only`);
             }
           }
         });
         
-        if (isTargetGuest) {
-          console.log(`Total calculated drinks for Ewan: ${calculatedDrinks}`);
-        }
-        
-        if (calculatedDrinks > 0) {
-          addons.push(`2 Drinks = ${calculatedDrinks}`);
+        // Display ticket breakdown and total drinks
+        if (ticketBreakdown.length > 0) {
+          if (calculatedDrinks > 0) {
+            addons.push(`${ticketBreakdown.join(' + ')} = ${calculatedDrinks} drinks`);
+          } else {
+            addons.push(ticketBreakdown.join(' + '));
+          }
         }
       } else {
         // Fallback to original logic if ticket_data is not available
-        if (isTargetGuest) {
-          console.log('=== EWAN FALLBACK LOGIC ===');
-          console.log('ticket_data not available or not object, using fallback');
-        }
-        
         const totalDrinks = totalDrinkTickets * 2;
         const totalPeople = totalDrinkTickets + totalNonDrinkTickets;
         
