@@ -448,8 +448,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           }
           
           // Handle different ticket type variations
-          if (ticketType.includes('House Magicians Show ticket') || ticketType.includes('House Magicians Show Ticket')) {
-            if (ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
+          if (ticketType.includes('House Magicians Show Ticket') || ticketType.includes('House Magicians Show ticket')) {
+            if (ticketType.includes('& 2 Drinks') || ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
               // Show + 2 drinks tickets
               const totalDrinks = 2 * qty;
               const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
@@ -457,12 +457,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                 type: `${qty} × Show & 2 Drinks`,
                 quantities: [`${totalDrinks} ${drinkType}`]
               });
+              
+              if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+                console.log(`Added show+drinks package: ${qty} × Show & 2 Drinks = ${totalDrinks} ${drinkType}`);
+              }
             } else if (!ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
-              // Show only tickets
+              // Show only tickets (no drinks or pizza)
               packages.push({
                 type: `${qty} × Show Only`,
                 quantities: ['Show Ticket Only']
               });
+              
+              if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+                console.log(`Added show-only package: ${qty} × Show Only`);
+              }
             }
           }
         });
