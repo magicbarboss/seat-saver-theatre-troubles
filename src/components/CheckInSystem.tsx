@@ -421,9 +421,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
         console.log('=== DEBUGGING GUEST ===');
         console.log('Guest name:', guestName);
-        console.log('Ticket data:', ticketData);
+        console.log('Guest full data:', guest);
+        console.log('Ticket data raw:', ticketData);
         console.log('Active ticket types:', ticketTypes);
         console.log('Number of ticket types:', ticketTypes.length);
+        
+        // Log each ticket type and its value
+        ticketTypes.forEach(type => {
+          console.log(`- "${type}": ${ticketData[type]}`);
+        });
       }
       
       // If multiple different ticket types, create separate package entries
@@ -463,12 +469,21 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         
         if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
           console.log('Generated packages:', packages);
-          console.log('Returning mixed ticket packages instead of single package');
+          console.log('Packages length:', packages.length);
+          console.log('About to return packages array:', packages);
         }
         
         // Only return packages if we found valid mixed tickets
         if (packages.length > 0) {
+          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+            console.log('=== RETURNING MIXED PACKAGES ARRAY ===');
+            console.log('Return value:', packages);
+          }
           return packages;
+        } else {
+          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+            console.log('=== NO PACKAGES GENERATED - FALLING THROUGH TO SINGLE PACKAGE ===');
+          }
         }
       }
     }
@@ -1374,8 +1389,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="min-w-[200px]">
+                       <TableCell className="min-w-[200px]">
                         <div className="space-y-2">
+                          {(() => {
+                            const guestName = extractGuestName(booker).toLowerCase();
+                            if (guestName.includes('ewan')) {
+                              console.log('=== UI RENDERING DEBUG FOR EWAN ===');
+                              console.log('packageQuantities:', packageQuantities);
+                              console.log('Array.isArray(packageQuantities):', Array.isArray(packageQuantities));
+                              console.log('packageQuantities.length:', packageQuantities?.length);
+                              console.log('typeof packageQuantities[0]:', typeof packageQuantities?.[0]);
+                              console.log('Will render mixed tickets?', Array.isArray(packageQuantities) && packageQuantities.length > 0 && typeof packageQuantities[0] === 'object');
+                            }
+                            return null;
+                          })()}
                           {Array.isArray(packageQuantities) && packageQuantities.length > 0 && typeof packageQuantities[0] === 'object' ? (
                             // Mixed ticket types - display multiple boxes
                             packageQuantities.map((pkg: any, idx: number) => (
