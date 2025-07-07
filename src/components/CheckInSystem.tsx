@@ -408,13 +408,19 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     // Check if this guest has mixed ticket types in ticket_data - if so, skip old logic
     if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as { [key: string]: string };
+      console.log('Debugging mixed ticket detection for:', guest.booker_name, ticketData);
+      
       const ticketTypes = Object.keys(ticketData).filter(key => {
         const qty = parseInt(ticketData[key]) || 0;
+        console.log('Ticket type:', key, 'Quantity:', qty);
         return qty > 0;
       });
       
+      console.log('Found ticket types:', ticketTypes, 'Length:', ticketTypes.length);
+      
       // If multiple different ticket types, let the enhanced display handle it
       if (ticketTypes.length > 1) {
+        console.log('Mixed tickets detected - returning empty array');
         return [];
       }
     }
