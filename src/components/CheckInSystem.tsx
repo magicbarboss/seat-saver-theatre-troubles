@@ -437,7 +437,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         const packages: Array<{type: string, quantities: string[]}> = [];
         
         if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-          console.log('=== PROCESSING MIXED TICKETS ===');
+          console.log('=== PROCESSING MIXED TICKETS FOR', guestName, '===');
+          console.log('ticketTypes array:', ticketTypes);
+          console.log('ticketData object:', ticketData);
         }
         
         ticketTypes.forEach(ticketType => {
@@ -476,22 +478,21 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         });
         
         if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-          console.log('Generated packages:', packages);
-          console.log('Packages length:', packages.length);
-          console.log('About to return packages array:', packages);
+          console.log('=== FINAL PACKAGES ARRAY ===');
+          console.log('packages.length:', packages.length);
+          console.log('packages array:', JSON.stringify(packages, null, 2));
         }
         
-        // Only return packages if we found valid mixed tickets
+        // Return packages array for mixed tickets - this should always return when we have multiple ticket types
         if (packages.length > 0) {
           if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
             console.log('=== RETURNING MIXED PACKAGES ARRAY ===');
-            console.log('Return value:', packages);
           }
           return packages;
-        } else {
-          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-            console.log('=== NO PACKAGES GENERATED - FALLING THROUGH TO SINGLE PACKAGE ===');
-          }
+        }
+        
+        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
+          console.log('=== NO PACKAGES GENERATED - FALLING THROUGH TO SINGLE PACKAGE ===');
         }
       }
     }
