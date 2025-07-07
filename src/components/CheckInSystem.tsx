@@ -549,9 +549,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       bookingGroup.addOns.forEach(addon => {
         const itemDetails = addon.Item || addon.item_details || '';
         
-        // Count Prosecco bottles
+        // Count Prosecco bottles using total_quantity
         if (itemDetails.toLowerCase().includes('prosecco')) {
-          proseccoCount++;
+          proseccoCount += addon.total_quantity || 1;
         }
         
         // Count drink packages
@@ -570,12 +570,34 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         addons.push(`${proseccoCount} Btls Prosecco`);
       }
       
-      // Add drink calculation if there's a mismatch
-      const totalDrinks = totalDrinkTickets * 2;
-      const totalPeople = totalDrinkTickets + totalNonDrinkTickets;
-      
-      if (totalDrinks > 0 && totalDrinks !== totalPeople * 2) {
-        addons.push(`2 Drinks = ${totalDrinks}`);
+      // Calculate drinks from ticket_data parsing for accurate calculation
+      if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+        let calculatedDrinks = 0;
+        const ticketData = guest.ticket_data as { [key: string]: string };
+        
+        // Parse specific ticket types that include drinks
+        Object.entries(ticketData).forEach(([ticketType, quantity]) => {
+          const qty = parseInt(quantity) || 0;
+          if (qty > 0) {
+            if (ticketType.includes('& 2 Drinks')) {
+              calculatedDrinks += qty * 2; // qty people × 2 drinks each
+            } else if (ticketType.includes('& 2 soft drinks')) {
+              calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
+            }
+          }
+        });
+        
+        if (calculatedDrinks > 0) {
+          addons.push(`2 Drinks = ${calculatedDrinks}`);
+        }
+      } else {
+        // Fallback to original logic if ticket_data is not available
+        const totalDrinks = totalDrinkTickets * 2;
+        const totalPeople = totalDrinkTickets + totalNonDrinkTickets;
+        
+        if (totalDrinks > 0 && totalDrinks !== totalPeople * 2) {
+          addons.push(`2 Drinks = ${totalDrinks}`);
+        }
       }
     }
     
