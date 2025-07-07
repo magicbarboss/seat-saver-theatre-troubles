@@ -27,6 +27,7 @@ interface TableAllocationProps {
   onGuestSeated: (guestIndex: number) => void;
   onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
   onAddWalkIn?: (walkInGuest: { name: string; count: number; showTime: string; notes?: string }) => void;
+  currentShowTime?: string; // Add current show time context
 }
 
 interface TableSection {
@@ -55,7 +56,8 @@ const TableAllocation = ({
   onPagerRelease, 
   onGuestSeated,
   onTableAllocated,
-  onAddWalkIn 
+  onAddWalkIn,
+  currentShowTime = 'all'
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
     // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -187,38 +189,169 @@ const TableAllocation = ({
     notes: ''
   });
 
-  // Load table state from localStorage on mount
+  // Load table state from localStorage on mount - show-time aware
   useEffect(() => {
-    const savedTables = localStorage.getItem('table-allocation-state-v3');
+    const storageKey = currentShowTime === 'all' 
+      ? 'table-allocation-state-v3' 
+      : `table-allocation-state-v3-${currentShowTime}`;
+    
+    const savedTables = localStorage.getItem(storageKey);
     if (savedTables) {
       try {
         const parsedTables = JSON.parse(savedTables);
         setTables(parsedTables);
-        console.log('Loaded table allocation state v3');
+        console.log(`Loaded table allocation state for show: ${currentShowTime}`);
       } catch (error) {
         console.error('Failed to load table allocation state:', error);
       }
+    } else {
+      // Reset to default state if no saved state for this show
+      setTables([
+        // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
+        { 
+          id: 1, 
+          name: 'T1',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '1-whole', tableId: 1, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 2, 
+          name: 'T2',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '2-whole', tableId: 2, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 3, 
+          name: 'T3',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '3-whole', tableId: 3, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        // Row 2 - T4, T5, T6 - 4 seats each (2 front, 2 back)
+        { 
+          id: 4, 
+          name: 'T4',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '4-front', tableId: 4, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '4-back', tableId: 4, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 5, 
+          name: 'T5',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '5-front', tableId: 5, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '5-back', tableId: 5, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 6, 
+          name: 'T6',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '6-front', tableId: 6, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '6-back', tableId: 6, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        // Row 3 - T7, T8, T9 - 4 seats each (2 front, 2 back)
+        { 
+          id: 7, 
+          name: 'T7',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '7-front', tableId: 7, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 8, 
+          name: 'T8',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '8-front', tableId: 8, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 9, 
+          name: 'T9',
+          totalCapacity: 4,
+          hasSections: true,
+          sections: [
+            { id: '9-front', tableId: 9, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        // Row 4 (Back) - T10, T11, T12, T13 - 2 seats each (whole tables)
+        { 
+          id: 10, 
+          name: 'T10',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '10-whole', tableId: 10, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 11, 
+          name: 'T11',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '11-whole', tableId: 11, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 12, 
+          name: 'T12',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '12-whole', tableId: 12, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 13, 
+          name: 'T13',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+      ]);
     }
-  }, []);
+  }, [currentShowTime]);
 
-  // Save table state to localStorage whenever it changes
+  // Save table state to localStorage whenever it changes - show-time aware
   useEffect(() => {
-    localStorage.setItem('table-allocation-state-v3', JSON.stringify(tables));
-  }, [tables]);
+    const storageKey = currentShowTime === 'all' 
+      ? 'table-allocation-state-v3' 
+      : `table-allocation-state-v3-${currentShowTime}`;
+    
+    localStorage.setItem(storageKey, JSON.stringify(tables));
+  }, [tables, currentShowTime]);
 
-  // Update table statuses based on current guest states - FIXED TO PROPERLY SYNC
+  // Update table statuses based on current guest states - SHOW TIME AWARE
   useEffect(() => {
-    console.log('Syncing table state with guest state');
+    console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
+    
+    // Filter guests by current show time
+    const showFilteredGuests = checkedInGuests.filter(guest => 
+      currentShowTime === 'all' || guest.showTime === currentShowTime
+    );
+    
     setTables(prevTables => 
       prevTables.map(table => ({
         ...table,
         sections: table.sections.map(section => {
           if (section.allocatedGuest) {
-            const currentGuest = checkedInGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
+            const currentGuest = showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
             
-            // If guest no longer exists, clear the allocation
+            // If guest no longer exists in current show filter, clear the allocation
             if (!currentGuest) {
-              console.log(`Guest no longer exists, clearing section ${section.id}`);
+              console.log(`Guest no longer exists in show ${currentShowTime}, clearing section ${section.id}`);
               return {
                 ...section,
                 status: 'AVAILABLE' as const,
@@ -251,11 +384,13 @@ const TableAllocation = ({
         })
       }))
     );
-  }, [checkedInGuests]);
+  }, [checkedInGuests, currentShowTime]);
 
-  // Get guests that can be assigned tables (checked in but not seated)
+  // Get guests that can be assigned tables (checked in but not seated) - filtered by show time
   const availableForAllocation = checkedInGuests.filter(guest => 
-    !guest.hasBeenSeated && !guest.hasTableAllocated
+    !guest.hasBeenSeated && 
+    !guest.hasTableAllocated &&
+    (currentShowTime === 'all' || guest.showTime === currentShowTime)
   );
 
   // Define adjacent table relationships based on physical layout - UPDATED TO INCLUDE VERTICAL ADJACENCY
@@ -1365,6 +1500,18 @@ const TableAllocation = ({
 
   return (
     <div className="space-y-6">
+      {/* Show Time Indicator */}
+      {currentShowTime !== 'all' && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-center space-x-2">
+            <span className="text-lg font-bold text-blue-800">🎭 Managing {currentShowTime} Show Tables</span>
+          </div>
+          <p className="text-sm text-blue-600 text-center mt-1">
+            Table allocations are show-specific. Switch show filters to manage different shows.
+          </p>
+        </div>
+      )}
+      
       {/* Guests waiting for table allocation */}
       <Card>
         <CardHeader>

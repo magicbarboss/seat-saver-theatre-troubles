@@ -1567,6 +1567,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             onPagerRelease={handlePagerRelease}
             onGuestSeated={handleGuestSeated}
             onTableAllocated={handleTableAllocated}
+            currentShowTime={showFilter}
           />
         </TabsContent>
 
