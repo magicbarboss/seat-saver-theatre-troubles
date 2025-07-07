@@ -295,17 +295,17 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return result;
   }, [guests]);
 
-  // Extract package information from ticket type fields - FIXED LOGIC WITH FALLBACK
+  // Extract package information from ticket type fields - ENHANCED FOR MIXED TICKETS
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh');
+    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan');
     
     if (isTargetGuest) {
-      console.log('=== PACKAGE INFO DEBUG ===');
-      console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-      console.log('Full guest data:', guest);
+      console.log('=== PACKAGE INFO DEBUG FOR', guest.booker_name, '===');
+      console.log('Guest data keys:', Object.keys(guest));
+      console.log('Booking code:', guest.booking_code);
     }
     
     // Check for "PAID in GYD" field first - classify as OLD Groupon
@@ -334,49 +334,79 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       'OLD Groupon Offer (per person - extras are already included)'
     ];
     
-    // Find which ticket type this guest has
+    // Count how many different ticket types this guest has
+    const activeTicketTypes = [];
+    
     for (const field of ticketFields) {
       const value = guest[field];
-      if (isTargetGuest) {
-        console.log(`Checking field "${field}": value = "${value}", type = ${typeof value}`);
-      }
       
       // Special case: Ignore Comedy ticket (as per specification)
       if (field === 'Comedy ticket plus 9" Pizza:' && guest.hasOwnProperty(field)) {
         if (isTargetGuest) console.log('IGNORING: Comedy ticket plus 9" Pizza as per specification');
-        continue; // Skip this field, don't return anything
+        continue;
       }
       
       if (value && String(value).trim() !== '' && String(value) !== '0') {
         const numValue = parseInt(String(value));
         if (numValue > 0) {
-          if (isTargetGuest) console.log(`SUCCESS: Found active ticket type: ${field} with value: ${value}`);
-          
-          // Return the appropriate package based on the field name
-          if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
-            return 'Show + 9" Pizza';
-          } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
-            return '2 Drinks + 9" Pizza';
-          } else if (field.includes('& 2 Drinks')) {
-            return '2 Drinks';
-          } else if (field.includes('& 2 soft drinks + 9')) {
-            return '2 Soft Drinks + 9" Pizza';
-          } else if (field.includes('& 2 soft drinks')) {
-            return '2 Soft Drinks';
-          } else if (field.includes('Magic & Pints Package')) {
-            return 'Pints Package';
-          } else if (field.includes('Magic & Cocktails Package')) {
-            return 'Cocktails Package';
-          } else if (field.includes('Wowcher')) {
-            return 'Wowcher Package';
-          } else if (field.includes('Smoke Offer')) {
-            return 'Drinks (min x2)';
-          } else if (field.includes('OLD Groupon')) {
-            return 'Groupon Package';
-          } else {
-            return 'Show Only';
+          activeTicketTypes.push({
+            field: field,
+            quantity: numValue
+          });
+          if (isTargetGuest) {
+            console.log(`Found active ticket: ${field} = ${numValue}`);
           }
         }
+      }
+    }
+    
+    if (isTargetGuest) {
+      console.log(`Total active ticket types: ${activeTicketTypes.length}`);
+      console.log('Active tickets:', activeTicketTypes);
+    }
+    
+    // If multiple ticket types found, return special indicator for mixed tickets
+    if (activeTicketTypes.length > 1) {
+      if (isTargetGuest) console.log('=== DETECTED MIXED TICKETS - RETURNING SPECIAL INDICATOR ===');
+      return { 
+        type: 'MIXED_TICKETS', 
+        tickets: activeTicketTypes.map(t => ({
+          type: t.field,
+          quantity: t.quantity
+        }))
+      };
+    }
+    
+    // Single ticket type - process normally
+    if (activeTicketTypes.length === 1) {
+      const ticket = activeTicketTypes[0];
+      const field = ticket.field;
+      
+      if (isTargetGuest) console.log(`SUCCESS: Found single ticket type: ${field} with value: ${ticket.quantity}`);
+      
+      // Return the appropriate package based on the field name
+      if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
+        return 'Show + 9" Pizza';
+      } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
+        return '2 Drinks + 9" Pizza';
+      } else if (field.includes('& 2 Drinks')) {
+        return '2 Drinks';
+      } else if (field.includes('& 2 soft drinks + 9')) {
+        return '2 Soft Drinks + 9" Pizza';
+      } else if (field.includes('& 2 soft drinks')) {
+        return '2 Soft Drinks';
+      } else if (field.includes('Magic & Pints Package')) {
+        return 'Pints Package';
+      } else if (field.includes('Magic & Cocktails Package')) {
+        return 'Cocktails Package';
+      } else if (field.includes('Wowcher')) {
+        return 'Wowcher Package';
+      } else if (field.includes('Smoke Offer')) {
+        return 'Drinks (min x2)';
+      } else if (field.includes('OLD Groupon')) {
+        return 'Groupon Package';
+      } else {
+        return 'Show Only';
       }
     }
     
@@ -403,98 +433,69 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return 'Show Only';
   };
 
-  // Calculate total package quantities based on guest count
-  const calculatePackageQuantities = (packageInfo: string, guestCount: number, guest?: Guest) => {
-    // Check if this guest has mixed ticket types - if so, create separate entries
-    if (guest && guest.ticket_data && typeof guest.ticket_data === 'object') {
-      const ticketData = guest.ticket_data as { [key: string]: string };
-      
-      // Debug logging for mixed ticket detection
-      const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-      
-      const ticketTypes = Object.keys(ticketData).filter(key => {
-        const qty = parseInt(ticketData[key]) || 0;
-        return qty > 0;
-      });
-      
-      // Debug specific guests to understand mixed ticket logic
-      if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-        console.log('=== DEBUGGING GUEST ===');
-        console.log('Guest name:', guestName);
-        console.log('Guest full data:', guest);
-        console.log('Ticket data raw:', ticketData);
-        console.log('Active ticket types:', ticketTypes);
-        console.log('Number of ticket types:', ticketTypes.length);
-        
-        // Log each ticket type and its value
-        ticketTypes.forEach(type => {
-          console.log(`- "${type}": ${ticketData[type]}`);
-        });
+  // Calculate total package quantities based on guest count - ENHANCED FOR MIXED TICKETS
+  const calculatePackageQuantities = (packageInfo: string | {type: string, tickets: any[]}, guestCount: number, guest?: Guest) => {
+    const guestName = extractGuestName(guest?.booker_name || '').toLowerCase();
+    const isTargetGuest = guestName.includes('josh') || guestName.includes('ewan');
+    
+    // Handle mixed tickets - packageInfo is an object with mixed ticket data
+    if (typeof packageInfo === 'object' && packageInfo.type === 'MIXED_TICKETS') {
+      if (isTargetGuest) {
+        console.log('=== PROCESSING MIXED TICKETS ===');
+        console.log('Guest:', guestName);
+        console.log('Mixed ticket data:', packageInfo.tickets);
       }
       
-      // If multiple different ticket types, create separate package entries
-      if (ticketTypes.length > 1) {
-        const packages: Array<{type: string, quantities: string[]}> = [];
+      const packages: Array<{type: string, quantities: string[]}> = [];
+      
+      packageInfo.tickets.forEach(ticket => {
+        const ticketType = ticket.type;
+        const qty = ticket.quantity;
         
-        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-          console.log('=== PROCESSING MIXED TICKETS FOR', guestName, '===');
-          console.log('ticketTypes array:', ticketTypes);
-          console.log('ticketData object:', ticketData);
+        if (isTargetGuest) {
+          console.log(`Processing mixed ticket: "${ticketType}" qty: ${qty}`);
         }
         
-        ticketTypes.forEach(ticketType => {
-          const qty = parseInt(ticketData[ticketType]) || 0;
-          
-          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-            console.log(`Processing ticket type: "${ticketType}" with qty: ${qty}`);
-          }
-          
-          // Handle different ticket type variations
-          if (ticketType.includes('House Magicians Show Ticket') || ticketType.includes('House Magicians Show ticket')) {
-            if (ticketType.includes('& 2 Drinks') || ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
-              // Show + 2 drinks tickets
-              const totalDrinks = 2 * qty;
-              const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
-              packages.push({
-                type: `${qty} × Show & 2 Drinks`,
-                quantities: [`${totalDrinks} ${drinkType}`]
-              });
-              
-              if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-                console.log(`Added show+drinks package: ${qty} × Show & 2 Drinks = ${totalDrinks} ${drinkType}`);
-              }
-            } else if (!ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
-              // Show only tickets (no drinks or pizza)
-              packages.push({
-                type: `${qty} × Show Only`,
-                quantities: ['Show Ticket Only']
-              });
-              
-              if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-                console.log(`Added show-only package: ${qty} × Show Only`);
-              }
+        // Determine package type and calculate quantities
+        if (ticketType.includes('House Magicians Show Ticket') || ticketType.includes('House Magicians Show ticket')) {
+          if (ticketType.includes('& 2 Drinks') || ticketType.includes('2 Drinks') || ticketType.includes('2 soft drinks')) {
+            // Show + 2 drinks tickets
+            const totalDrinks = 2 * qty;
+            const drinkType = ticketType.includes('soft drinks') ? 'Soft Drink Tokens' : 'Drink Tokens';
+            packages.push({
+              type: `${qty} × Show & 2 Drinks`,
+              quantities: [`${totalDrinks} ${drinkType}`]
+            });
+            
+            if (isTargetGuest) {
+              console.log(`Added: ${qty} × Show & 2 Drinks = ${totalDrinks} ${drinkType}`);
+            }
+          } else if (!ticketType.includes('Drinks') && !ticketType.includes('Pizza')) {
+            // Show only tickets
+            packages.push({
+              type: `${qty} × Show Only`,
+              quantities: ['Show Ticket Only']
+            });
+            
+            if (isTargetGuest) {
+              console.log(`Added: ${qty} × Show Only`);
             }
           }
-        });
-        
-        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-          console.log('=== FINAL PACKAGES ARRAY ===');
-          console.log('packages.length:', packages.length);
-          console.log('packages array:', JSON.stringify(packages, null, 2));
         }
-        
-        // Return packages array for mixed tickets - this should always return when we have multiple ticket types
-        if (packages.length > 0) {
-          if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-            console.log('=== RETURNING MIXED PACKAGES ARRAY ===');
-          }
-          return packages;
-        }
-        
-        if (guestName.toLowerCase().includes('josh') || guestName.toLowerCase().includes('ewan')) {
-          console.log('=== NO PACKAGES GENERATED - FALLING THROUGH TO SINGLE PACKAGE ===');
-        }
+      });
+      
+      if (isTargetGuest) {
+        console.log('=== RETURNING MIXED PACKAGES ===');
+        console.log('packages:', JSON.stringify(packages, null, 2));
       }
+      
+      return packages;
+    }
+    
+    // Handle regular single package type (packageInfo is a string)
+    if (typeof packageInfo !== 'string') {
+      console.error('Unexpected packageInfo type:', typeof packageInfo, packageInfo);
+      return ['Show Ticket Only'];
     }
     
     const quantities = [];
@@ -631,7 +632,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const mainPackage = getPackageInfo(guest);
       const mainQuantity = guest.total_quantity || 1;
       
-      if (mainPackage.includes('2 Drinks')) {
+      if (typeof mainPackage === 'string' && mainPackage.includes('2 Drinks')) {
         totalDrinkTickets += mainQuantity;
       } else {
         totalNonDrinkTickets += mainQuantity;
@@ -650,7 +651,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         const addonPackage = getPackageInfo(addon);
         const addonQuantity = addon.total_quantity || 1;
         
-        if (addonPackage.includes('2 Drinks')) {
+        if (typeof addonPackage === 'string' && addonPackage.includes('2 Drinks')) {
           totalDrinkTickets += addonQuantity;
         } else {
           totalNonDrinkTickets += addonQuantity;
@@ -1432,7 +1433,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                             // Single ticket type - display single box
                             <div className="bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
                               <div className="text-sm font-medium text-purple-800 mb-1">
-                                {packageInfo}
+                                {typeof packageInfo === 'string' ? packageInfo : 'Mixed Tickets'}
                               </div>
                               <div className="space-y-1">
                                 {(packageQuantities as string[]).map((quantity, idx) => (
