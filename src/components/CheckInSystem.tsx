@@ -520,115 +520,62 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return 'Show Ticket';
   };
 
-  // Enhanced addon detection system
+  // Simplified addon detection using only booking code grouping
   const getAddons = (guest: Guest, bookingGroup?: BookingGroup) => {
     if (!guest || typeof guest !== 'object') return [];
     
     const addons = [];
-    const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('richard') || guestName.includes('ewan');
     
-    if (isTargetGuest) {
-      console.log('=== ADDON DETECTION DEBUG ===');
-      console.log('Guest:', guest.booker_name, 'Booking code:', guest.booking_code);
-    }
-    
-    // Standard addon fields
-    const addonFields = [
-      'Prosecco add on',
-      'Bottle of Wine',
-      'GlutenBase',
-      'Salt & Pepper Fries',
-      'Vegan'
-    ];
-    
-    addonFields.forEach(field => {
-      const value = guest[field];
-      if (value && value !== '' && value !== '0') {
-        addons.push(`${field}: ${value}`);
-      }
-    });
-    
-    // Enhanced logic for Richard Mather-Holgate - detect separate Prosecco purchases
-    if (guestName.includes('richard') && guestName.includes('mather')) {
-      // Look for booking group to find separate line items
-      if (bookingGroup && bookingGroup.addOns.length > 0) {
-        let proseccoBottles = 0;
-        bookingGroup.addOns.forEach(addon => {
-          // Check for Prosecco in item details or pricing pattern
-          const itemDetails = addon.Item || addon.item_details || '';
-          const total = parseFloat(addon.Total || '0');
-          
-          if (isTargetGuest) {
-            console.log('Checking addon:', itemDetails, 'Total:', total);
-          }
-          
-          // Prosecco bottle typically costs around £28.95 each
-          if (itemDetails.toLowerCase().includes('prosecco') || (total > 25 && total < 35)) {
-            proseccoBottles++;
-          }
-        });
-        
-        if (proseccoBottles > 0) {
-          addons.push(`${proseccoBottles} Btls Prosecco`);
-          if (isTargetGuest) console.log(`FOUND: ${proseccoBottles} Prosecco bottles`);
-        }
-      }
-    }
-    
-    // Enhanced logic for Ewan McDonald - detect drink mismatches
-    if (guestName.includes('ewan') && guestName.includes('mcdonald')) {
-      const packageInfo = getPackageInfo(guest);
-      const totalGuests = guest.total_quantity || 1;
+    // Only process booking group addons if available
+    if (bookingGroup && bookingGroup.addOns.length > 0) {
+      // Count Prosecco bottles from separate line items
+      let proseccoCount = 0;
       
-      if (isTargetGuest) {
-        console.log('Package:', packageInfo, 'Total guests:', totalGuests);
-      }
+      // Track drink calculations for proper display
+      let totalDrinkTickets = 0;
+      let totalNonDrinkTickets = 0;
       
-      // Count actual drinks from booking group
-      let totalDrinkPackages = 0;
-      let totalNoDrinkPackages = 0;
+      // Check main booking
+      const mainPackage = getPackageInfo(guest);
+      const mainQuantity = guest.total_quantity || 1;
       
-      if (bookingGroup) {
-        // Check main booking
-        if (packageInfo.includes('2 Drinks')) {
-          totalDrinkPackages += guest.total_quantity || 1;
-        } else {
-          totalNoDrinkPackages += guest.total_quantity || 1;
-        }
-        
-        // Check addons for additional packages
-        bookingGroup.addOns.forEach(addon => {
-          const addonPackage = getPackageInfo(addon);
-          const addonQuantity = addon.total_quantity || 1;
-          
-          if (addonPackage.includes('2 Drinks')) {
-            totalDrinkPackages += addonQuantity;
-          } else {
-            totalNoDrinkPackages += addonQuantity;
-          }
-        });
+      if (mainPackage.includes('2 Drinks')) {
+        totalDrinkTickets += mainQuantity;
       } else {
-        // Fallback: just use main guest
-        if (packageInfo.includes('2 Drinks')) {
-          totalDrinkPackages = totalGuests;
-        } else {
-          totalNoDrinkPackages = totalGuests;
+        totalNonDrinkTickets += mainQuantity;
+      }
+      
+      // Process addon items
+      bookingGroup.addOns.forEach(addon => {
+        const itemDetails = addon.Item || addon.item_details || '';
+        
+        // Count Prosecco bottles
+        if (itemDetails.toLowerCase().includes('prosecco')) {
+          proseccoCount++;
         }
+        
+        // Count drink packages
+        const addonPackage = getPackageInfo(addon);
+        const addonQuantity = addon.total_quantity || 1;
+        
+        if (addonPackage.includes('2 Drinks')) {
+          totalDrinkTickets += addonQuantity;
+        } else {
+          totalNonDrinkTickets += addonQuantity;
+        }
+      });
+      
+      // Add Prosecco addon if found
+      if (proseccoCount > 0) {
+        addons.push(`${proseccoCount} Btls Prosecco`);
       }
       
-      const totalDrinks = totalDrinkPackages * 2;
-      const totalShowTickets = totalDrinkPackages + totalNoDrinkPackages;
+      // Add drink calculation if there's a mismatch
+      const totalDrinks = totalDrinkTickets * 2;
+      const totalPeople = totalDrinkTickets + totalNonDrinkTickets;
       
-      if (isTargetGuest) {
-        console.log(`Drink packages: ${totalDrinkPackages}, No-drink packages: ${totalNoDrinkPackages}`);
-        console.log(`Total drinks: ${totalDrinks}, Total show tickets: ${totalShowTickets}`);
-      }
-      
-      // For Ewan: 9 people with drinks + 1 without = 18 drinks for 10 people
-      if (totalDrinks < totalShowTickets * 2) {
+      if (totalDrinks > 0 && totalDrinks !== totalPeople * 2) {
         addons.push(`2 Drinks = ${totalDrinks}`);
-        if (isTargetGuest) console.log(`FOUND: Drink mismatch - ${totalDrinks} drinks for ${totalShowTickets} people`);
       }
     }
     
