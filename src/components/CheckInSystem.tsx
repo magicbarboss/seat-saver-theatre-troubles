@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
@@ -55,7 +54,7 @@ interface PartyGroup {
 
 const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState('all'); // Default to 'all' to show all guests
+  const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
@@ -79,54 +78,6 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log(`Initializing show filter to: ${showTimes[0]}`);
     }
   }, [showTimes]);
-
-  // SEATING STATUS SYNCHRONIZATION: Monitor guest data changes and sync seated status
-  useEffect(() => {
-    console.log('🔄 CheckInSystem: Syncing guest status with database...');
-    
-    const newSeatedGuests = new Set<number>();
-    const newAllocatedGuests = new Set<number>();
-    
-    guests.forEach((guest, index) => {
-      const guestName = extractGuestName(guest.booker_name || '');
-      const isSeated = guest.is_seated;
-      const hasTableAssignments = guest.table_assignments && guest.table_assignments.length > 0;
-      
-      // Debug logging for specific guest
-      if (guestName.toLowerCase().includes('isabel') || guestName.toLowerCase().includes('elliot')) {
-        console.log(`🔍 GUEST STATUS DEBUG - ${guestName} (index ${index}):`);
-        console.log(`  - is_seated in DB: ${isSeated}`);
-        console.log(`  - table_assignments: ${JSON.stringify(guest.table_assignments)}`);
-        console.log(`  - was in seatedGuests state: ${seatedGuests.has(index)}`);
-        console.log(`  - was in allocatedGuests state: ${allocatedGuests.has(index)}`);
-      }
-      
-      if (isSeated) {
-        newSeatedGuests.add(index);
-        console.log(`✅ Synced seated status for ${guestName} (index ${index})`);
-      } else if (hasTableAssignments) {
-        newAllocatedGuests.add(index);
-        console.log(`📍 Synced allocated status for ${guestName} (index ${index})`);
-      }
-    });
-    
-    // Update state if there are changes
-    const seatedChanged = newSeatedGuests.size !== seatedGuests.size || 
-      [...newSeatedGuests].some(index => !seatedGuests.has(index));
-    const allocatedChanged = newAllocatedGuests.size !== allocatedGuests.size || 
-      [...newAllocatedGuests].some(index => !allocatedGuests.has(index));
-    
-    if (seatedChanged) {
-      console.log(`🔄 Updating seated guests: ${Array.from(newSeatedGuests).length} guests`);
-      setSeatedGuests(newSeatedGuests);
-    }
-    
-    if (allocatedChanged) {
-      console.log(`🔄 Updating allocated guests: ${Array.from(newAllocatedGuests).length} guests`);
-      setAllocatedGuests(newAllocatedGuests);
-    }
-    
-  }, [guests]); // Re-run when guests data changes
 
   // Generate session key based on current date
   const getSessionKey = () => {
@@ -820,7 +771,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     return 'Unknown';
   };
 
-  // Filter bookings based on search and show time - WITH STATUS VERIFICATION
+  // Filter bookings based on search and show time
   const filteredBookings = useMemo(() => {
     const result = groupedBookings.filter((booking) => {
       if (!booking || !booking.mainBooking) return false;
@@ -833,26 +784,12 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       
       const matchesShow = showTime === showFilter;
       
-      // STATUS VERIFICATION: Log status mismatches for debugging
-      const dbSeated = booking.mainBooking.is_seated;
-      const stateSeated = seatedGuests.has(booking.originalIndex);
-      const dbAllocated = booking.mainBooking.table_assignments && booking.mainBooking.table_assignments.length > 0;
-      const stateAllocated = allocatedGuests.has(booking.originalIndex);
-      
-      if (dbSeated !== stateSeated || dbAllocated !== stateAllocated) {
-        console.warn(`⚠️ STATUS MISMATCH for ${guestName}:`);
-        console.warn(`  DB seated: ${dbSeated}, State seated: ${stateSeated}`);
-        console.warn(`  DB allocated: ${dbAllocated}, State allocated: ${stateAllocated}`);
-      }
-      
       return matchesSearch && matchesShow;
     });
     
     console.log(`Filtered bookings: ${result.length} from ${groupedBookings.length} total`);
-    console.log(`Current seated guests in state: ${Array.from(seatedGuests)}`);
-    console.log(`Current allocated guests in state: ${Array.from(allocatedGuests)}`);
     return result;
-  }, [groupedBookings, searchTerm, showFilter, seatedGuests, allocatedGuests]);
+  }, [groupedBookings, searchTerm, showFilter]);
 
   // Get available pagers (not currently assigned)
   const getAvailablePagers = () => {
@@ -950,18 +887,10 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
-  const handleGuestSeated = async (guestIndex: number) => {
-    console.log(`🪑 CheckInSystem: handleGuestSeated called for guest index ${guestIndex}`);
-    
+  const handleGuestSeated = (guestIndex: number) => {
     const newSeatedGuests = new Set(seatedGuests);
     const newAllocatedGuests = new Set(allocatedGuests);
     const newPagerAssignments = new Map(pagerAssignments);
-    
-    // ENHANCED LOGGING: Log guest details
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    console.log(`🪑 Seating guest: ${guestName} at index ${guestIndex}`);
-    console.log(`🪑 Guest database status - is_seated: ${guest?.is_seated}, table_assignments: ${JSON.stringify(guest?.table_assignments)}`);
     
     // Check if this guest is part of a party
     let partyToSeat: PartyGroup | null = null;
@@ -974,46 +903,19 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     
     if (partyToSeat) {
       // Seat all party members
-      console.log(`🪑 Seating party group: ${partyToSeat.guestNames.join(' & ')}`);
-      console.log(`🪑 Party booking indices: ${partyToSeat.bookingIndices.join(', ')}`);
-      console.log(`🪑 Current guest index being seated: ${guestIndex}`);
-      
-      // Update database for all party members
-      const updatePromises = partyToSeat.bookingIndices.map(async (index) => {
-        const partyGuest = guests[index];
-        if (partyGuest?.id) {
-          try {
-            const { error } = await supabase
-              .from('guests')
-              .update({
-                is_seated: true,
-                seated_at: new Date().toISOString()
-              })
-              .eq('id', partyGuest.id);
-
-            if (error) {
-              console.error(`❌ Failed to update database for party member ${index}:`, error);
-            } else {
-              console.log(`✅ Database updated for party member ${index} (${extractGuestName(partyGuest.booker_name || '')})`);
-            }
-          } catch (err) {
-            console.error(`❌ Database error for party member ${index}:`, err);
-          }
-        }
-      });
-      
-      // Wait for all database updates
-      await Promise.all(updatePromises);
+      console.log(`Seating party group: ${partyToSeat.guestNames.join(' & ')}`);
+      console.log(`Party booking indices: ${partyToSeat.bookingIndices.join(', ')}`);
+      console.log(`Current guest index being seated: ${guestIndex}`);
       
       partyToSeat.bookingIndices.forEach(index => {
-        console.log(`🪑 Seating guest at index ${index}`);
+        console.log(`Seating guest at index ${index}`);
         newSeatedGuests.add(index);
         newAllocatedGuests.delete(index);
         
         // Free up pager if assigned
         const assignedPager = newPagerAssignments.get(index);
         if (assignedPager) {
-          console.log(`📟 Freeing pager ${assignedPager} for guest ${index}`);
+          console.log(`Freeing pager ${assignedPager} for guest ${index}`);
           newPagerAssignments.delete(index);
         }
       });
@@ -1022,64 +924,27 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       setAllocatedGuests(newAllocatedGuests);
       setPagerAssignments(newPagerAssignments);
       
-      console.log(`🪑 Updated seated guests after party seating:`, Array.from(newSeatedGuests));
+      console.log(`Updated seated guests:`, Array.from(newSeatedGuests));
       
       toast({
         title: "🪑 Party Seated",
         description: `${partyToSeat.guestNames.join(' & ')} party (${partyToSeat.totalGuests} guests) has been seated`,
       });
     } else {
-      // Individual guest - update database
-      if (guest?.id) {
-        try {
-          const { error } = await supabase
-            .from('guests')
-            .update({
-              is_seated: true,
-              seated_at: new Date().toISOString()
-            })
-            .eq('id', guest.id);
-
-          if (error) {
-            console.error(`❌ Failed to update database for guest ${guestIndex}:`, error);
-            toast({
-              title: "❌ Database Error",
-              description: `Failed to update seating status for ${guestName}`,
-              variant: "destructive"
-            });
-            return;
-          } else {
-            console.log(`✅ Database updated for guest ${guestIndex} (${guestName})`);
-          }
-        } catch (err) {
-          console.error(`❌ Database error for guest ${guestIndex}:`, err);
-          toast({
-            title: "❌ Database Error", 
-            description: `Failed to update seating status for ${guestName}`,
-            variant: "destructive"
-          });
-          return;
-        }
-      }
-      
       // Individual guest
-      console.log(`🪑 Seating individual guest: ${guestName}`);
       newSeatedGuests.add(guestIndex);
       newAllocatedGuests.delete(guestIndex);
       
       // Free up the pager when guest is seated
       const assignedPager = newPagerAssignments.get(guestIndex);
-      if (assignedPager) {
-        console.log(`📟 Freeing pager ${assignedPager} for individual guest ${guestIndex}`);
-      }
       newPagerAssignments.delete(guestIndex);
       
       setSeatedGuests(newSeatedGuests);
       setAllocatedGuests(newAllocatedGuests);
       setPagerAssignments(newPagerAssignments);
       
-      console.log(`🪑 Updated seated guests after individual seating:`, Array.from(newSeatedGuests));
-      console.log(`🪑 Updated allocated guests after individual seating:`, Array.from(newAllocatedGuests));
+      const guest = guests[guestIndex];
+      const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
       
       toast({
         title: "🪑 Guest Seated",
@@ -1089,46 +954,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   };
 
   // New: Handle table allocation (not seated yet)
-  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
-    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
-    console.log(`📍 TableAllocation: Allocating tables ${tableIds.join(', ')} to guest ${guestName} (index: ${guestIndex})`);
-    
-    // Update database first
-    if (guest?.id && guestIndex < 10000) { // Only update real guests, not walk-ins
-      try {
-        const { error } = await supabase
-          .from('guests')
-          .update({
-            is_allocated: true,
-            table_assignments: tableIds
-          })
-          .eq('id', guest.id);
-
-        if (error) {
-          console.error(`❌ Failed to update database for guest ${guestIndex}:`, error);
-          toast({
-            title: "❌ Database Error",
-            description: `Failed to allocate table for ${guestName}`,
-            variant: "destructive"
-          });
-          return;
-        } else {
-          console.log(`✅ Database updated for guest ${guestIndex} (${guestName}) - allocated: true, table_assignments: ${JSON.stringify(tableIds)}`);
-        }
-      } catch (err) {
-        console.error(`❌ Database error for guest ${guestIndex}:`, err);
-        toast({
-          title: "❌ Database Error",
-          description: `Failed to allocate table for ${guestName}`,
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-    
-    // Update local state
+  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.add(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
@@ -1137,6 +963,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     const newGuestTableAllocations = new Map(guestTableAllocations);
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
+    
+    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "📍 Table Allocated",
@@ -1198,21 +1027,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
       const guestName = extractGuestName(guest.booker_name || '');
       const totalQty = guest.total_quantity || 1;
-      // Enhanced show time extraction with proper fallbacks
-      let showTime = guest.show_time;
-      
-      // If show_time is null/empty, try to extract from ticket data
-      if (!showTime) {
-        showTime = getShowTime(guest);
-      }
-      
-      // If still no show time, use current show filter as fallback
-      if (!showTime) {
-        showTime = showFilter || '7pm';
-        console.log(`🎭 Using fallback show time for ${guestName}: ${showTime}`);
-      }
-      
-      console.log(`🎭 Show time for ${guestName}: DB="${guest.show_time}" → Final="${showTime}"`);
+      const showTime = guest.show_time || getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
       const hasTableAllocated = allocatedGuests.has(guestIndex);
@@ -1771,56 +1586,24 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                           )}
                         </div>
                       </TableCell>
-                       <TableCell>
+                      <TableCell>
                         <div className="text-center">
-                          {(() => {
-                            // ENHANCED STATUS VERIFICATION with database sync
-                            const dbSeated = booking.mainBooking.is_seated;
-                            const dbAllocated = booking.mainBooking.table_assignments && booking.mainBooking.table_assignments.length > 0;
-                            const stateSeated = seatedGuests.has(booking.originalIndex);
-                            const stateAllocated = allocatedGuests.has(booking.originalIndex);
-                            
-                            // Use database status as source of truth for visual feedback
-                            const effectiveSeated = dbSeated || stateSeated;
-                            const effectiveAllocated = dbAllocated || stateAllocated;
-                            
-                            // Log mismatches for debugging
-                            const guestName = extractGuestName(booking.mainBooking.booker_name || '');
-                            if (dbSeated !== stateSeated || dbAllocated !== stateAllocated) {
-                              console.warn(`🔄 STATUS SYNC for ${guestName}: DB(seated:${dbSeated}, allocated:${dbAllocated}) vs State(seated:${stateSeated}, allocated:${stateAllocated})`);
-                            }
-                            
-                            if (effectiveSeated) {
-                              return (
-                                <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-bold">
-                                  ✅ Seated
-                                  {dbSeated !== stateSeated && (
-                                    <div className="text-xs text-green-600 mt-1">*Synced</div>
-                                  )}
-                                </div>
-                              );
-                            } else if (effectiveAllocated) {
-                              return (
-                                <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold flex items-center justify-center">
-                                  <MapPin className="h-3 w-3 mr-1" />
-                                  Allocated
-                                  {dbAllocated !== stateAllocated && (
-                                    <div className="text-xs text-blue-600 mt-1">*Synced</div>
-                                  )}
-                                </div>
-                              );
-                            } else if (isCheckedIn) {
-                              return (
-                                <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">
-                                  Checked In
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="text-gray-400 text-sm">Waiting</div>
-                              );
-                            }
-                          })()}
+                          {isSeated ? (
+                            <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm font-bold">
+                              Seated
+                            </div>
+                          ) : isAllocated ? (
+                            <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-bold flex items-center justify-center">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              Allocated
+                            </div>
+                          ) : isCheckedIn ? (
+                            <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-bold">
+                              Checked In
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 text-sm">Waiting</div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="w-96 min-w-96">

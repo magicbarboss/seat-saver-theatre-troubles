@@ -57,7 +57,7 @@ const TableAllocation = ({
   onGuestSeated,
   onTableAllocated,
   onAddWalkIn,
-  currentShowTime
+  currentShowTime = 'all'
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
     // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -365,26 +365,12 @@ const TableAllocation = ({
 
   // Update table statuses based on current guest states - SHOW TIME AWARE
   useEffect(() => {
-    console.log(`🔄 Syncing table state with guest state for show: ${currentShowTime}`);
-    console.log(`📊 Total checked-in guests: ${checkedInGuests.length}`);
+    console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
     
-    // Filter guests by current show time - be more lenient with filtering
-    const showFilteredGuests = checkedInGuests.filter(guest => {
-      // If no currentShowTime is set, show all guests (fix for empty filter)
-      if (!currentShowTime || currentShowTime === 'all') {
-        return true;
-      }
-      
-      // Be lenient with show time matching - handle null/undefined guest show times
-      const guestShowTime = guest.showTime || '7pm'; // Fallback to 7pm if no show time
-      const matches = guestShowTime === currentShowTime;
-      
-      console.log(`🔍 Guest ${guest.name}: showTime="${guest.showTime}" (fallback: "${guestShowTime}") vs currentShowTime="${currentShowTime}" → ${matches ? 'MATCH' : 'FILTERED OUT'}`);
-      
-      return matches;
-    });
-    
-    console.log(`📊 Show-filtered guests: ${showFilteredGuests.length} for show: ${currentShowTime}`);
+    // Filter guests by current show time
+    const showFilteredGuests = checkedInGuests.filter(guest => 
+      currentShowTime === 'all' || guest.showTime === currentShowTime
+    );
     
     setTables(prevTables => 
       prevTables.map(table => ({
@@ -409,21 +395,7 @@ const TableAllocation = ({
             // Update status based on guest state
             if (currentGuest.hasBeenSeated) {
               return { ...section, status: 'OCCUPIED' as const };
-            } else if (currentGuest.hasTableAllocated) {
-              // Guest has table allocation, ensure section shows as allocated
-              console.log(`🎯 SYNC: Guest ${currentGuest.name} allocated to section ${section.id}`);
-              return {
-                ...section,
-                status: 'ALLOCATED' as const,
-                allocatedTo: currentGuest.name,
-                allocatedGuest: {
-                  ...currentGuest,
-                  count: currentGuest.count,
-                  showTime: currentGuest.showTime
-                },
-                allocatedCount: currentGuest.count,
-              };
-            } else {
+            } else if (!currentGuest.hasTableAllocated) {
               // Guest lost table allocation, clear it
               console.log(`Guest ${currentGuest.name} lost table allocation, clearing section ${section.id}`);
               return {
@@ -445,22 +417,11 @@ const TableAllocation = ({
   }, [checkedInGuests, currentShowTime]);
 
   // Get guests that can be assigned tables (checked in but not seated) - filtered by show time
-  const availableForAllocation = checkedInGuests.filter(guest => {
-    console.log(`🔍 FILTER DEBUG - Guest: ${guest.name}, ShowTime: "${guest.showTime}", CurrentShowTime: "${currentShowTime}"`);
-    
-    // If no currentShowTime is set, show all guests
-    let showTimeMatches = true;
-    if (currentShowTime && currentShowTime !== 'all') {
-      const guestShowTime = guest.showTime || '7pm'; // Fallback for null show times
-      showTimeMatches = guestShowTime === currentShowTime;
-    }
-    
-    const isEligible = !guest.hasBeenSeated && !guest.hasTableAllocated && showTimeMatches;
-    
-    console.log(`  - hasBeenSeated: ${guest.hasBeenSeated}, hasTableAllocated: ${guest.hasTableAllocated}, showTimeMatches: ${showTimeMatches}, isEligible: ${isEligible}`);
-    
-    return isEligible;
-  });
+  const availableForAllocation = checkedInGuests.filter(guest => 
+    !guest.hasBeenSeated && 
+    !guest.hasTableAllocated &&
+    (currentShowTime === 'all' || guest.showTime === currentShowTime)
+  );
 
   // Define adjacent table relationships based on physical layout - UPDATED TO INCLUDE VERTICAL ADJACENCY
   const getAdjacentTables = (tableId: number): number[] => {
@@ -894,10 +855,9 @@ const TableAllocation = ({
     
     if (!table || !section || !section.allocatedGuest) return;
 
-    const guestToSeat = section.allocatedGuest;
+    console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
 
-    console.log(`🪑 DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
-    console.log(`🪑 Guest being seated:`, guestToSeat);
+    const guestToSeat = section.allocatedGuest;
     
     // Check if this guest is part of a party by checking if the name contains "(Party)"
     if (guestToSeat.name.includes('(Party)')) {
@@ -923,18 +883,26 @@ const TableAllocation = ({
                 const guestCount = s.allocatedGuest?.count || 0;
                 const newSeatedCount = currentSeatedCount + guestCount;
                 
-                console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}`);
+                // Check if THIS SPECIFIC SECTION is full after seating
+                const isSectionFull = newSeatedCount >= s.capacity;
                 
-                // FIXED: Always mark as OCCUPIED when guests are seated, regardless of section capacity
-                const newStatus = 'OCCUPIED' as const;
+                console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}, isSectionFull=${isSectionFull}`);
                 
-                console.log(`Section ${sectionId}: changing status to ${newStatus} (guests are seated)`);
+                // Only mark as OCCUPIED if this specific section is full
+                const newStatus = isSectionFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
+                
+                console.log(`Section ${sectionId}: changing status to ${newStatus}`);
                 
                 return { 
                   ...s, 
                   status: newStatus,
                   seatedCount: newSeatedCount,
-                  // Keep allocation info for tracking purposes
+                  // Clear allocation info only if section becomes full
+                  ...(isSectionFull ? {
+                    allocatedTo: undefined,
+                    allocatedGuest: undefined,
+                    allocatedCount: undefined,
+                  } : {})
                 };
               }
               return s;
@@ -1710,9 +1678,9 @@ const TableAllocation = ({
     return (
       <div key={section.id} className={`p-3 ${table.hasSections ? 'mb-2' : ''} border rounded-lg ${
         section.status === 'AVAILABLE' ? 'bg-green-100 border-green-300' :
-        section.status === 'ALLOCATED' ? 'bg-yellow-100 border-yellow-300' :
-        section.status === 'OCCUPIED' ? 'bg-red-100 border-red-300' :
-        'bg-gray-100 border-gray-300'
+        section.status === 'ALLOCATED' && availableCapacity > 0 ? 'bg-yellow-100 border-yellow-300' :
+        section.status === 'ALLOCATED' ? 'bg-blue-100 border-blue-300' :
+        'bg-red-100 border-red-300'
       }`}>
         <div className="flex justify-between items-center mb-2">
           <span className="font-medium text-sm">
@@ -1759,25 +1727,13 @@ const TableAllocation = ({
           </div>
         </div>
 
-        {/* Show guest info for both allocated and occupied sections */}
         {section.allocatedTo && (
           <div className="mb-2">
-            <p className="font-medium text-xs">
-              {section.status === 'OCCUPIED' ? '🪑 Seated: ' : 'Allocated: '}{section.allocatedTo}
-            </p>
-            <p className="text-xs text-gray-600">
-              {section.status === 'OCCUPIED' 
-                ? `${section.seatedCount || section.allocatedCount} guests seated`
-                : `${section.allocatedCount} guests allocated`
-              }
-            </p>
-            {/* Add pager number display for allocated and occupied sections */}
+            <p className="font-medium text-xs">{section.allocatedTo}</p>
+            <p className="text-xs text-gray-600">{section.allocatedCount} guests allocated</p>
+            {/* Add pager number display for allocated sections */}
             {section.allocatedGuest?.pagerNumber && (
-              <Badge className={`text-xs mt-1 ${
-                section.status === 'OCCUPIED' 
-                  ? 'bg-red-100 text-red-800' 
-                  : 'bg-purple-100 text-purple-800'
-              }`}>
+              <Badge className="bg-purple-100 text-purple-800 text-xs mt-1">
                 Pager #{section.allocatedGuest.pagerNumber}
               </Badge>
             )}
