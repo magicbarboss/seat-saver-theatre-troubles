@@ -437,10 +437,10 @@ const TableAllocation = ({
       return section.capacity;
     }
     if (section.status === 'ALLOCATED') {
-      // For allocated sections, available capacity is total capacity minus seated guests
-      const seatedGuests = section.seatedCount || 0;
-      const available = Math.max(0, section.capacity - seatedGuests);
-      console.log(`Section ${section.id} is ALLOCATED, ${seatedGuests} seated, ${available} available out of ${section.capacity} total`);
+      // For allocated sections, available capacity is total capacity minus allocated guests
+      const allocatedGuests = section.allocatedCount || 0;
+      const available = Math.max(0, section.capacity - allocatedGuests);
+      console.log(`Section ${section.id} is ALLOCATED, ${allocatedGuests} allocated, ${available} available out of ${section.capacity} total`);
       return available;
     }
     console.log(`Section ${section.id} is OCCUPIED, returning 0`);
@@ -550,14 +550,23 @@ const TableAllocation = ({
                 const currentAllocatedCount = s.allocatedCount || 0;
                 const newAllocatedCount = currentAllocatedCount + selectedGuest.count;
                 
+                // Validation: Prevent over-allocation
+                if (newAllocatedCount > s.capacity) {
+                  console.error(`Attempted over-allocation: ${newAllocatedCount} guests to ${s.capacity} capacity section`);
+                  return s; // Return unchanged section
+                }
+                
                 // For display purposes, concatenate guest names when adding to existing allocation
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ALLOCATED`);
+                // Determine status based on allocation vs capacity
+                const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+                
+                console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
                 return {
                   ...s,
-                  status: 'ALLOCATED' as const,
+                  status: newStatus,
                   allocatedTo: newAllocatedTo,
                   allocatedGuest: selectedGuest,
                   allocatedCount: newAllocatedCount,
@@ -634,9 +643,12 @@ const TableAllocation = ({
             const newAllocatedCount = currentAllocated + guestToMove.count;
             const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
             
+            // Determine status based on allocation vs capacity
+            const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+            
             return {
               ...s,
-              status: 'ALLOCATED' as const,
+              status: newStatus,
               allocatedTo: newAllocatedTo,
               allocatedGuest: guestToMove,
               allocatedCount: newAllocatedCount,
@@ -1080,9 +1092,12 @@ const TableAllocation = ({
                 const newAllocatedCount = currentAllocated + guestsForThisSection;
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
+                // Determine status based on allocation vs capacity
+                const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+                
                 return {
                   ...s,
-                  status: 'ALLOCATED' as const,
+                  status: newStatus,
                   allocatedTo: newAllocatedTo,
                   allocatedGuest: selectedGuest,
                   allocatedCount: newAllocatedCount, // Only the guests for THIS section
@@ -1369,11 +1384,18 @@ const TableAllocation = ({
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs text-gray-600">
             {section.capacity} seats
-            {seatedCount > 0 && (
-              <span className="text-blue-600"> ({seatedCount} seated)</span>
-            )}
-            {allocatedCount > 0 && section.status === 'ALLOCATED' && (
-              <span className="text-orange-600"> ({allocatedCount} allocated, {availableCapacity} free)</span>
+            {(allocatedCount > 0 || seatedCount > 0) && (
+              <span>
+                {allocatedCount > 0 && (
+                  <span className="text-orange-600"> ({allocatedCount} allocated)</span>
+                )}
+                {seatedCount > 0 && (
+                  <span className="text-blue-600"> ({seatedCount} seated)</span>
+                )}
+                {section.status !== 'OCCUPIED' && availableCapacity > 0 && (
+                  <span className="text-green-600"> ({availableCapacity} free)</span>
+                )}
+              </span>
             )}
           </span>
           <div className="flex items-center space-x-1">
