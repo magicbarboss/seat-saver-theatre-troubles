@@ -54,7 +54,7 @@ interface PartyGroup {
 
 const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState('all');
+  const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
@@ -71,11 +71,11 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [walkInGuests, setWalkInGuests] = useState<Guest[]>([]); // Store walk-in guests
 
-  // Auto-filter to first show time on component mount
+  // Initialize show filter to first show time on component mount
   useEffect(() => {
-    if (showTimes && showTimes.length > 0 && showFilter === 'all') {
+    if (showTimes && showTimes.length > 0 && !showTimes.includes(showFilter)) {
       setShowFilter(showTimes[0]);
-      console.log(`Auto-filtering to first show time: ${showTimes[0]}`);
+      console.log(`Initializing show filter to: ${showTimes[0]}`);
     }
   }, [showTimes]);
 
@@ -782,7 +782,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const matchesSearch = searchTerm === '' || 
         guestName.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
+      const matchesShow = showTime === showFilter;
       
       return matchesSearch && matchesShow;
     });
@@ -1088,7 +1088,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const showTime = getShowTime(guest);
       
       // Only count if matches current show filter
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
+      const matchesShow = showTime === showFilter;
       if (!matchesShow) return total;
       
       const totalQty = guest.total_quantity || 1;
@@ -1105,7 +1105,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const showTime = getShowTime(guest);
       
       // Only count if matches current show filter
-      const matchesShow = showFilter === 'all' || showTime === showFilter;
+      const matchesShow = showTime === showFilter;
       if (!matchesShow) return total;
       
       const totalQty = guest.total_quantity || 1;
@@ -1318,13 +1318,6 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
               <div className="w-72">
                 <Label htmlFor="show-filter" className="text-base font-medium text-gray-700">Filter by Show Time</Label>
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilter('all')}
-                    className={`flex-1 text-sm ${showFilter === 'all' ? 'bg-gray-200' : ''}`}
-                  >
-                    All Shows
-                  </Button>
                   <Button
                     variant={showFilter === '7pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('7pm')}
