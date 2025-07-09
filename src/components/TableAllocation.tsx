@@ -785,24 +785,44 @@ const TableAllocation = ({
           // Clear any section that has this guest allocated
           if (s.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
             console.log(`Clearing section ${s.id} for guest ${guestToMove.name}`);
-            return {
-              ...s,
-              status: 'AVAILABLE' as const,
-              allocatedTo: undefined,
-              allocatedGuest: undefined,
-              allocatedCount: undefined,
-              seatedCount: undefined,
-            };
+            const remainingAllocated = (s.allocatedCount || 0) - guestToMove.count;
+            const remainingSeated = guestToMove.hasBeenSeated ? 
+              Math.max(0, (s.seatedCount || 0) - guestToMove.count) : 
+              (s.seatedCount || 0);
+            
+            // If no guests remain, clear the section completely
+            if (remainingAllocated <= 0) {
+              return {
+                ...s,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+                seatedCount: undefined,
+              };
+            } else {
+              // Keep section with remaining guests
+              return {
+                ...s,
+                allocatedCount: remainingAllocated,
+                seatedCount: remainingSeated,
+                status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+              };
+            }
           }
           // Allocate to new section
           if (s.id === newSectionId) {
             console.log(`Allocating section ${s.id} to guest ${guestToMove.name}`);
             const currentAllocated = s.allocatedCount || 0;
+            const currentSeated = s.seatedCount || 0;
             const newAllocatedCount = currentAllocated + guestToMove.count;
             const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
             
-            // Determine status based on allocation vs capacity
-            const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+            // If the guest being moved is already seated, add them to seated count
+            const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
+            
+            // Determine status - if guest is seated or section is full, mark as OCCUPIED
+            const newStatus = guestToMove.hasBeenSeated || newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
             
             return {
               ...s,
@@ -810,7 +830,7 @@ const TableAllocation = ({
               allocatedTo: newAllocatedTo,
               allocatedGuest: guestToMove,
               allocatedCount: newAllocatedCount,
-              seatedCount: s.seatedCount || 0,
+              seatedCount: newSeatedCount,
             };
           }
           return s;
@@ -1743,14 +1763,27 @@ const TableAllocation = ({
         )}
 
         {section.status === 'OCCUPIED' && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => freeSection(section.id)}
-            className="w-full text-xs py-1"
-          >
-            Free
-          </Button>
+          <div className="flex space-x-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => freeSection(section.id)}
+              className="flex-1 text-xs py-1"
+            >
+              Free
+            </Button>
+            {section.allocatedGuest && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleMoveGuest(section.allocatedGuest!, section.id)}
+                className="flex-1 text-xs py-1"
+              >
+                <ArrowRightLeft className="h-3 w-3 mr-1" />
+                Move
+              </Button>
+            )}
+          </div>
         )}
       </div>
     );
@@ -2252,6 +2285,13 @@ const TableAllocation = ({
                   <span className="text-gray-600 ml-2">({guestToMove.count} guests)</span>
                 </div>
                 <Badge variant="outline">{guestToMove.showTime}</Badge>
+                {guestToMove.hasBeenSeated ? (
+                  <Badge className="bg-green-100 text-green-800">Currently Seated</Badge>
+                ) : guestToMove.hasTableAllocated ? (
+                  <Badge className="bg-blue-100 text-blue-800">Table Allocated</Badge>
+                ) : (
+                  <Badge className="bg-yellow-100 text-yellow-800">Checked In</Badge>
+                )}
                 {guestToMove.pagerNumber && (
                   <Badge className="bg-purple-100 text-purple-800">
                     Pager #{guestToMove.pagerNumber}
