@@ -1563,8 +1563,99 @@ const TableAllocation = ({
     setShowWalkInDialog(false);
   };
 
+  // Function to adjust capacity for all tables
+  const adjustAllTablesCapacity = (change: number) => {
+    let totalSeatsChanged = 0;
+    
+    setTables(prevTables => 
+      prevTables.map(table => {
+        const updatedSections = table.sections.map(section => {
+          const newCapacity = Math.max(1, section.capacity + change);
+          if (newCapacity !== section.capacity) {
+            totalSeatsChanged += (newCapacity - section.capacity);
+          }
+          return {
+            ...section,
+            capacity: newCapacity
+          };
+        });
+        
+        const newTotalCapacity = updatedSections.reduce((sum, section) => sum + section.capacity, 0);
+        
+        return {
+          ...table,
+          sections: updatedSections,
+          totalCapacity: newTotalCapacity
+        };
+      })
+    );
+
+    const newTotalCapacity = tables.reduce((sum, table) => sum + table.totalCapacity, 0) + totalSeatsChanged;
+    
+    toast({
+      title: totalSeatsChanged > 0 ? "Seats Added" : "Seats Removed",
+      description: `${Math.abs(totalSeatsChanged)} seats ${totalSeatsChanged > 0 ? 'added to' : 'removed from'} all tables. New total capacity: ${newTotalCapacity} seats`,
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Bulk Controls Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Bulk Table Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button 
+              onClick={() => adjustAllTablesCapacity(1)}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add 1 Seat to All Tables
+            </Button>
+            <Button 
+              onClick={() => adjustAllTablesCapacity(-1)}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Minus className="h-4 w-4" />
+              Remove 1 Seat from All Tables
+            </Button>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="±5"
+                className="w-20"
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value) && value !== 0) {
+                    adjustAllTablesCapacity(value);
+                    e.target.value = '';
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const value = parseInt((e.target as HTMLInputElement).value);
+                    if (!isNaN(value) && value !== 0) {
+                      adjustAllTablesCapacity(value);
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }
+                }}
+              />
+              <span className="text-sm text-muted-foreground">seats to all tables</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Show Time Indicator */}
       {currentShowTime !== 'all' && (
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
