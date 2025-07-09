@@ -1720,13 +1720,25 @@ const TableAllocation = ({
           </div>
         </div>
 
+        {/* Show guest info for both allocated and occupied sections */}
         {section.allocatedTo && (
           <div className="mb-2">
-            <p className="font-medium text-xs">{section.allocatedTo}</p>
-            <p className="text-xs text-gray-600">{section.allocatedCount} guests allocated</p>
-            {/* Add pager number display for allocated sections */}
+            <p className="font-medium text-xs">
+              {section.status === 'OCCUPIED' ? '🪑 Seated: ' : 'Allocated: '}{section.allocatedTo}
+            </p>
+            <p className="text-xs text-gray-600">
+              {section.status === 'OCCUPIED' 
+                ? `${section.seatedCount || section.allocatedCount} guests seated`
+                : `${section.allocatedCount} guests allocated`
+              }
+            </p>
+            {/* Add pager number display for allocated and occupied sections */}
             {section.allocatedGuest?.pagerNumber && (
-              <Badge className="bg-purple-100 text-purple-800 text-xs mt-1">
+              <Badge className={`text-xs mt-1 ${
+                section.status === 'OCCUPIED' 
+                  ? 'bg-red-100 text-red-800' 
+                  : 'bg-purple-100 text-purple-800'
+              }`}>
                 Pager #{section.allocatedGuest.pagerNumber}
               </Badge>
             )}
