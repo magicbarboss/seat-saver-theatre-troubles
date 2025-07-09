@@ -86,23 +86,23 @@ const TableAllocation = ({
     { 
       id: 4, 
       name: 'T4',
-      totalCapacity: 4,
+      totalCapacity: 5,
       hasSections: true,
       sections: [
-        { id: '4-front', tableId: 4, section: 'front', capacity: 2, status: 'AVAILABLE' },
-        { id: '4-back', tableId: 4, section: 'back', capacity: 2, status: 'AVAILABLE' }
-      ]
-    },
-    { 
-      id: 5, 
-      name: 'T5',
-      totalCapacity: 4,
-      hasSections: true,
-      sections: [
-        { id: '5-front', tableId: 5, section: 'front', capacity: 2, status: 'AVAILABLE' },
-        { id: '5-back', tableId: 5, section: 'back', capacity: 2, status: 'AVAILABLE' }
-      ]
-    },
+            { id: '4-front', tableId: 4, section: 'front', capacity: 3, status: 'AVAILABLE' },
+            { id: '4-back', tableId: 4, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 5, 
+          name: 'T5',
+          totalCapacity: 5,
+          hasSections: true,
+          sections: [
+            { id: '5-front', tableId: 5, section: 'front', capacity: 3, status: 'AVAILABLE' },
+            { id: '5-back', tableId: 5, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
     { 
       id: 6, 
       name: 'T6',
@@ -117,23 +117,23 @@ const TableAllocation = ({
     { 
       id: 7, 
       name: 'T7',
-      totalCapacity: 4,
+          totalCapacity: 5,
       hasSections: true,
       sections: [
-        { id: '7-front', tableId: 7, section: 'front', capacity: 2, status: 'AVAILABLE' },
-        { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }
-      ]
-    },
-    { 
-      id: 8, 
-      name: 'T8',
-      totalCapacity: 4,
-      hasSections: true,
-      sections: [
-        { id: '8-front', tableId: 8, section: 'front', capacity: 2, status: 'AVAILABLE' },
-        { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }
-      ]
-    },
+            { id: '7-front', tableId: 7, section: 'front', capacity: 3, status: 'AVAILABLE' },
+            { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
+        { 
+          id: 8, 
+          name: 'T8',
+          totalCapacity: 5,
+          hasSections: true,
+          sections: [
+            { id: '8-front', tableId: 8, section: 'front', capacity: 3, status: 'AVAILABLE' },
+            { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }
+          ]
+        },
     { 
       id: 9, 
       name: 'T9',
@@ -229,24 +229,24 @@ const TableAllocation = ({
           hasSections: false,
           sections: [{ id: '3-whole', tableId: 3, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
         },
-        // Row 2 - T4, T5, T6 - 4 seats each (2 front, 2 back)
+        // Row 2 - T4, T5, T6 - Updated capacities (user added seats)
         { 
           id: 4, 
           name: 'T4',
-          totalCapacity: 4,
+          totalCapacity: 5,
           hasSections: true,
           sections: [
-            { id: '4-front', tableId: 4, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '4-front', tableId: 4, section: 'front', capacity: 3, status: 'AVAILABLE' },
             { id: '4-back', tableId: 4, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
         { 
           id: 5, 
           name: 'T5',
-          totalCapacity: 4,
+          totalCapacity: 5,
           hasSections: true,
           sections: [
-            { id: '5-front', tableId: 5, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '5-front', tableId: 5, section: 'front', capacity: 3, status: 'AVAILABLE' },
             { id: '5-back', tableId: 5, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
@@ -260,24 +260,24 @@ const TableAllocation = ({
             { id: '6-back', tableId: 6, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
-        // Row 3 - T7, T8, T9 - 4 seats each (2 front, 2 back)
+        // Row 3 - T7, T8, T9 - Updated capacities (user added seats)
         { 
           id: 7, 
           name: 'T7',
-          totalCapacity: 4,
+          totalCapacity: 5,
           hasSections: true,
           sections: [
-            { id: '7-front', tableId: 7, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '7-front', tableId: 7, section: 'front', capacity: 3, status: 'AVAILABLE' },
             { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
         { 
           id: 8, 
           name: 'T8',
-          totalCapacity: 4,
+          totalCapacity: 5,
           hasSections: true,
           sections: [
-            { id: '8-front', tableId: 8, section: 'front', capacity: 2, status: 'AVAILABLE' },
+            { id: '8-front', tableId: 8, section: 'front', capacity: 3, status: 'AVAILABLE' },
             { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
@@ -875,22 +875,40 @@ const TableAllocation = ({
       });
     }
 
-    // Only add multi-table combinations for large parties if no single tables can accommodate them
+    // Add multi-table combinations for large parties (always show for 6+ guests, conditionally for smaller)
     if (selectedGuest && selectedGuest.count > 2) {
       const singleTableCanFit = options.some(option => 
         (option.type === 'section' || option.type === 'whole-table') && 
         option.totalCapacity >= selectedGuest.count
       );
       
-      if (!singleTableCanFit) {
+      // Always show multi-table options for 6+ guests, or when no single table can fit
+      if (!singleTableCanFit || selectedGuest.count >= 6) {
+        console.log(`DEBUG: Generating multi-table options for ${selectedGuest.count} guests (singleTableCanFit: ${singleTableCanFit})`);
         // Get all available whole tables (2-seat and 4-seat) - must be completely available
         const availableWholeTables = tables.filter(table => 
           table.sections.every(s => s.status === 'AVAILABLE')
         );
 
-        // Generate ONLY adjacent combinations
+        // Enhanced multi-table combination generator for large parties
         const generateAdjacentCombinations = (tables: Table[], targetCapacity: number) => {
           const combinations: Array<{tables: Table[], totalCapacity: number}> = [];
+          
+          console.log(`DEBUG generateAdjacentCombinations: Looking for ${targetCapacity} capacity with ${tables.length} available tables`);
+          tables.forEach(t => console.log(`  Available table: ${t.name} (${t.totalCapacity} seats)`));
+          
+          // Helper function to check if a group of tables are all adjacent to each other
+          const areAllTablesConnected = (tableGroup: Table[]): boolean => {
+            if (tableGroup.length <= 1) return true;
+            
+            // For each table, it must be adjacent to at least one other table in the group
+            return tableGroup.every(table => {
+              const adjacentIds = getAdjacentTables(table.id);
+              return tableGroup.some(otherTable => 
+                otherTable.id !== table.id && adjacentIds.includes(otherTable.id)
+              );
+            });
+          };
           
           // Try combinations of 2 adjacent tables
           for (let i = 0; i < tables.length; i++) {
@@ -900,8 +918,9 @@ const TableAllocation = ({
               if (i !== j && adjacentIds.includes(tables[j].id)) {
                 const combo = [tables[i], tables[j]];
                 const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+                console.log(`  2-table combo: ${combo.map(t => t.name).join('+')} = ${capacity} seats`);
+                
                 if (capacity >= targetCapacity) {
-                  // Check if we already have this combination (in reverse order)
                   const exists = combinations.some(c => 
                     c.tables.length === 2 && 
                     ((c.tables[0].id === tables[i].id && c.tables[1].id === tables[j].id) ||
@@ -909,12 +928,58 @@ const TableAllocation = ({
                   );
                   if (!exists) {
                     combinations.push({ tables: combo, totalCapacity: capacity });
+                    console.log(`    ✓ Added 2-table combination: ${combo.map(t => t.name).join('+')} (${capacity} seats)`);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Try combinations of 3 adjacent tables for larger parties
+          if (targetCapacity > 10) {
+            for (let i = 0; i < tables.length; i++) {
+              for (let j = i + 1; j < tables.length; j++) {
+                for (let k = j + 1; k < tables.length; k++) {
+                  const combo = [tables[i], tables[j], tables[k]];
+                  
+                  if (areAllTablesConnected(combo)) {
+                    const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+                    console.log(`  3-table combo: ${combo.map(t => t.name).join('+')} = ${capacity} seats`);
+                    
+                    if (capacity >= targetCapacity) {
+                      combinations.push({ tables: combo, totalCapacity: capacity });
+                      console.log(`    ✓ Added 3-table combination: ${combo.map(t => t.name).join('+')} (${capacity} seats)`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
+          // Try combinations of 4 adjacent tables for very large parties
+          if (targetCapacity > 14) {
+            for (let i = 0; i < tables.length; i++) {
+              for (let j = i + 1; j < tables.length; j++) {
+                for (let k = j + 1; k < tables.length; k++) {
+                  for (let l = k + 1; l < tables.length; l++) {
+                    const combo = [tables[i], tables[j], tables[k], tables[l]];
+                    
+                    if (areAllTablesConnected(combo)) {
+                      const capacity = combo.reduce((sum, t) => sum + t.totalCapacity, 0);
+                      console.log(`  4-table combo: ${combo.map(t => t.name).join('+')} = ${capacity} seats`);
+                      
+                      if (capacity >= targetCapacity) {
+                        combinations.push({ tables: combo, totalCapacity: capacity });
+                        console.log(`    ✓ Added 4-table combination: ${combo.map(t => t.name).join('+')} (${capacity} seats)`);
+                      }
+                    }
                   }
                 }
               }
             }
           }
 
+          console.log(`DEBUG generateAdjacentCombinations: Found ${combinations.length} valid combinations`);
           return combinations;
         };
 
