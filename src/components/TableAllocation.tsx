@@ -188,6 +188,12 @@ const TableAllocation = ({
     showTime: '7:00 PM',
     notes: ''
   });
+  
+  // Table joining states
+  const [isJoinTablesMode, setIsJoinTablesMode] = useState(false);
+  const [selectedTablesForJoining, setSelectedTablesForJoining] = useState<number[]>([]);
+  const [joinedTables, setJoinedTables] = useState<{[key: string]: {tables: number[], capacity: number}}>({});
+  const [manualOverride, setManualOverride] = useState(false);
 
   // Load table state from localStorage on mount - show-time aware
   useEffect(() => {
@@ -195,7 +201,12 @@ const TableAllocation = ({
       ? 'table-allocation-state-v3' 
       : `table-allocation-state-v3-${currentShowTime}`;
     
+    const joinedTablesKey = currentShowTime === 'all' 
+      ? 'joined-tables-v1' 
+      : `joined-tables-v1-${currentShowTime}`;
+    
     const savedTables = localStorage.getItem(storageKey);
+    const savedJoinedTables = localStorage.getItem(joinedTablesKey);
     if (savedTables) {
       try {
         const parsedTables = JSON.parse(savedTables);
@@ -203,6 +214,16 @@ const TableAllocation = ({
         console.log(`Loaded table allocation state for show: ${currentShowTime}`);
       } catch (error) {
         console.error('Failed to load table allocation state:', error);
+      }
+    }
+    
+    if (savedJoinedTables) {
+      try {
+        const parsedJoinedTables = JSON.parse(savedJoinedTables);
+        setJoinedTables(parsedJoinedTables);
+        console.log(`Loaded joined tables state for show: ${currentShowTime}`);
+      } catch (error) {
+        console.error('Failed to load joined tables state:', error);
       }
     } else {
       // Reset to default state if no saved state for this show
@@ -333,6 +354,15 @@ const TableAllocation = ({
     localStorage.setItem(storageKey, JSON.stringify(tables));
   }, [tables, currentShowTime]);
 
+  // Save joined tables state to localStorage
+  useEffect(() => {
+    const joinedTablesKey = currentShowTime === 'all' 
+      ? 'joined-tables-v1' 
+      : `joined-tables-v1-${currentShowTime}`;
+    
+    localStorage.setItem(joinedTablesKey, JSON.stringify(joinedTables));
+  }, [joinedTables, currentShowTime]);
+
   // Update table statuses based on current guest states - SHOW TIME AWARE
   useEffect(() => {
     console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
@@ -425,6 +455,134 @@ const TableAllocation = ({
     return tableIds.every(tableId => {
       const adjacent = getAdjacentTables(tableId);
       return tableIds.some(otherId => otherId !== tableId && adjacent.includes(otherId));
+    });
+  };
+
+  // Table joining functions
+  const handleTableClick = (tableId: number) => {
+    if (isJoinTablesMode) {
+      setSelectedTablesForJoining(prev => {
+        if (prev.includes(tableId)) {
+          return prev.filter(id => id !== tableId);
+        } else {
+          const newSelection = [...prev, tableId];
+          // Check if new selection maintains adjacency
+          if (areTablesAdjacent(newSelection)) {
+            return newSelection;
+          } else {
+            toast({
+              title: "Invalid Selection",
+              description: "Selected tables must be adjacent to each other",
+              variant: "destructive"
+            });
+            return prev;
+          }
+        }
+      });
+    }
+  };
+
+  const joinSelectedTables = () => {
+    if (selectedTablesForJoining.length < 2) {
+      toast({
+        title: "Invalid Selection",
+        description: "Please select at least 2 tables to join",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const sortedTables = [...selectedTablesForJoining].sort((a, b) => a - b);
+    const joinedId = sortedTables.join('+');
+    const totalCapacity = sortedTables.reduce((sum, tableId) => {
+      const table = tables.find(t => t.id === tableId);
+      return sum + (table?.totalCapacity || 0);
+    }, 0);
+
+    setJoinedTables(prev => ({
+      ...prev,
+      [joinedId]: {
+        tables: sortedTables,
+        capacity: totalCapacity
+      }
+    }));
+
+    setSelectedTablesForJoining([]);
+    setIsJoinTablesMode(false);
+    
+    toast({
+      title: "Tables Joined",
+      description: `Tables ${sortedTables.map(id => `T${id}`).join('+')} have been joined (${totalCapacity} seats)`,
+    });
+  };
+
+  const splitJoinedTable = (joinedId: string) => {
+    setJoinedTables(prev => {
+      const newJoined = { ...prev };
+      delete newJoined[joinedId];
+      return newJoined;
+    });
+    
+    toast({
+      title: "Tables Split",
+      description: "Tables have been separated back to individual tables",
+    });
+  };
+
+  const getTableDisplayName = (tableId: number): string => {
+    // Check if this table is part of a joined group
+    for (const [joinedId, joinedData] of Object.entries(joinedTables)) {
+      if (joinedData.tables.includes(tableId)) {
+        return `T${joinedData.tables.join('+T')}`;
+      }
+    }
+    return `T${tableId}`;
+  };
+
+  const isTableJoined = (tableId: number): boolean => {
+    return Object.values(joinedTables).some(joined => joined.tables.includes(tableId));
+  };
+
+  const getJoinedTableData = (tableId: number) => {
+    for (const [joinedId, joinedData] of Object.entries(joinedTables)) {
+      if (joinedData.tables.includes(tableId)) {
+        return { joinedId, ...joinedData };
+      }
+    }
+    return null;
+  };
+
+  // Handle assignment to joined tables
+  const handleJoinedTableAssign = (tableIds: number[], guest: CheckedInGuest) => {
+    if (!guest) return;
+
+    // Update all tables in the joined group
+    setTables(prevTables => 
+      prevTables.map(table => {
+        if (tableIds.includes(table.id)) {
+          return {
+            ...table,
+            sections: table.sections.map(section => ({
+              ...section,
+              status: 'ALLOCATED' as const,
+              allocatedTo: guest.name,
+              allocatedGuest: guest,
+              allocatedCount: guest.count
+            }))
+          };
+        }
+        return table;
+      })
+    );
+
+    // Notify parent component
+    onTableAllocated(guest.originalIndex, tableIds);
+    setShowAssignDialog(false);
+    setSelectedGuest(null);
+
+    toast({
+      title: "✅ Table Assigned",
+      description: `${guest.name} (${guest.count} guests) assigned to joined tables T${tableIds.join('+T')}`,
     });
   };
 
@@ -1482,14 +1640,44 @@ const TableAllocation = ({
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-gray-600">Row 1 (Front) - 2-seat tables</h4>
           <div className="grid grid-cols-3 gap-2">
-            {row1.map(table => (
-              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
-                <h3 className="font-bold text-center mb-2 text-sm">
-                  {table.name} ({table.totalCapacity} seats)
-                </h3>
-                {table.sections.map(section => renderSection(section, table))}
-              </div>
-            ))}
+             {row1.map(table => {
+               const isSelected = selectedTablesForJoining.includes(table.id);
+               const isJoined = isTableJoined(table.id);
+               const joinedData = getJoinedTableData(table.id);
+               
+               return (
+                 <div 
+                   key={table.id} 
+                   className={`border-2 rounded-lg p-2 ${
+                     isJoinTablesMode ? 'cursor-pointer' : ''
+                   } ${
+                     isSelected ? 'border-blue-500 bg-blue-50' : 
+                     isJoined ? 'border-green-500 bg-green-50' : 
+                     'border-gray-300'
+                   } ${isJoinTablesMode ? 'hover:border-blue-300' : ''}`}
+                   onClick={() => isJoinTablesMode && handleTableClick(table.id)}
+                 >
+                   <h3 className="font-bold text-center mb-2 text-sm">
+                     {isJoined ? getTableDisplayName(table.id) : table.name} 
+                     ({isJoined ? joinedData?.capacity : table.totalCapacity} seats)
+                     {isJoined && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           splitJoinedTable(joinedData!.joinedId);
+                         }}
+                         size="sm"
+                         variant="outline"
+                         className="ml-2 h-5 text-xs"
+                       >
+                         Split
+                       </Button>
+                     )}
+                   </h3>
+                 {table.sections.map(section => renderSection(section, table))}
+               </div>
+               );
+             })}
           </div>
         </div>
 
@@ -1497,14 +1685,44 @@ const TableAllocation = ({
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-gray-600">Row 2 - 4-seat tables (front & back sections)</h4>
           <div className="grid grid-cols-3 gap-2">
-            {row2.map(table => (
-              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
-                <h3 className="font-bold text-center mb-2 text-sm">
-                  {table.name} ({table.totalCapacity} seats)
-                </h3>
-                {table.sections.map(section => renderSection(section, table))}
-              </div>
-            ))}
+             {row2.map(table => {
+               const isSelected = selectedTablesForJoining.includes(table.id);
+               const isJoined = isTableJoined(table.id);
+               const joinedData = getJoinedTableData(table.id);
+               
+               return (
+                 <div 
+                   key={table.id} 
+                   className={`border-2 rounded-lg p-2 ${
+                     isJoinTablesMode ? 'cursor-pointer' : ''
+                   } ${
+                     isSelected ? 'border-blue-500 bg-blue-50' : 
+                     isJoined ? 'border-green-500 bg-green-50' : 
+                     'border-gray-300'
+                   } ${isJoinTablesMode ? 'hover:border-blue-300' : ''}`}
+                   onClick={() => isJoinTablesMode && handleTableClick(table.id)}
+                 >
+                   <h3 className="font-bold text-center mb-2 text-sm">
+                     {isJoined ? getTableDisplayName(table.id) : table.name} 
+                     ({isJoined ? joinedData?.capacity : table.totalCapacity} seats)
+                     {isJoined && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           splitJoinedTable(joinedData!.joinedId);
+                         }}
+                         size="sm"
+                         variant="outline"
+                         className="ml-2 h-5 text-xs"
+                       >
+                         Split
+                       </Button>
+                     )}
+                   </h3>
+                 {table.sections.map(section => renderSection(section, table))}
+               </div>
+               );
+             })}
           </div>
         </div>
 
@@ -1512,14 +1730,44 @@ const TableAllocation = ({
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-gray-600">Row 3 - 4-seat tables (front & back sections)</h4>
           <div className="grid grid-cols-3 gap-2">
-            {row3.map(table => (
-              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
-                <h3 className="font-bold text-center mb-2 text-sm">
-                  {table.name} ({table.totalCapacity} seats)
-                </h3>
-                {table.sections.map(section => renderSection(section, table))}
-              </div>
-            ))}
+             {row3.map(table => {
+               const isSelected = selectedTablesForJoining.includes(table.id);
+               const isJoined = isTableJoined(table.id);
+               const joinedData = getJoinedTableData(table.id);
+               
+               return (
+                 <div 
+                   key={table.id} 
+                   className={`border-2 rounded-lg p-2 ${
+                     isJoinTablesMode ? 'cursor-pointer' : ''
+                   } ${
+                     isSelected ? 'border-blue-500 bg-blue-50' : 
+                     isJoined ? 'border-green-500 bg-green-50' : 
+                     'border-gray-300'
+                   } ${isJoinTablesMode ? 'hover:border-blue-300' : ''}`}
+                   onClick={() => isJoinTablesMode && handleTableClick(table.id)}
+                 >
+                   <h3 className="font-bold text-center mb-2 text-sm">
+                     {isJoined ? getTableDisplayName(table.id) : table.name} 
+                     ({isJoined ? joinedData?.capacity : table.totalCapacity} seats)
+                     {isJoined && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           splitJoinedTable(joinedData!.joinedId);
+                         }}
+                         size="sm"
+                         variant="outline"
+                         className="ml-2 h-5 text-xs"
+                       >
+                         Split
+                       </Button>
+                     )}
+                   </h3>
+                 {table.sections.map(section => renderSection(section, table))}
+               </div>
+               );
+             })}
           </div>
         </div>
 
@@ -1527,14 +1775,44 @@ const TableAllocation = ({
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-gray-600">Row 4 (Back) - 2-seat tables</h4>
           <div className="grid grid-cols-4 gap-2">
-            {row4.map(table => (
-              <div key={table.id} className="border-2 border-gray-300 rounded-lg p-2">
-                <h3 className="font-bold text-center mb-2 text-sm">
-                  {table.name} ({table.totalCapacity} seats)
-                </h3>
-                {table.sections.map(section => renderSection(section, table))}
-              </div>
-            ))}
+             {row4.map(table => {
+               const isSelected = selectedTablesForJoining.includes(table.id);
+               const isJoined = isTableJoined(table.id);
+               const joinedData = getJoinedTableData(table.id);
+               
+               return (
+                 <div 
+                   key={table.id} 
+                   className={`border-2 rounded-lg p-2 ${
+                     isJoinTablesMode ? 'cursor-pointer' : ''
+                   } ${
+                     isSelected ? 'border-blue-500 bg-blue-50' : 
+                     isJoined ? 'border-green-500 bg-green-50' : 
+                     'border-gray-300'
+                   } ${isJoinTablesMode ? 'hover:border-blue-300' : ''}`}
+                   onClick={() => isJoinTablesMode && handleTableClick(table.id)}
+                 >
+                   <h3 className="font-bold text-center mb-2 text-sm">
+                     {isJoined ? getTableDisplayName(table.id) : table.name} 
+                     ({isJoined ? joinedData?.capacity : table.totalCapacity} seats)
+                     {isJoined && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           splitJoinedTable(joinedData!.joinedId);
+                         }}
+                         size="sm"
+                         variant="outline"
+                         className="ml-2 h-5 text-xs"
+                       >
+                         Split
+                       </Button>
+                     )}
+                   </h3>
+                 {table.sections.map(section => renderSection(section, table))}
+               </div>
+               );
+             })}
           </div>
         </div>
       </div>
@@ -1698,14 +1976,34 @@ const TableAllocation = ({
               <Users className="h-5 w-5" />
               <span>Guests Awaiting Table Allocation ({availableForAllocation.length})</span>
             </div>
-            <Button
-              onClick={() => setShowWalkInDialog(true)}
-              className="bg-green-600 hover:bg-green-700"
-              size="sm"
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Walk In
-            </Button>
+            <div className="flex space-x-2">
+              <Button
+                onClick={() => setIsJoinTablesMode(!isJoinTablesMode)}
+                variant={isJoinTablesMode ? "default" : "outline"}
+                size="sm"
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                {isJoinTablesMode ? "Exit Join Mode" : "Join Tables"}
+              </Button>
+              {selectedTablesForJoining.length >= 2 && (
+                <Button
+                  onClick={joinSelectedTables}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Join Selected ({selectedTablesForJoining.length})
+                </Button>
+              )}
+              <Button
+                onClick={() => setShowWalkInDialog(true)}
+                className="bg-green-600 hover:bg-green-700"
+                size="sm"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Walk In
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
