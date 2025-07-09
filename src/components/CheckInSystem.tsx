@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
@@ -949,7 +950,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
-  const handleGuestSeated = (guestIndex: number) => {
+  const handleGuestSeated = async (guestIndex: number) => {
     console.log(`🪑 CheckInSystem: handleGuestSeated called for guest index ${guestIndex}`);
     
     const newSeatedGuests = new Set(seatedGuests);
@@ -977,6 +978,33 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log(`🪑 Party booking indices: ${partyToSeat.bookingIndices.join(', ')}`);
       console.log(`🪑 Current guest index being seated: ${guestIndex}`);
       
+      // Update database for all party members
+      const updatePromises = partyToSeat.bookingIndices.map(async (index) => {
+        const partyGuest = guests[index];
+        if (partyGuest?.id) {
+          try {
+            const { error } = await supabase
+              .from('guests')
+              .update({
+                is_seated: true,
+                seated_at: new Date().toISOString()
+              })
+              .eq('id', partyGuest.id);
+
+            if (error) {
+              console.error(`❌ Failed to update database for party member ${index}:`, error);
+            } else {
+              console.log(`✅ Database updated for party member ${index} (${extractGuestName(partyGuest.booker_name || '')})`);
+            }
+          } catch (err) {
+            console.error(`❌ Database error for party member ${index}:`, err);
+          }
+        }
+      });
+      
+      // Wait for all database updates
+      await Promise.all(updatePromises);
+      
       partyToSeat.bookingIndices.forEach(index => {
         console.log(`🪑 Seating guest at index ${index}`);
         newSeatedGuests.add(index);
@@ -1001,6 +1029,39 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         description: `${partyToSeat.guestNames.join(' & ')} party (${partyToSeat.totalGuests} guests) has been seated`,
       });
     } else {
+      // Individual guest - update database
+      if (guest?.id) {
+        try {
+          const { error } = await supabase
+            .from('guests')
+            .update({
+              is_seated: true,
+              seated_at: new Date().toISOString()
+            })
+            .eq('id', guest.id);
+
+          if (error) {
+            console.error(`❌ Failed to update database for guest ${guestIndex}:`, error);
+            toast({
+              title: "❌ Database Error",
+              description: `Failed to update seating status for ${guestName}`,
+              variant: "destructive"
+            });
+            return;
+          } else {
+            console.log(`✅ Database updated for guest ${guestIndex} (${guestName})`);
+          }
+        } catch (err) {
+          console.error(`❌ Database error for guest ${guestIndex}:`, err);
+          toast({
+            title: "❌ Database Error", 
+            description: `Failed to update seating status for ${guestName}`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+      
       // Individual guest
       console.log(`🪑 Seating individual guest: ${guestName}`);
       newSeatedGuests.add(guestIndex);
@@ -1028,7 +1089,46 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   };
 
   // New: Handle table allocation (not seated yet)
-  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
+  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
+    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    
+    console.log(`📍 TableAllocation: Allocating tables ${tableIds.join(', ')} to guest ${guestName} (index: ${guestIndex})`);
+    
+    // Update database first
+    if (guest?.id && guestIndex < 10000) { // Only update real guests, not walk-ins
+      try {
+        const { error } = await supabase
+          .from('guests')
+          .update({
+            is_allocated: true,
+            table_assignments: tableIds
+          })
+          .eq('id', guest.id);
+
+        if (error) {
+          console.error(`❌ Failed to update database for guest ${guestIndex}:`, error);
+          toast({
+            title: "❌ Database Error",
+            description: `Failed to allocate table for ${guestName}`,
+            variant: "destructive"
+          });
+          return;
+        } else {
+          console.log(`✅ Database updated for guest ${guestIndex} (${guestName}) - allocated: true, table_assignments: ${JSON.stringify(tableIds)}`);
+        }
+      } catch (err) {
+        console.error(`❌ Database error for guest ${guestIndex}:`, err);
+        toast({
+          title: "❌ Database Error",
+          description: `Failed to allocate table for ${guestName}`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    // Update local state
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.add(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
@@ -1037,9 +1137,6 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     const newGuestTableAllocations = new Map(guestTableAllocations);
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
-    
-    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
       title: "📍 Table Allocated",

@@ -377,16 +377,7 @@ const TableAllocation = ({
         ...table,
         sections: table.sections.map(section => {
           if (section.allocatedGuest) {
-            console.log(`🔍 TABLE SYNC DEBUG for section ${section.id}:`);
-            console.log(`  - allocatedGuest exists: ${!!section.allocatedGuest}`);
-            console.log(`  - allocatedGuest originalIndex: ${section.allocatedGuest?.originalIndex}`);
-            console.log(`  - showFilteredGuests count: ${showFilteredGuests.length}`);
-            
             const currentGuest = showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
-            
-            console.log(`  - currentGuest found: ${!!currentGuest}`);
-            console.log(`  - currentGuest.hasTableAllocated: ${currentGuest?.hasTableAllocated}`);
-            console.log(`  - current section status: ${section.status}`);
             
             // If guest no longer exists in current show filter, clear the allocation
             if (!currentGuest) {
