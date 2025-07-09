@@ -837,8 +837,18 @@ const TableAllocation = ({
 
     console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
 
-    // Mark guest as seated
-    onGuestSeated(section.allocatedGuest.originalIndex);
+    const guestToSeat = section.allocatedGuest;
+    
+    // Check if this guest is part of a party by checking if the name contains "(Party)"
+    if (guestToSeat.name.includes('(Party)')) {
+      // This is a party group - we need to get the individual party members from the parent component
+      // The parent component should handle marking all party members as seated
+      console.log(`Seating party group: ${guestToSeat.name}`);
+      onGuestSeated(guestToSeat.originalIndex);
+    } else {
+      // Regular individual guest
+      onGuestSeated(guestToSeat.originalIndex);
+    }
 
     // FIXED: Properly track seated guests per section
     setTables(prevTables =>

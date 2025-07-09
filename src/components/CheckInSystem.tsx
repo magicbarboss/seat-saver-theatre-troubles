@@ -889,27 +889,61 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
   const handleGuestSeated = (guestIndex: number) => {
     const newSeatedGuests = new Set(seatedGuests);
-    newSeatedGuests.add(guestIndex);
-    setSeatedGuests(newSeatedGuests);
-    
-    // Remove from allocated when seated
     const newAllocatedGuests = new Set(allocatedGuests);
-    newAllocatedGuests.delete(guestIndex);
-    setAllocatedGuests(newAllocatedGuests);
-    
-    // Free up the pager when guest is seated
     const newPagerAssignments = new Map(pagerAssignments);
-    const assignedPager = newPagerAssignments.get(guestIndex);
-    newPagerAssignments.delete(guestIndex);
-    setPagerAssignments(newPagerAssignments);
     
-    const guest = guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    // Check if this guest is part of a party
+    let partyToSeat: PartyGroup | null = null;
+    for (const [, party] of partyGroups) {
+      if (party.bookingIndices.includes(guestIndex)) {
+        partyToSeat = party;
+        break;
+      }
+    }
     
-    toast({
-      title: "🪑 Guest Seated",
-      description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
-    });
+    if (partyToSeat) {
+      // Seat all party members
+      console.log(`Seating party group: ${partyToSeat.guestNames.join(' & ')}`);
+      partyToSeat.bookingIndices.forEach(index => {
+        newSeatedGuests.add(index);
+        newAllocatedGuests.delete(index);
+        
+        // Free up pager if assigned
+        const assignedPager = newPagerAssignments.get(index);
+        if (assignedPager) {
+          newPagerAssignments.delete(index);
+        }
+      });
+      
+      setSeatedGuests(newSeatedGuests);
+      setAllocatedGuests(newAllocatedGuests);
+      setPagerAssignments(newPagerAssignments);
+      
+      toast({
+        title: "🪑 Party Seated",
+        description: `${partyToSeat.guestNames.join(' & ')} party (${partyToSeat.totalGuests} guests) has been seated`,
+      });
+    } else {
+      // Individual guest
+      newSeatedGuests.add(guestIndex);
+      newAllocatedGuests.delete(guestIndex);
+      
+      // Free up the pager when guest is seated
+      const assignedPager = newPagerAssignments.get(guestIndex);
+      newPagerAssignments.delete(guestIndex);
+      
+      setSeatedGuests(newSeatedGuests);
+      setAllocatedGuests(newAllocatedGuests);
+      setPagerAssignments(newPagerAssignments);
+      
+      const guest = guests[guestIndex];
+      const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+      
+      toast({
+        title: "🪑 Guest Seated",
+        description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
+      });
+    }
   };
 
   // New: Handle table allocation (not seated yet)
