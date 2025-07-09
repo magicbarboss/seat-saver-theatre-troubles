@@ -855,9 +855,10 @@ const TableAllocation = ({
     
     if (!table || !section || !section.allocatedGuest) return;
 
-    console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
-
     const guestToSeat = section.allocatedGuest;
+
+    console.log(`🪑 DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
+    console.log(`🪑 Guest being seated:`, guestToSeat);
     
     // Check if this guest is part of a party by checking if the name contains "(Party)"
     if (guestToSeat.name.includes('(Party)')) {
@@ -883,26 +884,18 @@ const TableAllocation = ({
                 const guestCount = s.allocatedGuest?.count || 0;
                 const newSeatedCount = currentSeatedCount + guestCount;
                 
-                // Check if THIS SPECIFIC SECTION is full after seating
-                const isSectionFull = newSeatedCount >= s.capacity;
+                console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}`);
                 
-                console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}, isSectionFull=${isSectionFull}`);
+                // FIXED: Always mark as OCCUPIED when guests are seated, regardless of section capacity
+                const newStatus = 'OCCUPIED' as const;
                 
-                // Only mark as OCCUPIED if this specific section is full
-                const newStatus = isSectionFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
-                
-                console.log(`Section ${sectionId}: changing status to ${newStatus}`);
+                console.log(`Section ${sectionId}: changing status to ${newStatus} (guests are seated)`);
                 
                 return { 
                   ...s, 
                   status: newStatus,
                   seatedCount: newSeatedCount,
-                  // Clear allocation info only if section becomes full
-                  ...(isSectionFull ? {
-                    allocatedTo: undefined,
-                    allocatedGuest: undefined,
-                    allocatedCount: undefined,
-                  } : {})
+                  // Keep allocation info for tracking purposes
                 };
               }
               return s;
@@ -1678,9 +1671,9 @@ const TableAllocation = ({
     return (
       <div key={section.id} className={`p-3 ${table.hasSections ? 'mb-2' : ''} border rounded-lg ${
         section.status === 'AVAILABLE' ? 'bg-green-100 border-green-300' :
-        section.status === 'ALLOCATED' && availableCapacity > 0 ? 'bg-yellow-100 border-yellow-300' :
-        section.status === 'ALLOCATED' ? 'bg-blue-100 border-blue-300' :
-        'bg-red-100 border-red-300'
+        section.status === 'ALLOCATED' ? 'bg-yellow-100 border-yellow-300' :
+        section.status === 'OCCUPIED' ? 'bg-red-100 border-red-300' :
+        'bg-gray-100 border-gray-300'
       }`}>
         <div className="flex justify-between items-center mb-2">
           <span className="font-medium text-sm">
