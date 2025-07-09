@@ -395,7 +395,21 @@ const TableAllocation = ({
             // Update status based on guest state
             if (currentGuest.hasBeenSeated) {
               return { ...section, status: 'OCCUPIED' as const };
-            } else if (!currentGuest.hasTableAllocated) {
+            } else if (currentGuest.hasTableAllocated) {
+              // Guest has table allocation, ensure section shows as allocated
+              console.log(`🎯 SYNC: Guest ${currentGuest.name} allocated to section ${section.id}`);
+              return {
+                ...section,
+                status: 'ALLOCATED' as const,
+                allocatedTo: currentGuest.name,
+                allocatedGuest: {
+                  ...currentGuest,
+                  count: currentGuest.count,
+                  showTime: currentGuest.showTime
+                },
+                allocatedCount: currentGuest.count,
+              };
+            } else {
               // Guest lost table allocation, clear it
               console.log(`Guest ${currentGuest.name} lost table allocation, clearing section ${section.id}`);
               return {
