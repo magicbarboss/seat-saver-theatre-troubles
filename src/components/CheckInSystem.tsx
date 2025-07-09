@@ -55,7 +55,7 @@ interface PartyGroup {
 
 const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
+  const [showFilter, setShowFilter] = useState('all'); // Default to 'all' to show all guests
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
@@ -1198,7 +1198,21 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
       const guestName = extractGuestName(guest.booker_name || '');
       const totalQty = guest.total_quantity || 1;
-      const showTime = guest.show_time || getShowTime(guest);
+      // Enhanced show time extraction with proper fallbacks
+      let showTime = guest.show_time;
+      
+      // If show_time is null/empty, try to extract from ticket data
+      if (!showTime) {
+        showTime = getShowTime(guest);
+      }
+      
+      // If still no show time, use current show filter as fallback
+      if (!showTime) {
+        showTime = showFilter || '7pm';
+        console.log(`🎭 Using fallback show time for ${guestName}: ${showTime}`);
+      }
+      
+      console.log(`🎭 Show time for ${guestName}: DB="${guest.show_time}" → Final="${showTime}"`);
       const pagerNumber = pagerAssignments.get(guestIndex);
       const hasBeenSeated = seatedGuests.has(guestIndex);
       const hasTableAllocated = allocatedGuests.has(guestIndex);

@@ -370,10 +370,17 @@ const TableAllocation = ({
     
     // Filter guests by current show time - be more lenient with filtering
     const showFilteredGuests = checkedInGuests.filter(guest => {
-      const matches = currentShowTime === 'all' || guest.showTime === currentShowTime;
-      if (!matches) {
-        console.log(`🚫 Guest ${guest.name} filtered out: showTime="${guest.showTime}" vs currentShowTime="${currentShowTime}"`);
+      // If no currentShowTime is set, show all guests (fix for empty filter)
+      if (!currentShowTime || currentShowTime === 'all') {
+        return true;
       }
+      
+      // Be lenient with show time matching - handle null/undefined guest show times
+      const guestShowTime = guest.showTime || '7pm'; // Fallback to 7pm if no show time
+      const matches = guestShowTime === currentShowTime;
+      
+      console.log(`🔍 Guest ${guest.name}: showTime="${guest.showTime}" (fallback: "${guestShowTime}") vs currentShowTime="${currentShowTime}" → ${matches ? 'MATCH' : 'FILTERED OUT'}`);
+      
       return matches;
     });
     
@@ -441,7 +448,13 @@ const TableAllocation = ({
   const availableForAllocation = checkedInGuests.filter(guest => {
     console.log(`🔍 FILTER DEBUG - Guest: ${guest.name}, ShowTime: "${guest.showTime}", CurrentShowTime: "${currentShowTime}"`);
     
-    const showTimeMatches = currentShowTime === 'all' || guest.showTime === currentShowTime;
+    // If no currentShowTime is set, show all guests
+    let showTimeMatches = true;
+    if (currentShowTime && currentShowTime !== 'all') {
+      const guestShowTime = guest.showTime || '7pm'; // Fallback for null show times
+      showTimeMatches = guestShowTime === currentShowTime;
+    }
+    
     const isEligible = !guest.hasBeenSeated && !guest.hasTableAllocated && showTimeMatches;
     
     console.log(`  - hasBeenSeated: ${guest.hasBeenSeated}, hasTableAllocated: ${guest.hasTableAllocated}, showTimeMatches: ${showTimeMatches}, isEligible: ${isEligible}`);
