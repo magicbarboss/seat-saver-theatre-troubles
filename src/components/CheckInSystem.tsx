@@ -904,13 +904,18 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     if (partyToSeat) {
       // Seat all party members
       console.log(`Seating party group: ${partyToSeat.guestNames.join(' & ')}`);
+      console.log(`Party booking indices: ${partyToSeat.bookingIndices.join(', ')}`);
+      console.log(`Current guest index being seated: ${guestIndex}`);
+      
       partyToSeat.bookingIndices.forEach(index => {
+        console.log(`Seating guest at index ${index}`);
         newSeatedGuests.add(index);
         newAllocatedGuests.delete(index);
         
         // Free up pager if assigned
         const assignedPager = newPagerAssignments.get(index);
         if (assignedPager) {
+          console.log(`Freeing pager ${assignedPager} for guest ${index}`);
           newPagerAssignments.delete(index);
         }
       });
@@ -918,6 +923,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       setSeatedGuests(newSeatedGuests);
       setAllocatedGuests(newAllocatedGuests);
       setPagerAssignments(newPagerAssignments);
+      
+      console.log(`Updated seated guests:`, Array.from(newSeatedGuests));
       
       toast({
         title: "🪑 Party Seated",
