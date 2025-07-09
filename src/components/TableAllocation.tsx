@@ -57,7 +57,7 @@ const TableAllocation = ({
   onGuestSeated,
   onTableAllocated,
   onAddWalkIn,
-  currentShowTime = 'all'
+  currentShowTime
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
     // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -365,12 +365,19 @@ const TableAllocation = ({
 
   // Update table statuses based on current guest states - SHOW TIME AWARE
   useEffect(() => {
-    console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
+    console.log(`🔄 Syncing table state with guest state for show: ${currentShowTime}`);
+    console.log(`📊 Total checked-in guests: ${checkedInGuests.length}`);
     
-    // Filter guests by current show time
-    const showFilteredGuests = checkedInGuests.filter(guest => 
-      currentShowTime === 'all' || guest.showTime === currentShowTime
-    );
+    // Filter guests by current show time - be more lenient with filtering
+    const showFilteredGuests = checkedInGuests.filter(guest => {
+      const matches = currentShowTime === 'all' || guest.showTime === currentShowTime;
+      if (!matches) {
+        console.log(`🚫 Guest ${guest.name} filtered out: showTime="${guest.showTime}" vs currentShowTime="${currentShowTime}"`);
+      }
+      return matches;
+    });
+    
+    console.log(`📊 Show-filtered guests: ${showFilteredGuests.length} for show: ${currentShowTime}`);
     
     setTables(prevTables => 
       prevTables.map(table => ({
@@ -431,11 +438,16 @@ const TableAllocation = ({
   }, [checkedInGuests, currentShowTime]);
 
   // Get guests that can be assigned tables (checked in but not seated) - filtered by show time
-  const availableForAllocation = checkedInGuests.filter(guest => 
-    !guest.hasBeenSeated && 
-    !guest.hasTableAllocated &&
-    (currentShowTime === 'all' || guest.showTime === currentShowTime)
-  );
+  const availableForAllocation = checkedInGuests.filter(guest => {
+    console.log(`🔍 FILTER DEBUG - Guest: ${guest.name}, ShowTime: "${guest.showTime}", CurrentShowTime: "${currentShowTime}"`);
+    
+    const showTimeMatches = currentShowTime === 'all' || guest.showTime === currentShowTime;
+    const isEligible = !guest.hasBeenSeated && !guest.hasTableAllocated && showTimeMatches;
+    
+    console.log(`  - hasBeenSeated: ${guest.hasBeenSeated}, hasTableAllocated: ${guest.hasTableAllocated}, showTimeMatches: ${showTimeMatches}, isEligible: ${isEligible}`);
+    
+    return isEligible;
+  });
 
   // Define adjacent table relationships based on physical layout - UPDATED TO INCLUDE VERTICAL ADJACENCY
   const getAdjacentTables = (tableId: number): number[] => {
