@@ -982,15 +982,42 @@ const TableAllocation = ({
   // Get all available sections and whole table options for assignment - FIXED TO PROPERLY PRIORITIZE PARTIAL CAPACITY
   const getAvailableOptions = () => {
     const options: Array<{
-      type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent';
+      type: 'section' | 'whole-table' | 'multi-table' | 'expand-adjacent' | 'joined-table';
       section?: TableSection;
       table?: Table;
       tables?: Table[];
       expandOption?: { table: Table; adjacentTable: Table };
+      joinedData?: { joinedId: string; tables: number[]; capacity: number };
       totalCapacity: number;
       display: string;
       tableIds: number[];
     }> = [];
+
+    // Add joined tables as priority options
+    Object.entries(joinedTables).forEach(([joinedId, joinedData]) => {
+      // Check if all tables in the joined group are available
+      const allTablesAvailable = joinedData.tables.every(tableId => {
+        const table = tables.find(t => t.id === tableId);
+        return table && table.sections.every(s => s.status === 'AVAILABLE');
+      });
+
+      if (allTablesAvailable) {
+        const tableNames = joinedData.tables
+          .map(tableId => tables.find(t => t.id === tableId)?.name)
+          .filter(Boolean)
+          .join(' + ');
+        
+        options.push({
+          type: 'joined-table',
+          joinedData: { joinedId, ...joinedData },
+          totalCapacity: joinedData.capacity,
+          display: `${tableNames} Combined - ${joinedData.capacity} seats`,
+          tableIds: joinedData.tables
+        });
+        
+        console.log(`Added joined table option: ${tableNames} (${joinedData.capacity} seats)`);
+      }
+    });
 
     tables.forEach(table => {
       // Add individual sections that have available capacity (including partially allocated ones)
@@ -1351,6 +1378,73 @@ const TableAllocation = ({
     setSelectedGuest(null);
   };
 
+  // Handle joined table assignment
+  const assignJoinedTable = (joinedData: { joinedId: string; tables: number[]; capacity: number }) => {
+    if (!selectedGuest) return;
+
+    if (selectedGuest.count > joinedData.capacity) {
+      toast({
+        title: "❌ Insufficient Capacity",
+        description: `Joined tables can only seat ${joinedData.capacity} guests, but ${selectedGuest.name} has ${selectedGuest.count} guests.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get the actual table objects
+    const tablesToAssign = joinedData.tables
+      .map(tableId => tables.find(t => t.id === tableId))
+      .filter(Boolean) as Table[];
+
+    // Check if all tables are fully available
+    const allTablesAvailable = tablesToAssign.every(table => 
+      table.sections.every(s => s.status === 'AVAILABLE')
+    );
+
+    if (!allTablesAvailable) {
+      toast({
+        title: "❌ Tables Not Available",
+        description: `Some of the joined tables are not fully available.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Allocate all sections of all joined tables
+    setTables(prevTables =>
+      prevTables.map(t => {
+        if (tablesToAssign.some(assignTable => assignTable.id === t.id)) {
+          return {
+            ...t,
+            sections: t.sections.map(s => ({
+              ...s,
+              status: 'ALLOCATED' as const,
+              allocatedTo: selectedGuest.name,
+              allocatedGuest: selectedGuest,
+              allocatedCount: selectedGuest.count,
+            }))
+          };
+        }
+        return t;
+      })
+    );
+
+    // Call the parent callback to track allocation
+    onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
+
+    // Call onTableAssign for the first table (for compatibility)
+    onTableAssign(tablesToAssign[0].id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+
+    const tableNames = tablesToAssign.map(t => t.name).join(' + ');
+    toast({
+      title: "📍 Joined Tables Allocated",
+      description: `${selectedGuest.name} (${selectedGuest.count} guests) allocated to joined tables ${tableNames}. Page when ready!`,
+    });
+
+    setShowAssignDialog(false);
+    setSelectedGuest(null);
+  };
+
   // Organize tables by the layout
   const organizeTablesByRows = () => {
     const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
@@ -1439,6 +1533,32 @@ const TableAllocation = ({
         <div className="text-center py-2 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg border-2 border-dashed border-purple-300">
           <span className="text-sm font-bold text-purple-700">🎭 STAGE 🎭</span>
         </div>
+
+        {/* Joined Tables Options */}
+        {getAvailableOptions().filter(option => option.type === 'joined-table').length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-800">✨ Joined Table Combinations</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {getAvailableOptions()
+                .filter(option => option.type === 'joined-table')
+                .map(option => (
+                  <Button
+                    key={option.joinedData!.joinedId}
+                    variant="outline"
+                    onClick={() => assignJoinedTable(option.joinedData!)}
+                    className="p-3 h-auto flex flex-col border-2 border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
+                    disabled={selectedGuest!.count > option.totalCapacity}
+                  >
+                    <span className="font-bold text-center text-sm">{option.display}</span>
+                    <span className="text-xs text-gray-600">{option.totalCapacity} total seats</span>
+                    {selectedGuest!.count > option.totalCapacity && (
+                      <span className="text-xs text-red-600">Too small</span>
+                    )}
+                  </Button>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Expansion options for single guests - REMOVED BROKEN FUNCTIONALITY */}
         {selectedGuest && selectedGuest.count === 1 && getExpandableTablesForSingleGuest().length > 0 && (
@@ -2137,11 +2257,20 @@ const TableAllocation = ({
                     .filter(option => option.type !== 'section' || option.section!.id !== currentSectionId)
                     .map((option) => (
                       <Button
-                        key={option.type === 'section' ? option.section!.id : `whole-${option.table!.id}`}
+                        key={option.type === 'section' ? option.section!.id : 
+                             option.type === 'joined-table' ? option.joinedData!.joinedId :
+                             `whole-${option.table!.id}`}
                         variant="outline"
                         onClick={() => {
                           if (option.type === 'section') {
                             moveGuestToSection(option.section!.id);
+                          } else if (option.type === 'joined-table') {
+                            // Move to first available section of joined tables
+                            const firstTable = tables.find(t => t.id === option.joinedData!.tables[0]);
+                            const firstAvailable = firstTable?.sections.find(s => s.status === 'AVAILABLE');
+                            if (firstAvailable) {
+                              moveGuestToSection(firstAvailable.id);
+                            }
                           } else {
                             // For whole table moves, we'd need to implement this differently
                             // For now, just use the first available section
