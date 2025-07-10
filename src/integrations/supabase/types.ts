@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      checkin_sessions: {
+        Row: {
+          allocated_guests: number[] | null
+          booking_comments: Json | null
+          checked_in_guests: number[] | null
+          created_at: string
+          guest_list_id: string
+          guest_table_allocations: Json | null
+          id: string
+          pager_assignments: Json | null
+          party_groups: Json | null
+          seated_guests: number[] | null
+          seated_sections: string[] | null
+          session_date: string
+          updated_at: string
+          user_id: string
+          walk_in_guests: Json | null
+        }
+        Insert: {
+          allocated_guests?: number[] | null
+          booking_comments?: Json | null
+          checked_in_guests?: number[] | null
+          created_at?: string
+          guest_list_id: string
+          guest_table_allocations?: Json | null
+          id?: string
+          pager_assignments?: Json | null
+          party_groups?: Json | null
+          seated_guests?: number[] | null
+          seated_sections?: string[] | null
+          session_date?: string
+          updated_at?: string
+          user_id: string
+          walk_in_guests?: Json | null
+        }
+        Update: {
+          allocated_guests?: number[] | null
+          booking_comments?: Json | null
+          checked_in_guests?: number[] | null
+          created_at?: string
+          guest_list_id?: string
+          guest_table_allocations?: Json | null
+          id?: string
+          pager_assignments?: Json | null
+          party_groups?: Json | null
+          seated_guests?: number[] | null
+          seated_sections?: string[] | null
+          session_date?: string
+          updated_at?: string
+          user_id?: string
+          walk_in_guests?: Json | null
+        }
+        Relationships: []
+      }
       guest_lists: {
         Row: {
           id: string

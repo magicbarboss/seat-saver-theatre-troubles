@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Search, Users, CheckCircle, User, Clock, Layout, Plus, Radio, MapPin, Save, UserPlus, MessageSquare, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import TableAllocation from './TableAllocation';
 
 interface Guest {
@@ -25,6 +27,7 @@ interface CheckInSystemProps {
   guests: Guest[];
   headers: string[];
   showTimes: string[];
+  guestListId: string;
 }
 
 interface BookingGroup {
@@ -54,7 +57,8 @@ interface PartyGroup {
   connectionType: 'mutual' | 'one-way';
 }
 
-const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
+const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSystemProps) => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
@@ -82,44 +86,47 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     }
   }, [showTimes]);
 
-  // Generate session key based on current date
-  const getSessionKey = () => {
-    const today = new Date().toDateString();
-    return `checkin-system-state-${today}`;
-  };
-
   // Clear all data and start fresh
-  const clearAllData = () => {
-    setCheckedInGuests(new Set());
-    setPagerAssignments(new Map());
-    setSeatedGuests(new Set());
-    setSeatedSections(new Set()); // Critical: Clear seated sections
-    setAllocatedGuests(new Set());
-    setGuestTableAllocations(new Map());
-    setPartyGroups(new Map());
-    setBookingComments(new Map());
-    setWalkInGuests([]);
-    
-    // Clear from localStorage
-    localStorage.removeItem(getSessionKey());
-    
-    console.log(`🧹 SYSTEM RESET: All data cleared including seated sections`);
-    
-    // Clear old session keys (cleanup)
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('checkin-system-state-')) {
-        localStorage.removeItem(key);
-      }
+  const clearAllData = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Delete from Supabase
+      await supabase
+        .from('checkin_sessions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('guest_list_id', guestListId)
+        .eq('session_date', new Date().toISOString().split('T')[0]);
+
+      // Clear local state
+      setCheckedInGuests(new Set());
+      setPagerAssignments(new Map());
+      setSeatedGuests(new Set());
+      setSeatedSections(new Set());
+      setAllocatedGuests(new Set());
+      setGuestTableAllocations(new Map());
+      setPartyGroups(new Map());
+      setBookingComments(new Map());
+      setWalkInGuests([]);
+      
+      console.log(`🧹 SYSTEM RESET: All data cleared from Supabase and local state`);
+      
+      setSessionDate(new Date().toDateString());
+      setShowClearDialog(false);
+      
+      toast({
+        title: "🗑️ All Data Cleared",
+        description: "Started fresh session for today",
+      });
+    } catch (error) {
+      console.error('Error clearing data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear data",
+        variant: "destructive"
+      });
     }
-    
-    setSessionDate(new Date().toDateString());
-    setShowClearDialog(false);
-    
-    toast({
-      title: "🗑️ All Data Cleared",
-      description: "Started fresh session for today",
-    });
   };
 
   // Add refresh status function for syncing state
@@ -134,77 +141,112 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
-  // Load state on component mount (only once)
+  // Load state from Supabase on component mount
   useEffect(() => {
-    const loadState = () => {
+    const loadState = async () => {
+      if (!user?.id) {
+        setIsInitialized(true);
+        return;
+      }
+
       try {
-        const today = new Date().toDateString();
-        const todaySessionKey = getSessionKey();
-        const savedState = localStorage.getItem(todaySessionKey);
+        const today = new Date().toISOString().split('T')[0];
         
-        if (savedState) {
-          const state = JSON.parse(savedState);
-          const savedDate = new Date(state.timestamp).toDateString();
+        const { data, error } = await supabase
+          .from('checkin_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('guest_list_id', guestListId)
+          .eq('session_date', today)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error loading session:', error);
+          setSessionDate(today);
+          setIsInitialized(true);
+          return;
+        }
+
+        if (data) {
+          // Load state from Supabase with proper type conversions
+          setCheckedInGuests(new Set(data.checked_in_guests || []));
+          setPagerAssignments(new Map(
+            Object.entries(data.pager_assignments || {}).map(([k, v]) => [parseInt(k), v as number])
+          ));
+          setSeatedGuests(new Set(data.seated_guests || []));
+          setSeatedSections(new Set(data.seated_sections || []));
+          setAllocatedGuests(new Set(data.allocated_guests || []));
+          setGuestTableAllocations(new Map(
+            Object.entries(data.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])
+          ));
+          setPartyGroups(new Map(Object.entries(data.party_groups || {}) as [string, PartyGroup][]));
+          setBookingComments(new Map(
+            Object.entries(data.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])
+          ));
+          setWalkInGuests((data.walk_in_guests as Guest[]) || []);
+          setSessionDate(today);
           
-          // Only load if it's from today
-          if (savedDate === today) {
-            setCheckedInGuests(new Set(state.checkedInGuests || []));
-            setPagerAssignments(new Map(state.pagerAssignments || []));
-            setSeatedGuests(new Set(state.seatedGuests || []));
-            setSeatedSections(new Set(state.seatedSections || []));
-            setAllocatedGuests(new Set(state.allocatedGuests || []));
-            setGuestTableAllocations(new Map(state.guestTableAllocations || []));
-            setPartyGroups(new Map(state.partyGroups || []));
-            setBookingComments(new Map(state.bookingComments || []));
-            setWalkInGuests(state.walkInGuests || []);
-            setSessionDate(savedDate);
-            console.log('Loaded saved state from', state.timestamp);
-            
-            toast({
-              title: "🔄 Today's Session Restored",
-              description: `Previous data loaded from ${new Date(state.timestamp).toLocaleTimeString()}`,
-            });
-          } else {
-            // Different day - start fresh but keep the old data visible
-            setSessionDate(today);
-            toast({
-              title: "🌅 New Day Started",
-              description: "Starting fresh session for today. Previous day's data has been cleared.",
-            });
-          }
+          console.log('Loaded saved state from Supabase:', data.updated_at);
+          
+          toast({
+            title: "🔄 Today's Session Restored",
+            description: `Previous data loaded from ${new Date(data.updated_at).toLocaleTimeString()}`,
+          });
         } else {
           setSessionDate(today);
+          toast({
+            title: "🌅 New Session Started",
+            description: "Starting fresh session for today",
+          });
         }
       } catch (error) {
         console.error('Failed to load saved state:', error);
-        setSessionDate(new Date().toDateString());
+        setSessionDate(new Date().toISOString().split('T')[0]);
       }
       setIsInitialized(true);
     };
 
     loadState();
-  }, []);
+  }, [user?.id, guestListId]);
 
-  // Auto-save functionality - separate effect that only runs after initialization
+  // Auto-save to Supabase - separate effect that only runs after initialization
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !user?.id) return;
 
-    const saveState = () => {
-      const state = {
-        checkedInGuests: Array.from(checkedInGuests),
-        pagerAssignments: Array.from(pagerAssignments.entries()),
-        seatedGuests: Array.from(seatedGuests),
-        seatedSections: Array.from(seatedSections),
-        allocatedGuests: Array.from(allocatedGuests),
-        guestTableAllocations: Array.from(guestTableAllocations.entries()),
-        partyGroups: Array.from(partyGroups.entries()),
-        bookingComments: Array.from(bookingComments.entries()),
-        walkInGuests: walkInGuests,
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem(getSessionKey(), JSON.stringify(state));
-      setLastSaved(new Date());
-      console.log('Auto-saved state at', new Date().toLocaleTimeString());
+    const saveState = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        
+        const sessionData = {
+          user_id: user.id,
+          guest_list_id: guestListId,
+          session_date: today,
+          checked_in_guests: Array.from(checkedInGuests),
+          seated_guests: Array.from(seatedGuests),
+          seated_sections: Array.from(seatedSections),
+          allocated_guests: Array.from(allocatedGuests),
+          guest_table_allocations: Object.fromEntries(guestTableAllocations) as any,
+          pager_assignments: Object.fromEntries(pagerAssignments) as any,
+          party_groups: Object.fromEntries(partyGroups) as any,
+          booking_comments: Object.fromEntries(bookingComments) as any,
+          walk_in_guests: walkInGuests as any
+        };
+
+        const { error } = await supabase
+          .from('checkin_sessions')
+          .upsert(sessionData, {
+            onConflict: 'user_id,guest_list_id,session_date'
+          });
+
+        if (error) {
+          console.error('Error saving session:', error);
+        } else {
+          setLastSaved(new Date());
+          console.log('Auto-saved state to Supabase at', new Date().toLocaleTimeString());
+        }
+      } catch (error) {
+        console.error('Failed to save state to Supabase:', error);
+      }
     };
 
     const interval = setInterval(saveState, 30000);
@@ -212,7 +254,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);

@@ -214,6 +214,7 @@ const GuestManager = () => {
           guests={transformedGuests}
           headers={headers}
           showTimes={showTimes}
+          guestListId={activeGuestList.id}
         />
       </div>
     );
