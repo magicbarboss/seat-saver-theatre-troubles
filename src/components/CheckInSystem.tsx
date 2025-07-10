@@ -313,7 +313,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log('Ticket data:', guest.ticket_data);
     }
     
-    // Check for "Paid in GYG" in ticket_data.Status field first - classify as OLD Groupon
+    // Check for "Paid in GYG" in Status field (spread from ticket_data) - classify as OLD Groupon
+    if (guest.Status === "Paid in GYG") {
+      if (isTargetGuest) console.log('SUCCESS: Found "Paid in GYG" in Status field, classifying as OLD Groupon Package');
+      return 'OLD Groupon Package';
+    }
+    
+    // Fallback: Check for "Paid in GYG" in nested ticket_data.Status - classify as OLD Groupon
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as any;
       if (ticketData.Status === "Paid in GYG") {
