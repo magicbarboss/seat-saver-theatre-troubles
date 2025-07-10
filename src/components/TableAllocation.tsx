@@ -883,6 +883,26 @@ const TableAllocation = ({
     
     if (!table || !section || !section.allocatedGuest) return;
 
+    // Validate: Only allow seating if section is allocated and guest is not already seated
+    if (section.status !== 'ALLOCATED') {
+      toast({
+        title: "❌ Cannot Seat",
+        description: `Section ${sectionId} is not allocated or already seated`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if the guest has already been seated (to prevent duplicate seating)
+    if (section.allocatedGuest.hasBeenSeated) {
+      toast({
+        title: "❌ Already Seated",
+        description: `${section.allocatedGuest.name} has already been seated`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     console.log(`DEBUG markGuestSeated: Section ${sectionId}, allocatedCount=${section.allocatedCount}, seatedCount=${section.seatedCount || 0}, capacity=${section.capacity}`);
 
     const guestToSeat = section.allocatedGuest;
@@ -1026,7 +1046,7 @@ const TableAllocation = ({
           return <Badge className="bg-yellow-600 text-xs">Partial ({remaining} left)</Badge>;
         }
         return <Badge className="bg-blue-600 text-xs">Allocated</Badge>;
-      case 'OCCUPIED': return <Badge className="bg-red-600 text-xs">Occupied</Badge>;
+      case 'OCCUPIED': return <Badge className="bg-green-600 text-xs">Seated</Badge>;
       default: return <Badge variant="secondary" className="text-xs">Unknown</Badge>;
     }
   };
@@ -1808,25 +1828,36 @@ const TableAllocation = ({
           </div>
         )}
 
-        {section.status === 'ALLOCATED' && section.allocatedGuest && (
-          <div className="flex space-x-1">
-            <Button
-              size="sm"
-              onClick={() => markGuestSeated(section.id)}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-xs py-1"
-            >
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Seat
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleMoveGuest(section.allocatedGuest!, section.id)}
-              className="flex-1 text-xs py-1"
-            >
-              <ArrowRightLeft className="h-3 w-3 mr-1" />
-              Move
-            </Button>
+        {section.status === 'ALLOCATED' && section.allocatedGuest && !section.allocatedGuest.hasBeenSeated && (
+          <div className="space-y-2">
+            <div className="text-xs text-yellow-600 font-medium bg-yellow-50 p-2 rounded border">
+              📟 Page when ready!
+            </div>
+            <div className="flex space-x-1">
+              <Button
+                size="sm"
+                onClick={() => markGuestSeated(section.id)}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-xs py-1"
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Seat
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleMoveGuest(section.allocatedGuest!, section.id)}
+                className="flex-1 text-xs py-1"
+              >
+                <ArrowRightLeft className="h-3 w-3 mr-1" />
+                Move
+              </Button>
+            </div>
+          </div>
+        )}
+        
+        {section.status === 'ALLOCATED' && section.allocatedGuest && section.allocatedGuest.hasBeenSeated && (
+          <div className="text-xs text-green-600 font-medium bg-green-50 p-2 rounded border">
+            ✅ Already seated
           </div>
         )}
 

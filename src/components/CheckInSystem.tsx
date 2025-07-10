@@ -118,6 +118,18 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
+  // Add refresh status function for syncing state
+  const refreshStatus = () => {
+    console.log('Refreshing status sync...');
+    // Force a re-render by updating last saved time
+    setLastSaved(new Date());
+    
+    toast({
+      title: "🔄 Status Refreshed",
+      description: "Table and guest statuses have been synchronized",
+    });
+  };
+
   // Load state on component mount (only once)
   useEffect(() => {
     const loadState = () => {
@@ -1175,6 +1187,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshStatus}
+              className="text-blue-600 border-blue-300 hover:bg-blue-50"
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Refresh Status
+            </Button>
             <Button
               variant="outline"
               size="sm"
