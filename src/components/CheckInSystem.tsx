@@ -304,20 +304,30 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan');
+    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan') || guestName.includes('rena');
     
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG FOR', guest.booker_name, '===');
       console.log('Guest data keys:', Object.keys(guest));
       console.log('Booking code:', guest.booking_code);
+      console.log('Ticket data:', guest.ticket_data);
     }
     
-    // Check for "PAID in GYD" field first - classify as OLD Groupon
+    // Check for "Paid in GYG" in ticket_data.Status field first - classify as OLD Groupon
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      const ticketData = guest.ticket_data as any;
+      if (ticketData.Status === "Paid in GYG") {
+        if (isTargetGuest) console.log('SUCCESS: Found "Paid in GYG" in ticket_data.Status, classifying as OLD Groupon Package');
+        return 'OLD Groupon Package';
+      }
+    }
+    
+    // Check for "PAID in GYD" field (legacy) - classify as OLD Groupon
     if (guest['PAID in GYD'] && String(guest['PAID in GYD']).trim() !== '' && String(guest['PAID in GYD']) !== '0') {
       const numValue = parseInt(String(guest['PAID in GYD']));
       if (numValue > 0) {
-        if (isTargetGuest) console.log('SUCCESS: Found PAID in GYD, classifying as Groupon Package');
-        return 'Groupon Package';
+        if (isTargetGuest) console.log('SUCCESS: Found PAID in GYD, classifying as OLD Groupon Package');
+        return 'OLD Groupon Package';
       }
     }
     
@@ -440,7 +450,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   // Calculate total package quantities based on guest count - ENHANCED FOR MIXED TICKETS
   const calculatePackageQuantities = (packageInfo: string | {type: string, tickets: any[]}, guestCount: number, guest?: Guest) => {
     const guestName = extractGuestName(guest?.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('josh') || guestName.includes('ewan');
+    const isTargetGuest = guestName.includes('josh') || guestName.includes('ewan') || guestName.includes('rena');
+    
+    if (isTargetGuest) {
+      console.log(`=== CALCULATING PACKAGE QUANTITIES FOR ${guest?.booker_name} ===`);
+      console.log('Package info:', packageInfo);
+      console.log('Guest count:', guestCount);
+    }
     
     // Handle mixed tickets - packageInfo is an object with mixed ticket data
     if (typeof packageInfo === 'object' && packageInfo.type === 'MIXED_TICKETS') {
