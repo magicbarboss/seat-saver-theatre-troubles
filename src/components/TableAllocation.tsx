@@ -887,16 +887,14 @@ const TableAllocation = ({
 
     const guestToSeat = section.allocatedGuest;
     
-    // Check if this guest is part of a party by checking if the name contains "(Party)"
-    if (guestToSeat.name.includes('(Party)')) {
-      // This is a party group - we need to get the individual party members from the parent component
-      // The parent component should handle marking all party members as seated
-      console.log(`Seating party group: ${guestToSeat.name}`);
-      onGuestSeated(guestToSeat.originalIndex);
-    } else {
-      // Regular individual guest
-      onGuestSeated(guestToSeat.originalIndex);
+    // FIXED: Only seat guests in THIS specific section, release pager for this section only
+    if (guestToSeat.pagerNumber) {
+      console.log(`Releasing pager ${guestToSeat.pagerNumber} for ${guestToSeat.name} at section ${sectionId}`);
+      onPagerRelease(guestToSeat.pagerNumber);
     }
+    
+    // Mark ONLY this guest/section as seated (not entire party)
+    onGuestSeated(guestToSeat.originalIndex);
 
     // FIXED: Properly track seated guests per section
     setTables(prevTables =>
@@ -916,21 +914,13 @@ const TableAllocation = ({
                 
                 console.log(`DEBUG markGuestSeated: Section ${s.id} seating ${guestCount} guests, newSeatedCount=${newSeatedCount}/${s.capacity}, isSectionFull=${isSectionFull}`);
                 
-                // Only mark as OCCUPIED if this specific section is full
-                const newStatus = isSectionFull ? 'OCCUPIED' as const : 'ALLOCATED' as const;
-                
-                console.log(`Section ${sectionId}: changing status to ${newStatus}`);
+                // FIXED: When seating, section becomes OCCUPIED (seated guests are at the table)
+                console.log(`Section ${sectionId}: marking as OCCUPIED after seating ${guestCount} guests`);
                 
                 return { 
                   ...s, 
-                  status: newStatus,
+                  status: 'OCCUPIED' as const,
                   seatedCount: newSeatedCount,
-                  // Clear allocation info only if section becomes full
-                  ...(isSectionFull ? {
-                    allocatedTo: undefined,
-                    allocatedGuest: undefined,
-                    allocatedCount: undefined,
-                  } : {})
                 };
               }
               return s;
