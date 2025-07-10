@@ -185,7 +185,7 @@ const TableAllocation = ({
   const [walkInForm, setWalkInForm] = useState({
     name: '',
     count: 1,
-    showTime: '7:00 PM',
+    showTime: '7pm',
     notes: ''
   });
   
@@ -2173,7 +2173,7 @@ const TableAllocation = ({
     setWalkInForm({
       name: '',
       count: 1,
-      showTime: '7:00 PM',
+      showTime: '7pm',
       notes: ''
     });
     setShowWalkInDialog(false);
@@ -2543,10 +2543,10 @@ const TableAllocation = ({
                 onChange={(e) => setWalkInForm(prev => ({ ...prev, showTime: e.target.value }))}
                 className="w-full p-2 border rounded-md"
               >
-                <option value="7:00 PM">7:00 PM</option>
-                <option value="8:00 PM">8:00 PM</option>
-                <option value="9:00 PM">9:00 PM</option>
-                <option value="10:00 PM">10:00 PM</option>
+                <option value="7pm">7:00 PM</option>
+                <option value="8pm">8:00 PM</option>
+                <option value="9pm">9:00 PM</option>
+                <option value="10pm">10:00 PM</option>
               </select>
             </div>
 
