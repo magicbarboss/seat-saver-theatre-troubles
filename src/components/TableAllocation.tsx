@@ -849,8 +849,8 @@ const TableAllocation = ({
             // If the guest being moved is already seated, add them to seated count
             const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
             
-            // Determine status - if guest is seated or section is full, mark as OCCUPIED
-            const newStatus = guestToMove.hasBeenSeated || newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+            // FIXED: Status should be ALLOCATED when assigned, OCCUPIED only when seated
+            const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
             
             return {
               ...s,
