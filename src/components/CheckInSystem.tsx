@@ -957,9 +957,16 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     // For section-specific seating, create a unique identifier for this seated section
     const sectionSeatedId = `${guestIndex}-${sectionId}`;
     const newSeatedSections = new Set(seatedSections);
-    newSeatedSections.add(sectionSeatedId);
     
-    console.log(`Adding sectionSeatedId: ${sectionSeatedId}`);
+    // CRITICAL VALIDATION: Only add to seatedSections if this is a legitimate seating action
+    if (!sectionId || sectionId.trim() === '') {
+      console.error(`🚨 INVALID SECTION ID: Cannot seat guest ${guestIndex} to empty section ID`);
+      return;
+    }
+    
+    newSeatedSections.add(sectionSeatedId);
+    console.log(`✅ VALID SEATING ACTION: Adding sectionSeatedId: ${sectionSeatedId}`);
+    console.log(`Total seated sections for guest ${guestIndex}:`, Array.from(newSeatedSections).filter(id => id.startsWith(`${guestIndex}-`)));
     
     // IMPROVED: Check if ALL allocated sections for this guest are now seated
     const allocatedTables = guestTableAllocations.get(guestIndex) || [];
@@ -1040,7 +1047,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
     
+    // CRITICAL: Ensure allocation does NOT add to seatedSections
+    const currentSeatedSections = Array.from(seatedSections).filter(id => id.startsWith(`${guestIndex}-`));
+    if (currentSeatedSections.length > 0) {
+      console.error(`🚨 CRITICAL BUG: seatedSections contains data for guest ${guestIndex} during allocation!`, currentSeatedSections);
+      console.error(`This will cause the guest to appear as seated when they're only allocated.`);
+    }
+    
     console.log(`✅ Guest ${guestIndex} allocated to ${tableIds.length} tables and added to allocation tracking`);
+    console.log(`Current seatedSections for this guest:`, currentSeatedSections);
     console.log(`=== TABLE ALLOCATION DEBUG END ===`);
     
     toast({
@@ -1126,9 +1141,22 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         });
       }
       
-      // FIXED: Only mark as seated if ALL allocated sections are seated OR traditional seating is used
+      // CRITICAL FIX: Only mark as seated if ALL allocated sections are seated OR traditional seating is used
+      // Problem was: seatedSectionsForGuest was matching allocatedTables immediately, causing premature seating
       const hasBeenSeated = seatedGuests.has(guestIndex) || 
         (allocatedTables.length > 0 && seatedSectionsForGuest.length >= allocatedTables.length);
+      
+      // Add debugging to catch the issue
+      if (totalQty >= 10 && allocatedTables.length > 0 && seatedSectionsForGuest.length > 0) {
+        console.log(`🐛 CRITICAL DEBUG - Large group seating calculation for ${guestName}:`, {
+          allocatedTables: allocatedTables.length,
+          seatedSections: seatedSectionsForGuest.length,
+          seatedSectionIds: seatedSectionsForGuest,
+          traditionalSeated: seatedGuests.has(guestIndex),
+          calculatedHasBeenSeated: hasBeenSeated,
+          willBeRemovedFromAllocation: hasBeenSeated
+        });
+      }
       const hasTableAllocated = allocatedGuests.has(guestIndex);
       
       // Additional debugging for status changes
