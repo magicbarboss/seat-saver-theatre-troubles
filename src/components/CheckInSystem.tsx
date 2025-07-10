@@ -42,6 +42,7 @@ interface CheckedInGuest {
   pagerNumber?: number;
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
+  isWalkIn?: boolean;
 }
 
 interface PartyGroup {
@@ -1068,7 +1069,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         originalIndex: guestIndex,
         pagerNumber: pagerNumber,
         hasBeenSeated: hasBeenSeated,
-        hasTableAllocated: hasTableAllocated
+        hasTableAllocated: hasTableAllocated,
+        isWalkIn: guestIndex >= 10000
       };
     }).filter(Boolean) as CheckedInGuest[];
 
