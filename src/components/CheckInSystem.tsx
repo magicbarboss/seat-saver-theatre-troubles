@@ -59,6 +59,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map()); // guestIndex -> pagerId
   const [seatedGuests, setSeatedGuests] = useState<Set<number>>(new Set()); // Track seated guests
+  const [seatedSections, setSeatedSections] = useState<Set<string>>(new Set()); // Track seated sections for parties
   const [allocatedGuests, setAllocatedGuests] = useState<Set<number>>(new Set()); // Track guests with allocated tables
   const [guestTableAllocations, setGuestTableAllocations] = useState<Map<number, number[]>>(new Map()); // guestIndex -> tableIds
   const [availablePagers] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
@@ -90,6 +91,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     setCheckedInGuests(new Set());
     setPagerAssignments(new Map());
     setSeatedGuests(new Set());
+    setSeatedSections(new Set());
     setAllocatedGuests(new Set());
     setGuestTableAllocations(new Map());
     setPartyGroups(new Map());
@@ -133,6 +135,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
             setCheckedInGuests(new Set(state.checkedInGuests || []));
             setPagerAssignments(new Map(state.pagerAssignments || []));
             setSeatedGuests(new Set(state.seatedGuests || []));
+            setSeatedSections(new Set(state.seatedSections || []));
             setAllocatedGuests(new Set(state.allocatedGuests || []));
             setGuestTableAllocations(new Map(state.guestTableAllocations || []));
             setPartyGroups(new Map(state.partyGroups || []));
@@ -175,6 +178,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         checkedInGuests: Array.from(checkedInGuests),
         pagerAssignments: Array.from(pagerAssignments.entries()),
         seatedGuests: Array.from(seatedGuests),
+        seatedSections: Array.from(seatedSections),
         allocatedGuests: Array.from(allocatedGuests),
         guestTableAllocations: Array.from(guestTableAllocations.entries()),
         partyGroups: Array.from(partyGroups.entries()),
@@ -192,7 +196,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
+  }, [isInitialized, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
 
   // Debug: Log headers to see what we're working with
   console.log('Available headers:', headers);
@@ -909,26 +913,34 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     });
   };
 
-  const handleGuestSeated = (guestIndex: number) => {
+  const handleGuestSeated = (sectionInfo: { originalIndex: number; sectionId: string; guestCount: number }) => {
+    const { originalIndex: guestIndex, sectionId, guestCount: sectionGuestCount } = sectionInfo;
     const newSeatedGuests = new Set(seatedGuests);
     const newAllocatedGuests = new Set(allocatedGuests);
     const newPagerAssignments = new Map(pagerAssignments);
     
-    // FIXED: Only seat the specific guest that was clicked, not entire party
-    console.log(`Seating individual guest at index: ${guestIndex}`);
+    // FIXED: Only seat the specific section that was clicked, not entire party
+    console.log(`Seating section ${sectionId} for guest at index: ${guestIndex}, section guest count: ${sectionGuestCount}`);
     
-    // Seat only this specific guest
-    newSeatedGuests.add(guestIndex);
-    newAllocatedGuests.delete(guestIndex);
+    // For section-specific seating, we'll create a unique identifier for this seated section
+    // This allows us to track which parts of a large party have been seated
+    const sectionSeatedId = `${guestIndex}-${sectionId}`;
+    const newSeatedSections = new Set(seatedSections);
+    newSeatedSections.add(sectionSeatedId);
     
-    // Free up the pager when guest is seated
+    // Only remove from allocated if ALL sections of this guest have been seated
+    // For now, we'll keep the guest in allocated until explicitly moved
+    // This allows multiple sections of the same party to be seated independently
+    
+    // Free up the pager when this section is seated (if they have one)
     const assignedPager = newPagerAssignments.get(guestIndex);
     if (assignedPager) {
-      console.log(`Freeing pager ${assignedPager} for guest ${guestIndex}`);
+      console.log(`Releasing pager ${assignedPager} for guest section ${sectionSeatedId}`);
       newPagerAssignments.delete(guestIndex);
     }
     
     setSeatedGuests(newSeatedGuests);
+    setSeatedSections(newSeatedSections);
     setAllocatedGuests(newAllocatedGuests);
     setPagerAssignments(newPagerAssignments);
     
@@ -936,8 +948,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
     
     toast({
-      title: "🪑 Guest Seated",
-      description: `${guestName} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
+      title: "🪑 Section Seated",
+      description: `${guestName} section (${sectionGuestCount} guests) at ${sectionId} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
     });
   };
 
@@ -1017,7 +1029,9 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const totalQty = guest.total_quantity || 1;
       const showTime = guest.show_time || getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
-      const hasBeenSeated = seatedGuests.has(guestIndex);
+      // Check if guest has been seated (either traditional seating or section-based seating)
+      const hasBeenSeated = seatedGuests.has(guestIndex) || 
+        Array.from(seatedSections).some(sectionId => sectionId.startsWith(`${guestIndex}-`));
       const hasTableAllocated = allocatedGuests.has(guestIndex);
       
       return {
@@ -1039,7 +1053,11 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         const firstGuest = guests[party.bookingIndices[0]];
         const showTime = getShowTime(firstGuest);
         const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
-        const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index));
+        // Check if any party member has been seated (traditional or section-based)
+        const hasBeenSeated = party.bookingIndices.some(index => 
+          seatedGuests.has(index) || 
+          Array.from(seatedSections).some(sectionId => sectionId.startsWith(`${index}-`))
+        );
         const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
 
         partyData.push({

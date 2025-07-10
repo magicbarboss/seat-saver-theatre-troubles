@@ -24,7 +24,7 @@ interface TableAllocationProps {
   onTableAssign: (tableId: number, guestName: string, guestCount: number, showTime: string) => void;
   checkedInGuests: CheckedInGuest[];
   onPagerRelease: (pagerNumber: number) => void;
-  onGuestSeated: (guestIndex: number) => void;
+  onGuestSeated: (sectionInfo: { originalIndex: number; sectionId: string; guestCount: number }) => void;
   onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
   onAddWalkIn?: (walkInGuest: { name: string; count: number; showTime: string; notes?: string }) => void;
   currentShowTime?: string; // Add current show time context
@@ -893,8 +893,12 @@ const TableAllocation = ({
       onPagerRelease(guestToSeat.pagerNumber);
     }
     
-    // Mark ONLY this guest/section as seated (not entire party)
-    onGuestSeated(guestToSeat.originalIndex);
+    // Mark ONLY this guest/section as seated (not entire party) - pass section-specific info
+    onGuestSeated({
+      originalIndex: guestToSeat.originalIndex,
+      sectionId: sectionId,
+      guestCount: section.allocatedCount || guestToSeat.count
+    });
 
     // FIXED: Properly track seated guests per section
     setTables(prevTables =>
