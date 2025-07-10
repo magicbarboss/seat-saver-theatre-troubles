@@ -1167,10 +1167,10 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         });
       }
       
-      // CRITICAL FIX: Only mark as seated if ALL allocated sections are seated OR traditional seating is used
-      // The key fix: seatedSectionsForGuest should only count VALID section IDs that match allocated tables
-      const hasBeenSeated = seatedGuests.has(guestIndex) || 
-        (allocatedTables.length > 0 && seatedSectionsForGuest.length >= allocatedTables.length);
+      // CRITICAL FIX: Only mark as seated if traditional seating is used
+      // Large groups should ONLY be marked seated via traditional seating (seatedGuests Set)
+      // Section-based seating should NOT automatically mark large groups as seated
+      const hasBeenSeated = seatedGuests.has(guestIndex);
       
       // ENHANCED debugging to catch and fix the premature seating issue
       if (totalQty >= 10) {
