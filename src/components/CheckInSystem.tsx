@@ -35,6 +35,7 @@ interface BookingGroup {
 }
 
 interface CheckedInGuest {
+  guest: Guest;
   name: string;
   count: number;
   showTime: string;
@@ -1019,11 +1020,13 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     
     const newWalkInGuests = [...walkInGuests, newWalkIn];
     setWalkInGuests(newWalkInGuests);
+    console.log('🚶 Added walk-in guest:', newWalkIn, 'Walk-ins array:', newWalkInGuests);
     
     // Add to checked-in guests
     const newCheckedInGuests = new Set(checkedInGuests);
     newCheckedInGuests.add(walkInIndex);
     setCheckedInGuests(newCheckedInGuests);
+    console.log('✅ Auto-checked in walk-in:', walkInIndex, 'Checked-in set:', Array.from(newCheckedInGuests));
     
     toast({
       title: "🚶 Walk-in Added",
@@ -1047,6 +1050,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       if (guestIndex >= 10000) {
         const walkInIndex = guestIndex - 10000;
         guest = walkInGuests[walkInIndex] || null;
+        console.log('🚶 Processing walk-in:', guestIndex, 'Walk-in index:', walkInIndex, 'Guest found:', guest);
       } else {
         guest = guests[guestIndex] || null;
       }
@@ -1063,6 +1067,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const hasTableAllocated = allocatedGuests.has(guestIndex);
       
       return {
+        guest: guest,
         name: guestName,
         count: totalQty,
         showTime: showTime,
@@ -1090,13 +1095,15 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
 
         partyData.push({
+          guest: firstGuest,
           name: `${party.guestNames.join(' & ')} (Party)`,
           count: party.totalGuests,
           showTime: showTime,
           originalIndex: party.bookingIndices[0], // Use first guest's index as reference
           pagerNumber: pagerNumber,
           hasBeenSeated: hasBeenSeated,
-          hasTableAllocated: hasTableAllocated
+          hasTableAllocated: hasTableAllocated,
+          isWalkIn: false
         });
 
         // Remove individual entries for party members
@@ -1109,7 +1116,11 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       }
     }
 
-    return [...checkedInData, ...partyData];
+    const finalData = [...checkedInData, ...partyData];
+    console.log('📊 All checked-in guests data:', finalData);
+    console.log('🚶 Walk-ins in checked-in data:', finalData.filter(g => g.isWalkIn));
+    
+    return finalData;
   };
 
   // Calculate total guests for filtered bookings (respects show filter)
