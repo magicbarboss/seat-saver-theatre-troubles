@@ -93,7 +93,7 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     setCheckedInGuests(new Set());
     setPagerAssignments(new Map());
     setSeatedGuests(new Set());
-    setSeatedSections(new Set());
+    setSeatedSections(new Set()); // Critical: Clear seated sections
     setAllocatedGuests(new Set());
     setGuestTableAllocations(new Map());
     setPartyGroups(new Map());
@@ -102,6 +102,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     
     // Clear from localStorage
     localStorage.removeItem(getSessionKey());
+    
+    console.log(`🧹 SYSTEM RESET: All data cleared including seated sections`);
     
     // Clear old session keys (cleanup)
     for (let i = 0; i < localStorage.length; i++) {
@@ -964,6 +966,23 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       return;
     }
     
+    // EXTRA VALIDATION: Ensure the guest is actually allocated before seating
+    if (!allocatedGuests.has(guestIndex)) {
+      console.error(`🚨 SEATING ERROR: Guest ${guestIndex} is not allocated, cannot seat them`);
+      toast({
+        title: "Seating Error", 
+        description: `Cannot seat guest - they must be allocated first`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // EXTRA VALIDATION: Check if this section ID already exists
+    if (seatedSections.has(sectionSeatedId)) {
+      console.warn(`⚠️ Section ${sectionSeatedId} is already seated, skipping duplicate seating`);
+      return;
+    }
+    
     newSeatedSections.add(sectionSeatedId);
     console.log(`✅ VALID SEATING ACTION: Adding sectionSeatedId: ${sectionSeatedId}`);
     console.log(`Total seated sections for guest ${guestIndex}:`, Array.from(newSeatedSections).filter(id => id.startsWith(`${guestIndex}-`)));
@@ -1047,15 +1066,22 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
     
-    // CRITICAL: Ensure allocation does NOT add to seatedSections
+    // CRITICAL: Ensure allocation does NOT add to seatedSections and clear any existing ones
     const currentSeatedSections = Array.from(seatedSections).filter(id => id.startsWith(`${guestIndex}-`));
     if (currentSeatedSections.length > 0) {
       console.error(`🚨 CRITICAL BUG: seatedSections contains data for guest ${guestIndex} during allocation!`, currentSeatedSections);
-      console.error(`This will cause the guest to appear as seated when they're only allocated.`);
+      console.error(`Clearing these seated sections to fix premature seating status:`, currentSeatedSections);
+      
+      // Clear the problematic seated sections for this guest
+      const cleanedSeatedSections = new Set(seatedSections);
+      currentSeatedSections.forEach(sectionId => {
+        cleanedSeatedSections.delete(sectionId);
+      });
+      setSeatedSections(cleanedSeatedSections);
     }
     
     console.log(`✅ Guest ${guestIndex} allocated to ${tableIds.length} tables and added to allocation tracking`);
-    console.log(`Current seatedSections for this guest:`, currentSeatedSections);
+    console.log(`Current seatedSections for this guest AFTER cleanup:`, Array.from(seatedSections).filter(id => id.startsWith(`${guestIndex}-`)));
     console.log(`=== TABLE ALLOCATION DEBUG END ===`);
     
     toast({
@@ -1142,20 +1168,32 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       }
       
       // CRITICAL FIX: Only mark as seated if ALL allocated sections are seated OR traditional seating is used
-      // Problem was: seatedSectionsForGuest was matching allocatedTables immediately, causing premature seating
+      // The key fix: seatedSectionsForGuest should only count VALID section IDs that match allocated tables
       const hasBeenSeated = seatedGuests.has(guestIndex) || 
         (allocatedTables.length > 0 && seatedSectionsForGuest.length >= allocatedTables.length);
       
-      // Add debugging to catch the issue
-      if (totalQty >= 10 && allocatedTables.length > 0 && seatedSectionsForGuest.length > 0) {
-        console.log(`🐛 CRITICAL DEBUG - Large group seating calculation for ${guestName}:`, {
-          allocatedTables: allocatedTables.length,
-          seatedSections: seatedSectionsForGuest.length,
+      // ENHANCED debugging to catch and fix the premature seating issue
+      if (totalQty >= 10) {
+        console.log(`🔍 LARGE GROUP STATUS DEBUG - ${guestName}:`, {
+          guestIndex,
+          allocatedTablesCount: allocatedTables.length,
+          allocatedTableIds: allocatedTables,
+          seatedSectionsCount: seatedSectionsForGuest.length,
           seatedSectionIds: seatedSectionsForGuest,
           traditionalSeated: seatedGuests.has(guestIndex),
           calculatedHasBeenSeated: hasBeenSeated,
-          willBeRemovedFromAllocation: hasBeenSeated
+          isAllocated: allocatedGuests.has(guestIndex),
+          willShowInAllocation: allocatedGuests.has(guestIndex) && !hasBeenSeated
         });
+        
+        // Additional validation: Check if seatedSections contains invalid entries
+        if (seatedSectionsForGuest.length > 0 && !hasBeenSeated && allocatedTables.length > 0) {
+          console.warn(`⚠️ POTENTIAL ISSUE: Guest ${guestIndex} has seated sections but should still be in allocation:`, {
+            seatedSectionIds: seatedSectionsForGuest,
+            shouldBeInAllocation: true,
+            recommendation: 'Check if these seated sections are valid'
+          });
+        }
       }
       const hasTableAllocated = allocatedGuests.has(guestIndex);
       
