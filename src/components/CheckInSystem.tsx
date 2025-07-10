@@ -929,40 +929,73 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
 
   const handleGuestSeated = (sectionInfo: { originalIndex: number; sectionId: string; guestCount: number }) => {
     const { originalIndex: guestIndex, sectionId, guestCount: sectionGuestCount } = sectionInfo;
+    
+    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    const totalQty = guest ? guest.total_quantity || 1 : 1;
+    
+    // ENHANCED DEBUG LOGGING FOR LARGE GROUPS
+    console.log(`=== SEATING DEBUG START ===`);
+    console.log(`Guest Index: ${guestIndex}, Section ID: ${sectionId}, Section Guest Count: ${sectionGuestCount}`);
+    
+    if (totalQty >= 10) {
+      console.log(`🎯 LARGE GROUP SEATING - ${guestName} (${totalQty} guests):`, {
+        sectionBeingSeated: sectionId,
+        sectionGuestCount,
+        currentStatus: {
+          isAllocated: allocatedGuests.has(guestIndex),
+          currentSeatedSections: Array.from(seatedSections).filter(id => id.startsWith(`${guestIndex}-`)),
+          allocatedTables: guestTableAllocations.get(guestIndex) || []
+        }
+      });
+    }
+    
     const newSeatedGuests = new Set(seatedGuests);
     const newAllocatedGuests = new Set(allocatedGuests);
     const newPagerAssignments = new Map(pagerAssignments);
     
-    // COMPREHENSIVE DEBUG LOGGING
-    console.log(`=== SEATING DEBUG START ===`);
-    console.log(`Guest Index: ${guestIndex}, Section ID: ${sectionId}, Section Guest Count: ${sectionGuestCount}`);
-    console.log(`Current seatedSections before update:`, Array.from(seatedSections));
-    
-    // For section-specific seating, we'll create a unique identifier for this seated section
-    // This allows us to track which parts of a large party have been seated
+    // For section-specific seating, create a unique identifier for this seated section
     const sectionSeatedId = `${guestIndex}-${sectionId}`;
     const newSeatedSections = new Set(seatedSections);
     newSeatedSections.add(sectionSeatedId);
     
     console.log(`Adding sectionSeatedId: ${sectionSeatedId}`);
-    console.log(`New seatedSections after update:`, Array.from(newSeatedSections));
     
-    // Check what the isSeated logic will return for this guest
+    // IMPROVED: Check if ALL allocated sections for this guest are now seated
     const allocatedTables = guestTableAllocations.get(guestIndex) || [];
     const guestSeatedSections = Array.from(newSeatedSections)
       .filter(id => id.startsWith(`${guestIndex}-`));
-    console.log(`Guest ${guestIndex} allocated tables:`, allocatedTables);
-    console.log(`Guest ${guestIndex} seated sections:`, guestSeatedSections);
-    console.log(`Will guest ${guestIndex} be marked as seated? ${guestSeatedSections.length > 0}`);
     
-    // Only remove from allocated if ALL sections of this guest have been seated
-    // For now, we'll keep the guest in allocated until explicitly moved
-    // This allows multiple sections of the same party to be seated independently
+    const isFullySeated = allocatedTables.length > 0 && guestSeatedSections.length >= allocatedTables.length;
     
-    // Free up the pager when this section is seated (if they have one)
+    console.log(`Guest ${guestIndex} seating status:`, {
+      allocatedTables: allocatedTables.length,
+      seatedSections: guestSeatedSections.length,
+      isFullySeated,
+      seatedSectionIds: guestSeatedSections
+    });
+    
+    // Enhanced logging for large groups
+    if (totalQty >= 10) {
+      console.log(`🎯 LARGE GROUP STATUS UPDATE - ${guestName}:`, {
+        fullySeated: isFullySeated,
+        willRemainInAllocation: !isFullySeated,
+        nextStatus: isFullySeated ? 'REMOVED from allocation' : 'REMAINS in allocation'
+      });
+    }
+    
+    // FIXED: Only remove from allocated if ALL sections are seated
+    if (isFullySeated) {
+      newAllocatedGuests.delete(guestIndex);
+      console.log(`✅ Guest ${guestIndex} is now fully seated and removed from allocation list`);
+    } else {
+      console.log(`⏳ Guest ${guestIndex} is partially seated but remains in allocation list`);
+    }
+    
+    // Free up the pager when first section is seated (if they have one)
     const assignedPager = newPagerAssignments.get(guestIndex);
     if (assignedPager) {
-      console.log(`Releasing pager ${assignedPager} for guest section ${sectionSeatedId}`);
+      console.log(`📟 Releasing pager ${assignedPager} for guest section ${sectionSeatedId}`);
       newPagerAssignments.delete(guestIndex);
     }
     
@@ -973,17 +1006,31 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     setAllocatedGuests(newAllocatedGuests);
     setPagerAssignments(newPagerAssignments);
     
-    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
-    
     toast({
       title: "🪑 Section Seated",
-      description: `${guestName} section (${sectionGuestCount} guests) at ${sectionId} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}`,
+      description: `${guestName} section (${sectionGuestCount} guests) at ${sectionId} has been seated${assignedPager ? ` and pager ${assignedPager} is now available` : ''}${isFullySeated ? ' - Group fully seated!' : ' - More sections remaining'}`,
     });
   };
 
   // New: Handle table allocation (not seated yet)
   const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
+    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
+    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    const totalQty = guest ? guest.total_quantity || 1 : 1;
+    
+    // ENHANCED DEBUG LOGGING FOR LARGE GROUP ALLOCATIONS
+    console.log(`=== TABLE ALLOCATION DEBUG START ===`);
+    console.log(`Allocating tables for Guest ${guestIndex} (${guestName}) - ${totalQty} guests to tables:`, tableIds);
+    
+    if (totalQty >= 10) {
+      console.log(`🎯 LARGE GROUP ALLOCATION - ${guestName}:`, {
+        guestCount: totalQty,
+        allocatedTables: tableIds,
+        tableCount: tableIds.length,
+        wasAlreadyAllocated: allocatedGuests.has(guestIndex)
+      });
+    }
+    
     const newAllocatedGuests = new Set(allocatedGuests);
     newAllocatedGuests.add(guestIndex);
     setAllocatedGuests(newAllocatedGuests);
@@ -993,8 +1040,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     newGuestTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newGuestTableAllocations);
     
-    const guest = guestIndex >= 10000 ? walkInGuests[guestIndex - 10000] : guests[guestIndex];
-    const guestName = extractGuestName(guest && guest.booker_name ? guest.booker_name : '');
+    console.log(`✅ Guest ${guestIndex} allocated to ${tableIds.length} tables and added to allocation tracking`);
+    console.log(`=== TABLE ALLOCATION DEBUG END ===`);
     
     toast({
       title: "📍 Table Allocated",
@@ -1061,10 +1108,33 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       const totalQty = guest.total_quantity || 1;
       const showTime = guest.show_time || getShowTime(guest);
       const pagerNumber = pagerAssignments.get(guestIndex);
-      // Check if guest has been seated (either traditional seating or section-based seating)
+      
+      // FIXED: For large groups, check if ALL their allocated sections have been seated
+      const allocatedTables = guestTableAllocations.get(guestIndex) || [];
+      const seatedSectionsForGuest = Array.from(seatedSections)
+        .filter(sectionId => sectionId.startsWith(`${guestIndex}-`));
+      
+      // Enhanced debugging for large groups (10+ guests)
+      if (totalQty >= 10) {
+        console.log(`🔍 LARGE GROUP DEBUG - Guest ${guestIndex} (${guestName}):`, {
+          totalQty,
+          allocatedTables: allocatedTables.length,
+          seatedSections: seatedSectionsForGuest.length,
+          seatedSectionIds: seatedSectionsForGuest,
+          hasTableAllocated: allocatedGuests.has(guestIndex),
+          traditionalSeated: seatedGuests.has(guestIndex)
+        });
+      }
+      
+      // FIXED: Only mark as seated if ALL allocated sections are seated OR traditional seating is used
       const hasBeenSeated = seatedGuests.has(guestIndex) || 
-        Array.from(seatedSections).some(sectionId => sectionId.startsWith(`${guestIndex}-`));
+        (allocatedTables.length > 0 && seatedSectionsForGuest.length >= allocatedTables.length);
       const hasTableAllocated = allocatedGuests.has(guestIndex);
+      
+      // Additional debugging for status changes
+      if (totalQty >= 10 && (hasBeenSeated || hasTableAllocated)) {
+        console.log(`🎯 LARGE GROUP STATUS - ${guestName}: allocated=${hasTableAllocated}, fullySeated=${hasBeenSeated}`);
+      }
       
       return {
         guest: guest,
@@ -1087,11 +1157,33 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
         const firstGuest = guests[party.bookingIndices[0]];
         const showTime = getShowTime(firstGuest);
         const pagerNumber = pagerAssignments.get(party.bookingIndices[0]);
-        // Check if any party member has been seated (traditional or section-based)
-        const hasBeenSeated = party.bookingIndices.some(index => 
-          seatedGuests.has(index) || 
-          Array.from(seatedSections).some(sectionId => sectionId.startsWith(`${index}-`))
-        );
+        
+        // FIXED: For party groups, check if ALL party members are fully seated
+        let totalAllocatedSections = 0;
+        let totalSeatedSections = 0;
+        
+        party.bookingIndices.forEach(index => {
+          const allocatedTables = guestTableAllocations.get(index) || [];
+          const guestSeatedSections = Array.from(seatedSections)
+            .filter((sectionId: string) => sectionId.startsWith(`${index}-`));
+          totalAllocatedSections += allocatedTables.length;
+          totalSeatedSections += guestSeatedSections.length;
+        });
+        
+        // Enhanced debugging for large party groups
+        if (party.totalGuests >= 10) {
+          console.log(`🔍 LARGE PARTY DEBUG - ${party.guestNames.join(' & ')}:`, {
+            totalGuests: party.totalGuests,
+            memberCount: party.bookingIndices.length,
+            totalAllocatedSections,
+            totalSeatedSections,
+            traditionalSeated: party.bookingIndices.some(index => seatedGuests.has(index))
+          });
+        }
+        
+        // FIXED: Only mark party as seated if ALL sections are seated OR any member uses traditional seating
+        const hasBeenSeated = party.bookingIndices.some(index => seatedGuests.has(index)) ||
+          (totalAllocatedSections > 0 && totalSeatedSections >= totalAllocatedSections);
         const hasTableAllocated = party.bookingIndices.some(index => allocatedGuests.has(index));
 
         partyData.push({
