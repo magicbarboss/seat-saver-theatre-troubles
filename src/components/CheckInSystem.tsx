@@ -931,14 +931,27 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
     const newAllocatedGuests = new Set(allocatedGuests);
     const newPagerAssignments = new Map(pagerAssignments);
     
-    // FIXED: Only seat the specific section that was clicked, not entire party
-    console.log(`Seating section ${sectionId} for guest at index: ${guestIndex}, section guest count: ${sectionGuestCount}`);
+    // COMPREHENSIVE DEBUG LOGGING
+    console.log(`=== SEATING DEBUG START ===`);
+    console.log(`Guest Index: ${guestIndex}, Section ID: ${sectionId}, Section Guest Count: ${sectionGuestCount}`);
+    console.log(`Current seatedSections before update:`, Array.from(seatedSections));
     
     // For section-specific seating, we'll create a unique identifier for this seated section
     // This allows us to track which parts of a large party have been seated
     const sectionSeatedId = `${guestIndex}-${sectionId}`;
     const newSeatedSections = new Set(seatedSections);
     newSeatedSections.add(sectionSeatedId);
+    
+    console.log(`Adding sectionSeatedId: ${sectionSeatedId}`);
+    console.log(`New seatedSections after update:`, Array.from(newSeatedSections));
+    
+    // Check what the isSeated logic will return for this guest
+    const allocatedTables = guestTableAllocations.get(guestIndex) || [];
+    const guestSeatedSections = Array.from(newSeatedSections)
+      .filter(id => id.startsWith(`${guestIndex}-`));
+    console.log(`Guest ${guestIndex} allocated tables:`, allocatedTables);
+    console.log(`Guest ${guestIndex} seated sections:`, guestSeatedSections);
+    console.log(`Will guest ${guestIndex} be marked as seated? ${guestSeatedSections.length > 0}`);
     
     // Only remove from allocated if ALL sections of this guest have been seated
     // For now, we'll keep the guest in allocated until explicitly moved
@@ -950,6 +963,8 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
       console.log(`Releasing pager ${assignedPager} for guest section ${sectionSeatedId}`);
       newPagerAssignments.delete(guestIndex);
     }
+    
+    console.log(`=== SEATING DEBUG END ===`);
     
     setSeatedGuests(newSeatedGuests);
     setSeatedSections(newSeatedSections);
@@ -1248,6 +1263,12 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
           <div>
             <h2 className="text-3xl font-bold text-gray-800">🎭 Theatre Check-In</h2>
             <p className="text-gray-600 mt-1">Simple guest management with pager assignment</p>
+            {/* DEBUG: Visual display of seated sections */}
+            {seatedSections.size > 0 && (
+              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <strong>DEBUG - Seated Sections ({seatedSections.size}):</strong> {Array.from(seatedSections).join(', ')}
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-6 text-lg">
             <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-lg shadow-sm">
@@ -1407,6 +1428,11 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                     // seatedSections format: "${guestIndex}-${sectionId}"
                     const guestSeatedSections = Array.from(seatedSections)
                       .filter(sectionId => sectionId.startsWith(`${booking.originalIndex}-`));
+                    
+                    // DEBUG: Log seating status check for debugging
+                    if (guestSeatedSections.length > 0) {
+                      console.log(`Guest ${booking.originalIndex} (${booking.mainBooking.booker_name}) has seated sections:`, guestSeatedSections);
+                    }
                     
                     // For now, consider a guest seated if they have any seated sections
                     // This will show progress and avoid the "Page when ready!" for partially seated guests

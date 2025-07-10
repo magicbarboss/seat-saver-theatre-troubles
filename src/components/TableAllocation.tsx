@@ -878,10 +878,20 @@ const TableAllocation = ({
   };
 
   const markGuestSeated = (sectionId: string) => {
+    console.log(`=== MARK GUEST SEATED DEBUG START ===`);
+    console.log(`Attempting to seat section: ${sectionId}`);
+    
     const table = tables.find(t => t.sections.some(s => s.id === sectionId));
     const section = table?.sections.find(s => s.id === sectionId);
     
-    if (!table || !section || !section.allocatedGuest) return;
+    console.log(`Found table:`, table?.name);
+    console.log(`Found section:`, section?.id, section?.status);
+    console.log(`Section allocated guest:`, section?.allocatedGuest);
+    
+    if (!table || !section || !section.allocatedGuest) {
+      console.log(`Early return: missing table/section/guest`);
+      return;
+    }
 
     // Validate: Only allow seating if section is allocated and guest is not already seated
     if (section.status !== 'ALLOCATED') {
@@ -914,11 +924,19 @@ const TableAllocation = ({
     }
     
     // Mark ONLY this guest/section as seated (not entire party) - pass section-specific info
+    console.log(`Calling onGuestSeated with:`, {
+      originalIndex: guestToSeat.originalIndex,
+      sectionId: sectionId,
+      guestCount: section.allocatedCount || guestToSeat.count
+    });
+    
     onGuestSeated({
       originalIndex: guestToSeat.originalIndex,
       sectionId: sectionId,
       guestCount: section.allocatedCount || guestToSeat.count
     });
+    
+    console.log(`=== MARK GUEST SEATED DEBUG END ===`);
 
     // FIXED: Properly track seated guests per section
     setTables(prevTables =>
