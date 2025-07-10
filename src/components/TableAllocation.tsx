@@ -2525,14 +2525,49 @@ const TableAllocation = ({
 
             <div>
               <Label htmlFor="walkInCount">Number of Guests</Label>
-              <Input
-                id="walkInCount"
-                type="number"
-                min="1"
-                max="12"
-                value={walkInForm.count}
-                onChange={(e) => setWalkInForm(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
-              />
+              <div className="flex items-center space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setWalkInForm(prev => ({ 
+                    ...prev, 
+                    count: Math.max(1, prev.count - 1) 
+                  }))}
+                  disabled={walkInForm.count <= 1}
+                  className="h-10 w-10"
+                >
+                  -
+                </Button>
+                <Input
+                  id="walkInCount"
+                  type="number"
+                  min="1"
+                  max="12"
+                  value={walkInForm.count}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 1;
+                    setWalkInForm(prev => ({ 
+                      ...prev, 
+                      count: Math.min(12, Math.max(1, value)) 
+                    }));
+                  }}
+                  className="text-center"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setWalkInForm(prev => ({ 
+                    ...prev, 
+                    count: Math.min(12, prev.count + 1) 
+                  }))}
+                  disabled={walkInForm.count >= 12}
+                  className="h-10 w-10"
+                >
+                  +
+                </Button>
+              </div>
             </div>
 
             <div>
