@@ -1398,7 +1398,20 @@ const CheckInSystem = ({ guests, headers, showTimes }: CheckInSystemProps) => {
                   if (!booking || !booking.mainBooking) return null;
 
                   const isCheckedIn = checkedInGuests.has(booking.originalIndex);
-                  const isSeated = seatedGuests.has(booking.originalIndex);
+                  // Use section-based seating logic instead of simple seatedGuests check
+                  const isSeated = (() => {
+                    const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
+                    if (allocatedTables.length === 0) return false;
+                    
+                    // Check how many sections for this guest have been seated
+                    // seatedSections format: "${guestIndex}-${sectionId}"
+                    const guestSeatedSections = Array.from(seatedSections)
+                      .filter(sectionId => sectionId.startsWith(`${booking.originalIndex}-`));
+                    
+                    // For now, consider a guest seated if they have any seated sections
+                    // This will show progress and avoid the "Page when ready!" for partially seated guests
+                    return guestSeatedSections.length > 0;
+                  })();
                   const isAllocated = allocatedGuests.has(booking.originalIndex);
                   const assignedPager = pagerAssignments.get(booking.originalIndex);
                   const allocatedTables = guestTableAllocations.get(booking.originalIndex) || [];
