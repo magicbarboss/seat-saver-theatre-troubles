@@ -210,8 +210,29 @@ const TableAllocation = ({
     if (savedTables) {
       try {
         const parsedTables = JSON.parse(savedTables);
-        setTables(parsedTables);
-        console.log(`Loaded table allocation state for show: ${currentShowTime}`);
+        
+        // Check for and fix corrupted data on load
+        const fixedTables = parsedTables.map((table: Table) => ({
+          ...table,
+          sections: table.sections.map((section: TableSection) => {
+            const allocatedCount = section.allocatedCount || 0;
+            if (allocatedCount > section.capacity) {
+              console.log(`Auto-fixing corrupted section ${section.id}: had ${allocatedCount} allocated in ${section.capacity} capacity`);
+              return {
+                ...section,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+                seatedCount: undefined,
+              };
+            }
+            return section;
+          })
+        }));
+        
+        setTables(fixedTables);
+        console.log(`Loaded and auto-fixed table allocation state for show: ${currentShowTime}`);
       } catch (error) {
         console.error('Failed to load table allocation state:', error);
       }
@@ -590,6 +611,13 @@ const TableAllocation = ({
   const getSectionAvailableCapacity = (section: TableSection): number => {
     console.log(`DEBUG getSectionAvailableCapacity: Section ${section.id}, status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, seatedCount=${section.seatedCount || 0}`);
     
+    // Validation: Check for corrupted data
+    const allocatedCount = section.allocatedCount || 0;
+    if (allocatedCount > section.capacity) {
+      console.error(`CORRUPTION DETECTED: Section ${section.id} has ${allocatedCount} allocated but only ${section.capacity} capacity!`);
+      return 0; // Return 0 to prevent further corruption
+    }
+    
     if (section.status === 'AVAILABLE') {
       console.log(`Section ${section.id} is AVAILABLE, returning full capacity: ${section.capacity}`);
       return section.capacity;
@@ -717,8 +745,8 @@ const TableAllocation = ({
                 // For display purposes, concatenate guest names when adding to existing allocation
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                // Determine status based on allocation vs capacity
-                const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+                // FIXED: Status should be ALLOCATED when assigned, OCCUPIED only when seated
+                const newStatus: 'ALLOCATED' | 'OCCUPIED' = 'ALLOCATED';
                 
                 console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
@@ -1307,8 +1335,8 @@ const TableAllocation = ({
                 const newAllocatedCount = currentAllocated + guestsForThisSection;
                 const newAllocatedTo = s.allocatedTo ? `${s.allocatedTo}, ${selectedGuest.name}` : selectedGuest.name;
                 
-                // Determine status based on allocation vs capacity
-                const newStatus = newAllocatedCount >= s.capacity ? 'OCCUPIED' : 'ALLOCATED';
+                // FIXED: Status should be ALLOCATED when assigned, OCCUPIED only when seated
+                const newStatus: 'ALLOCATED' | 'OCCUPIED' = 'ALLOCATED';
                 
                 return {
                   ...s,
@@ -1373,19 +1401,42 @@ const TableAllocation = ({
       return;
     }
 
-    // Allocate all sections of all tables
+    // FIXED: Properly distribute guests across all sections of all tables
     setTables(prevTables =>
       prevTables.map(t => {
         if (tablesToAssign.some(assignTable => assignTable.id === t.id)) {
+          let remainingGuests = selectedGuest.count;
+          console.log(`Multi-table assignment: Starting distribution of ${remainingGuests} guests across table ${t.name}`);
+          
           return {
             ...t,
-            sections: t.sections.map(s => ({
-              ...s,
-              status: 'ALLOCATED' as const,
-              allocatedTo: selectedGuest.name,
-              allocatedGuest: selectedGuest, // Keep the most recent guest for UI purposes
-              allocatedCount: selectedGuest.count,
-            }))
+            sections: t.sections.map(s => {
+              if (remainingGuests <= 0) {
+                // No more guests to assign, but mark as allocated for the party
+                return {
+                  ...s,
+                  status: 'ALLOCATED' as const,
+                  allocatedTo: selectedGuest.name,
+                  allocatedGuest: selectedGuest,
+                  allocatedCount: 0,
+                  seatedCount: 0,
+                };
+              }
+              
+              const guestsForThisSection = Math.min(remainingGuests, s.capacity);
+              remainingGuests -= guestsForThisSection;
+              
+              console.log(`  Section ${s.id}: assigning ${guestsForThisSection}/${s.capacity} guests`);
+              
+              return {
+                ...s,
+                status: guestsForThisSection >= s.capacity ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                allocatedTo: selectedGuest.name,
+                allocatedGuest: selectedGuest,
+                allocatedCount: guestsForThisSection, // Only guests for THIS section
+                seatedCount: 0,
+              };
+            })
           };
         }
         return t;
@@ -1440,19 +1491,42 @@ const TableAllocation = ({
       return;
     }
 
-    // Allocate all sections of all joined tables
+    // FIXED: Properly distribute guests across all sections of all joined tables
     setTables(prevTables =>
       prevTables.map(t => {
         if (tablesToAssign.some(assignTable => assignTable.id === t.id)) {
+          let remainingGuests = selectedGuest.count;
+          console.log(`Joined table assignment: Starting distribution of ${remainingGuests} guests across table ${t.name}`);
+          
           return {
             ...t,
-            sections: t.sections.map(s => ({
-              ...s,
-              status: 'ALLOCATED' as const,
-              allocatedTo: selectedGuest.name,
-              allocatedGuest: selectedGuest,
-              allocatedCount: selectedGuest.count,
-            }))
+            sections: t.sections.map(s => {
+              if (remainingGuests <= 0) {
+                // No more guests to assign, but mark as allocated for the party
+                return {
+                  ...s,
+                  status: 'ALLOCATED' as const,
+                  allocatedTo: selectedGuest.name,
+                  allocatedGuest: selectedGuest,
+                  allocatedCount: 0,
+                  seatedCount: 0,
+                };
+              }
+              
+              const guestsForThisSection = Math.min(remainingGuests, s.capacity);
+              remainingGuests -= guestsForThisSection;
+              
+              console.log(`  Section ${s.id}: assigning ${guestsForThisSection}/${s.capacity} guests`);
+              
+              return {
+                ...s,
+                status: guestsForThisSection >= s.capacity ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                allocatedTo: selectedGuest.name,
+                allocatedGuest: selectedGuest,
+                allocatedCount: guestsForThisSection, // Only guests for THIS section
+                seatedCount: 0,
+              };
+            })
           };
         }
         return t;
@@ -1980,6 +2054,42 @@ const TableAllocation = ({
         </div>
       </div>
     );
+  };
+
+  // Reset corrupted table allocations
+  const resetCorruptedData = () => {
+    console.log('Resetting corrupted table data...');
+    let corruptedSections = 0;
+    
+    setTables(prevTables =>
+      prevTables.map(table => ({
+        ...table,
+        sections: table.sections.map(section => {
+          // Reset any section with impossible allocations
+          const allocatedCount = section.allocatedCount || 0;
+          if (allocatedCount > section.capacity) {
+            console.log(`Resetting section ${section.id}: had ${allocatedCount} allocated in ${section.capacity} capacity`);
+            corruptedSections++;
+            return {
+              ...section,
+              status: 'AVAILABLE' as const,
+              allocatedTo: undefined,
+              allocatedGuest: undefined,
+              allocatedCount: undefined,
+              seatedCount: undefined,
+            };
+          }
+          return section;
+        })
+      }))
+    );
+    
+    if (corruptedSections > 0) {
+      toast({
+        title: "🔄 Data Reset",
+        description: `Fixed ${corruptedSections} corrupted table allocations`,
+      });
+    }
   };
 
   const handleAddWalkIn = () => {
