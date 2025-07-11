@@ -721,9 +721,18 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     let calculatedDrinks = 0;
     let proseccoCount = 0;
     
+    const guestName = extractGuestName(guest.booker_name || '');
+    console.log(`🔍 PROCESSING ${guestName}:`, {
+      hasTicketData: !!guest.ticket_data,
+      ticketData: guest.ticket_data,
+      hasBookingGroup: !!bookingGroup,
+      mainBooking: bookingGroup?.mainBooking
+    });
+    
     // First priority: Process main booking ticket data for drinks
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as { [key: string]: string };
+      console.log(`🎫 Processing ticket_data for ${guestName}:`, ticketData);
       
       // Parse all ticket types and calculate drinks
       Object.entries(ticketData).forEach(([ticketType, quantity]) => {
@@ -731,22 +740,29 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         
         if (qty > 0 && ticketType.includes('& 2 Drinks')) {
           calculatedDrinks += qty * 2; // qty people × 2 drinks each
+          console.log(`🍺 Found drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
         } else if (qty > 0 && ticketType.includes('& 2 soft drinks')) {
           calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
+          console.log(`🥤 Found soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
         }
       });
     } else if (bookingGroup?.mainBooking) {
       // Fallback: Parse main booking data directly when ticket_data is undefined
       const mainBooking = bookingGroup.mainBooking;
+      console.log(`🔄 FALLBACK processing for ${guestName}:`, mainBooking);
       
       // Look for ticket columns in main booking and extract drinks
       Object.entries(mainBooking).forEach(([key, value]) => {
+        console.log(`🔍 Checking key: "${key}" with value: "${value}"`);
         if (key.includes('House Magicians Show Ticket') && value && parseInt(value as string) > 0) {
           const qty = parseInt(value as string);
+          console.log(`🎟️ Found ticket: ${key} with qty: ${qty}`);
           if (key.includes('& 2 Drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 drinks each
+            console.log(`🍺 FALLBACK drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
           } else if (key.includes('& 2 soft drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
+            console.log(`🥤 FALLBACK soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
           }
         }
       });
@@ -755,6 +771,9 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Add drinks to addons if found
     if (calculatedDrinks > 0) {
       addons.push(`${calculatedDrinks} Drinks`);
+      console.log(`✅ Added ${calculatedDrinks} drinks to addons for ${guestName}`);
+    } else {
+      console.log(`❌ NO DRINKS FOUND for ${guestName}`);
     }
     
     // Process booking group addons if available
