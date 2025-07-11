@@ -843,6 +843,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const time = timeMatch[1].toLowerCase();
       // Normalize to standard format
       if (time.includes('7:00pm') || time.includes('7pm')) return '7pm';
+      if (time.includes('8:00pm') || time.includes('8pm')) return '8pm';
       if (time.includes('9:00pm') || time.includes('9pm')) return '9pm';
       return timeMatch[1];
     }
