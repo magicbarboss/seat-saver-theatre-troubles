@@ -1025,7 +1025,12 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     }
     
     newSeatedSections.add(sectionSeatedId);
+    
+    // CRITICAL FIX: Add guest to seatedGuests set immediately when they start being seated
+    newSeatedGuests.add(guestIndex);
+    
     console.log(`✅ VALID SEATING ACTION: Adding sectionSeatedId: ${sectionSeatedId}`);
+    console.log(`✅ Added guest ${guestIndex} to seatedGuests set`);
     console.log(`Total seated sections for guest ${guestIndex}:`, Array.from(newSeatedSections).filter(id => id.startsWith(`${guestIndex}-`)));
     
     // IMPROVED: Check if ALL allocated sections for this guest are now seated
