@@ -719,25 +719,55 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     const addons = [];
     
-    // Only process booking group addons if available
-    if (bookingGroup && bookingGroup.addOns.length > 0) {
-      // Count Prosecco bottles from separate line items
-      let proseccoCount = 0;
+    // Count Prosecco bottles from separate line items
+    let proseccoCount = 0;
+    
+    // Process main booking drinks regardless of addons
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      let calculatedDrinks = 0;
+      const ticketData = guest.ticket_data as { [key: string]: string };
+      const ticketBreakdown: string[] = [];
       
-      // Track drink calculations for proper display
-      let totalDrinkTickets = 0;
-      let totalNonDrinkTickets = 0;
+      // Parse all ticket types and build breakdown
+      Object.entries(ticketData).forEach(([ticketType, quantity]) => {
+        const qty = parseInt(quantity) || 0;
+        
+        if (qty > 0) {
+          // Add to ticket breakdown
+          if (ticketType.includes('& 2 Drinks')) {
+            calculatedDrinks += qty * 2; // qty people × 2 drinks each
+            ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
+          } else if (ticketType.includes('& 2 soft drinks')) {
+            calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
+            ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
+          } else if (ticketType.includes('House Magicians Show Ticket')) {
+            // Show-only tickets (no drinks)
+            ticketBreakdown.push(`${qty}x Show Only`);
+          }
+        }
+      });
       
-      // Check main booking
+      // Display ticket breakdown and total drinks
+      if (ticketBreakdown.length > 0) {
+        if (calculatedDrinks > 0) {
+          addons.push(`${ticketBreakdown.join(' + ')} = ${calculatedDrinks} drinks`);
+        } else {
+          addons.push(ticketBreakdown.join(' + '));
+        }
+      }
+    } else {
+      // Fallback to original logic if ticket_data is not available
       const mainPackage = getPackageInfo(guest);
       const mainQuantity = guest.total_quantity || 1;
       
       if (typeof mainPackage === 'string' && mainPackage.includes('2 Drinks')) {
-        totalDrinkTickets += mainQuantity;
-      } else {
-        totalNonDrinkTickets += mainQuantity;
+        const totalDrinks = mainQuantity * 2;
+        addons.push(`2 Drinks = ${totalDrinks}`);
       }
-      
+    }
+    
+    // Process booking group addons if available
+    if (bookingGroup && bookingGroup.addOns.length > 0) {
       // Process addon items
       bookingGroup.addOns.forEach(addon => {
         const itemDetails = addon.Item || addon.item_details || '';
@@ -745,65 +775,23 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         // Count Prosecco bottles using total_quantity
         if (itemDetails.toLowerCase().includes('prosecco')) {
           proseccoCount += addon.total_quantity || 1;
-        }
-        
-        // Count drink packages
-        const addonPackage = getPackageInfo(addon);
-        const addonQuantity = addon.total_quantity || 1;
-        
-        if (typeof addonPackage === 'string' && addonPackage.includes('2 Drinks')) {
-          totalDrinkTickets += addonQuantity;
         } else {
-          totalNonDrinkTickets += addonQuantity;
+          // General addon fallback - display any addon that's not prosecco
+          const quantity = addon.total_quantity || 1;
+          const price = addon.price || '';
+          if (itemDetails) {
+            if (price) {
+              addons.push(`${quantity}x ${itemDetails} (${price})`);
+            } else {
+              addons.push(`${quantity}x ${itemDetails}`);
+            }
+          }
         }
       });
       
       // Add Prosecco addon if found
       if (proseccoCount > 0) {
         addons.push(`${proseccoCount} Btls Prosecco`);
-      }
-      
-      // Calculate drinks and build ticket breakdown from ticket_data
-      if (guest.ticket_data && typeof guest.ticket_data === 'object') {
-        let calculatedDrinks = 0;
-        const ticketData = guest.ticket_data as { [key: string]: string };
-        const ticketBreakdown: string[] = [];
-        
-        // Parse all ticket types and build breakdown
-        Object.entries(ticketData).forEach(([ticketType, quantity]) => {
-          const qty = parseInt(quantity) || 0;
-          
-          if (qty > 0) {
-            // Add to ticket breakdown
-            if (ticketType.includes('& 2 Drinks')) {
-              calculatedDrinks += qty * 2; // qty people × 2 drinks each
-              ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
-            } else if (ticketType.includes('& 2 soft drinks')) {
-              calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
-              ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
-            } else if (ticketType.includes('House Magicians Show Ticket')) {
-              // Show-only tickets (no drinks)
-              ticketBreakdown.push(`${qty}x Show Only`);
-            }
-          }
-        });
-        
-        // Display ticket breakdown and total drinks
-        if (ticketBreakdown.length > 0) {
-          if (calculatedDrinks > 0) {
-            addons.push(`${ticketBreakdown.join(' + ')} = ${calculatedDrinks} drinks`);
-          } else {
-            addons.push(ticketBreakdown.join(' + '));
-          }
-        }
-      } else {
-        // Fallback to original logic if ticket_data is not available
-        const totalDrinks = totalDrinkTickets * 2;
-        const totalPeople = totalDrinkTickets + totalNonDrinkTickets;
-        
-        if (totalDrinks > 0 && totalDrinks !== totalPeople * 2) {
-          addons.push(`2 Drinks = ${totalDrinks}`);
-        }
       }
     }
     
