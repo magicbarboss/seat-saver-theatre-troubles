@@ -1594,6 +1594,13 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                     7pm
                   </Button>
                   <Button
+                    variant={showFilter === '8pm' ? 'default' : 'outline'}
+                    onClick={() => setShowFilter('8pm')}
+                    className="flex-1 text-sm"
+                  >
+                    8pm
+                  </Button>
+                  <Button
                     variant={showFilter === '9pm' ? 'default' : 'outline'}
                     onClick={() => setShowFilter('9pm')}
                     className="flex-1 text-sm"
