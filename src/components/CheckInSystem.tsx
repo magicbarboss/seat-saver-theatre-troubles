@@ -718,6 +718,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     if (!guest || typeof guest !== 'object') return [];
     
     const addons = [];
+    const guestName = extractGuestName(guest.booker_name || '');
+    
+    // Debug logging for specific guests
+    if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+      console.log(`🔍 Processing addons for ${guestName}:`, {
+        ticket_data: guest.ticket_data,
+        item_details: guest.item_details,
+        booker_name: guest.booker_name,
+        bookingGroup: bookingGroup
+      });
+    }
     
     // Count Prosecco bottles from separate line items
     let proseccoCount = 0;
@@ -728,24 +739,49 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const ticketData = guest.ticket_data as { [key: string]: string };
       const ticketBreakdown: string[] = [];
       
+      if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+        console.log(`🎫 Processing ticket_data for ${guestName}:`, ticketData);
+      }
+      
       // Parse all ticket types and build breakdown
       Object.entries(ticketData).forEach(([ticketType, quantity]) => {
         const qty = parseInt(quantity) || 0;
+        
+        if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+          console.log(`🎫 Processing ticket type "${ticketType}" with quantity ${qty} for ${guestName}`);
+        }
         
         if (qty > 0) {
           // Add to ticket breakdown
           if (ticketType.includes('& 2 Drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 drinks each
             ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
+            if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+              console.log(`🍺 Found drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
+            }
           } else if (ticketType.includes('& 2 soft drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
             ticketBreakdown.push(`${qty}x ${ticketType.replace('House Magicians Show Ticket', 'Show')}`);
+            if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+              console.log(`🥤 Found soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
+            }
           } else if (ticketType.includes('House Magicians Show Ticket')) {
             // Show-only tickets (no drinks)
             ticketBreakdown.push(`${qty}x Show Only`);
+            if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+              console.log(`🎭 Found show-only ticket for ${guestName}: ${qty}x Show Only`);
+            }
           }
         }
       });
+      
+      if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+        console.log(`📊 Final calculation for ${guestName}:`, {
+          ticketBreakdown,
+          calculatedDrinks,
+          willAddToAddons: ticketBreakdown.length > 0
+        });
+      }
       
       // Display ticket breakdown and total drinks
       if (ticketBreakdown.length > 0) {
@@ -793,6 +829,10 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       if (proseccoCount > 0) {
         addons.push(`${proseccoCount} Btls Prosecco`);
       }
+    }
+    
+    if (guestName.includes('Dawn') || guestName.includes('Catherine') || guestName.includes('Gayle')) {
+      console.log(`✅ Final addons for ${guestName}:`, addons);
     }
     
     return addons;
