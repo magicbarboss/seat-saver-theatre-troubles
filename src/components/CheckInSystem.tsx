@@ -588,6 +588,20 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     const quantities = [];
     
+    // DEBUG: Add comprehensive logging for Kelly Foote specifically
+    if (guest?.booker_name === "Kelly Foote") {
+      console.log(`🔍 KELLY FOOTE DEBUG - calculatePackageQuantities:`, {
+        packageInfo,
+        packageInfoType: typeof packageInfo,
+        guestCount,
+        includesDrinks: packageInfo.includes('2 Drinks'),
+        includesPizza: packageInfo.includes('9" Pizza'),
+        isPintsPackage: packageInfo.includes('Pints Package'),
+        isCocktailsPackage: packageInfo.includes('Cocktails Package'),
+        isShowPizza: packageInfo === 'Show + 9" Pizza'
+      });
+    }
+    
     // Extract drink quantities with updated logic
     if (packageInfo.includes('2 Drinks') || packageInfo.includes('2 soft drinks')) {
       const totalDrinks = 2 * guestCount;
@@ -622,9 +636,28 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     }
     
     // Extract pizza quantities (for non-Pints/Cocktails packages)
-    if (packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza') {
+    const pizzaCondition = packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza';
+    
+    // DEBUG: Log pizza condition evaluation for Kelly Foote
+    if (guest?.booker_name === "Kelly Foote") {
+      console.log(`🍕 KELLY FOOTE PIZZA DEBUG:`, {
+        packageInfo,
+        includes9Pizza: packageInfo.includes('9" Pizza'),
+        includesPintsPackage: packageInfo.includes('Pints Package'),
+        includesCocktailsPackage: packageInfo.includes('Cocktails Package'),
+        isShowPizza: packageInfo === 'Show + 9" Pizza',
+        pizzaConditionMet: pizzaCondition,
+        guestCount
+      });
+    }
+    
+    if (pizzaCondition) {
       const totalPizzas = 1 * guestCount; // 1 pizza per person for these packages
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      
+      if (guest?.booker_name === "Kelly Foote") {
+        console.log(`🍕 KELLY FOOTE PIZZA ADDED: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      }
     }
     
     // Handle special packages
@@ -646,6 +679,14 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       quantities.push('Wowcher Items Included');
     } else if (packageInfo === 'Show Only') {
       quantities.push('Show Ticket Only');
+    }
+    
+    // DEBUG: Final quantities for Kelly Foote
+    if (guest?.booker_name === "Kelly Foote") {
+      console.log(`🔍 KELLY FOOTE FINAL QUANTITIES:`, {
+        quantities,
+        finalResult: quantities.length > 0 ? quantities : ['Show Ticket Only']
+      });
     }
     
     return quantities.length > 0 ? quantities : ['Show Ticket Only'];
