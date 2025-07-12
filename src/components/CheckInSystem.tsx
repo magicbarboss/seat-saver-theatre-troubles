@@ -302,23 +302,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       console.log('🍕 Kelly Foote Pizza Fields Found:', pizzaFields);
     }
     
-    // First priority: Find pizza fields with actual non-zero values
-    for (const field of pizzaFields) {
-      if (field.hasValue) {
-        const numericValue = parseInt(field.value as string, 10);
-        if (!isNaN(numericValue) && numericValue > 0) {
-          if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-            console.log('🍕 Kelly Foote FIRST PRIORITY match:', { key: field.key, value: field.value, numericValue });
-          }
-          return `${numericValue} × Pizza`;
-        }
-      }
-    }
-    
-    // Second priority: If any pizza field exists (even with empty value), use total_quantity
+    // Simple logic: If any pizza field exists, use the ticket quantity (total_quantity)
+    // This handles cases like "includes 1 Pizza" where the value "3" means 3 tickets, each with 1 pizza
     if (pizzaFields.length > 0) {
       if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-        console.log('🍕 Kelly Foote SECOND PRIORITY match using total_quantity:', { totalQty, pizzaFields: pizzaFields.map(f => f.key) });
+        console.log('🍕 Kelly Foote pizza match using total_quantity:', { totalQty, pizzaFields: pizzaFields.map(f => ({ key: f.key, value: f.value })) });
       }
       return `${totalQty} × Pizza`;
     }
@@ -568,10 +556,19 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       Object.entries(ticketData).forEach(([ticketType, quantity]) => {
         const qty = parseInt(quantity) || 0;
         
-        if (qty > 0 && ticketType.includes('& 2 Drinks')) {
+        // Check for various drink patterns in ticket names
+        if (qty > 0 && (
+          ticketType.includes('& 2 Drinks') || 
+          ticketType.includes('includes 2 Drinks') ||
+          ticketType.includes('+ 2 Drinks')
+        )) {
           calculatedDrinks += qty * 2; // qty people × 2 drinks each
           console.log(`🍺 Found drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
-        } else if (qty > 0 && ticketType.includes('& 2 soft drinks')) {
+        } else if (qty > 0 && (
+          ticketType.includes('& 2 soft drinks') ||
+          ticketType.includes('includes 2 soft drinks') ||
+          ticketType.includes('+ 2 soft drinks')
+        )) {
           calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
           console.log(`🥤 Found soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
         }
@@ -587,10 +584,10 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         if (key.includes('House Magicians Show Ticket') && value && parseInt(value as string) > 0) {
           const qty = parseInt(value as string);
           console.log(`🎟️ Found ticket: ${key} with qty: ${qty}`);
-          if (key.includes('& 2 Drinks')) {
+          if (key.includes('& 2 Drinks') || key.includes('includes 2 Drinks') || key.includes('+ 2 Drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 drinks each
             console.log(`🍺 FALLBACK drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
-          } else if (key.includes('& 2 soft drinks')) {
+          } else if (key.includes('& 2 soft drinks') || key.includes('includes 2 soft drinks') || key.includes('+ 2 soft drinks')) {
             calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
             console.log(`🥤 FALLBACK soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
           }
