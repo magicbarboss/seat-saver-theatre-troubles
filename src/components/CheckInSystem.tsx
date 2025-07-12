@@ -267,17 +267,18 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Helper function to get pizza information from guest data - BULLETPROOF
+  // Helper function to get pizza information from guest data - UNIVERSAL LOGGING
   const getPizzaInfo = (guest: Guest): string => {
     const totalQty = guest.total_quantity || 1;
     const bookerName = guest.booker_name || 'UNKNOWN';
     
-    console.log(`🍕 PIZZA CHECK for ${bookerName}:`, {
+    // UNIVERSAL LOG: Track EVERY guest that reaches this function
+    console.log(`🍕 UNIVERSAL PIZZA CHECK for ${bookerName}:`, {
       booker_name: bookerName,
       total_quantity: totalQty,
       hasTicketData: !!guest.ticket_data,
       ticketDataType: typeof guest.ticket_data,
-      ticketData: guest.ticket_data
+      fullGuestObject: guest
     });
     
     if (!guest?.ticket_data || typeof guest.ticket_data !== 'object') {
@@ -285,8 +286,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       return '';
     }
     
+    console.log(`🔍 ${bookerName}: Processing ticket_data:`, guest.ticket_data);
+    
     // BULLETPROOF: Check EVERY field for "pizza" and numeric value > 0
     for (const [key, value] of Object.entries(guest.ticket_data)) {
+      console.log(`🔍 ${bookerName}: Field "${key}" = "${value}" (type: ${typeof value})`);
       if (key.toLowerCase().includes('pizza') && value && Number(value) > 0) {
         console.log(`✅ ${bookerName}: FOUND PIZZA! Field: "${key}", Value: "${value}"`);
         const result = `${totalQty} × Pizza`;
@@ -295,7 +299,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       }
     }
     
-    console.log(`❌ ${bookerName}: NO VALID PIZZA FIELDS FOUND`);
+    // EXTENSIVE FALLBACK LOGGING
+    const allFields = Object.keys(guest.ticket_data).join(', ');
+    console.log(`❌ ${bookerName}: NO PIZZA FOUND. All fields: ${allFields}`);
+    console.log(`🚨 ${bookerName}: Full ticket data analysis:`, Object.entries(guest.ticket_data));
+    
     return '';
   };
 
@@ -349,29 +357,41 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     setPartyGroups(detectPartyConnections);
   }, [detectPartyConnections]);
 
-  // Group bookings by booking code to identify add-ons
+  // Group bookings by booking code to identify add-ons - ENHANCED LOGGING
   const groupedBookings = useMemo(() => {
-    console.log('Processing guests for grouping:', guests.length);
+    console.log('🔄 BOOKING GROUPING: Processing guests for grouping:', guests.length);
     const groups = new Map<string, BookingGroup>();
     
     guests.forEach((guest, index) => {
       if (!guest || typeof guest !== 'object') {
-        console.warn(`Invalid guest at index ${index}:`, guest);
+        console.warn(`❌ Invalid guest at index ${index}:`, guest);
         return;
       }
 
-      // Use the booking_code directly from the guest object since it's already structured
+      const bookerName = guest.booker_name || 'UNKNOWN';
       const bookingCode = guest.booking_code || '';
-      console.log(`Guest ${index}: booking_code = "${bookingCode}"`);
+      
+      // SPECIAL LOGGING FOR KELLY FOOTE
+      if (bookerName.toLowerCase().includes('kelly')) {
+        console.log(`🚨 KELLY FOOTE DETECTED at index ${index}:`, {
+          booker_name: bookerName,
+          booking_code: bookingCode,
+          total_quantity: guest.total_quantity,
+          ticket_data: guest.ticket_data,
+          fullGuest: guest
+        });
+      }
+      
+      console.log(`👤 Guest ${index} (${bookerName}): booking_code = "${bookingCode}"`);
       
       if (!bookingCode) {
-        console.warn(`No booking code for guest at index ${index}:`, guest);
+        console.warn(`❌ No booking code for guest at index ${index} (${bookerName}):`, guest);
         return;
       }
       
       if (!groups.has(bookingCode)) {
         // First occurrence - this is the main booking
-        console.log(`Creating new group for booking code: ${bookingCode}`);
+        console.log(`✅ Creating new group for booking code: ${bookingCode} (${bookerName})`);
         groups.set(bookingCode, {
           mainBooking: guest,
           addOns: [],
@@ -380,7 +400,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         });
       } else {
         // Subsequent occurrence - this is an add-on
-        console.log(`Adding to existing group for booking code: ${bookingCode}`);
+        console.log(`➕ Adding to existing group for booking code: ${bookingCode} (${bookerName})`);
         const group = groups.get(bookingCode)!;
         group.addOns.push(guest);
         group.addOnIndices.push(index);
@@ -1504,7 +1524,24 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
                   const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
+                  
+                  // KELLY FOOTE SPECIFIC LOGGING
+                  if (booker.toLowerCase().includes('kelly')) {
+                    console.log(`🚨 KELLY UI PROCESSING:`, {
+                      booker,
+                      totalQty,
+                      mainBookingData: booking.mainBooking,
+                      aboutToCallGetPizzaInfo: true
+                    });
+                  }
+                  
                   const pizzaInfo = getPizzaInfo(booking.mainBooking);
+                  
+                  // KELLY FOOTE PIZZA RESULT LOGGING
+                  if (booker.toLowerCase().includes('kelly')) {
+                    console.log(`🍕 KELLY PIZZA RESULT: "${pizzaInfo}"`);
+                  }
+                  
                   const addons = getAddons(booking.mainBooking, booking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
