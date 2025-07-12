@@ -622,17 +622,25 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
     }
     
-    // Handle 2 Drinks + 9" Pizza package specifically
+    // Handle 2 Drinks + 9" Pizza package specifically  
     if (packageInfo === '2 Drinks + 9" Pizza') {
+      // Add drinks first
+      const totalDrinks = 2 * guestCount; // 2 drinks per person
+      quantities.push(`${totalDrinks} Drink Tokens`);
+      
+      // Add pizzas
       const totalPizzas = 1 * guestCount; // 1 pizza per person
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
       
-      console.log(`🍕🍕🍕 PIZZA SECTION 1 - ${guest?.booker_name || 'Unknown'}:`);
+      console.log(`🍕🍕🍕 PIZZA SECTION 1 EXECUTED - ${guest?.booker_name || 'Unknown'}:`);
       console.log(`    Package: ${packageInfo}`);
       console.log(`    Guest Count: ${guestCount}`);
-      console.log(`    Total Pizzas: ${totalPizzas}`);
-      console.log(`    Added to quantities: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      console.log(`    Total Drinks: ${totalDrinks} Drink Tokens`);
+      console.log(`    Total Pizzas: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
       console.log(`    Current quantities array:`, quantities);
+      
+      // Early return to prevent double processing
+      return quantities.length > 0 ? quantities : ['Show Ticket Only'];
     }
     
     // Extract pizza quantities (for other pizza packages)
