@@ -273,11 +273,25 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     const totalQty = guest.total_quantity || 1;
     
+    // Debug logging for Kelly Foote specifically
+    if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+      console.log('🍕 DEBUGGING Kelly Foote Pizza:', {
+        booker_name: guest.booker_name,
+        total_quantity: guest.total_quantity,
+        ticket_data: guest.ticket_data,
+        ticket_data_keys: Object.keys(guest.ticket_data),
+        pizza_keys: Object.keys(guest.ticket_data).filter(key => key.toLowerCase().includes('pizza'))
+      });
+    }
+    
     // First priority: Look for pizza fields with actual values
     for (const [key, value] of Object.entries(guest.ticket_data)) {
       if (value && value !== '' && key.toLowerCase().includes('pizza')) {
         const numericValue = parseInt(value as string, 10);
         if (!isNaN(numericValue)) {
+          if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+            console.log('🍕 Kelly Foote FIRST PRIORITY match:', { key, value, numericValue });
+          }
           return `${numericValue} × Pizza`;
         }
       }
@@ -286,8 +300,15 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Second priority: Look for pizza fields regardless of value (use total_quantity)
     for (const [key] of Object.entries(guest.ticket_data)) {
       if (key.toLowerCase().includes('pizza')) {
+        if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+          console.log('🍕 Kelly Foote SECOND PRIORITY match:', { key, totalQty });
+        }
         return `${totalQty} × Pizza`;
       }
+    }
+    
+    if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+      console.log('🍕 Kelly Foote NO PIZZA FOUND');
     }
     
     return '';
