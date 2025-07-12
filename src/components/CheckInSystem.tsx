@@ -267,16 +267,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Simplified pizza detection - just check for "pizza" in any field
+  // Simplified pizza detection - check for "pizza" in field names (regardless of value)
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest || typeof guest !== 'object') return '';
     
-    // Check all fields in the guest object for the word "pizza" (case-insensitive)
+    // Check all field names in the guest object for the word "pizza" (case-insensitive)
     for (const [key, value] of Object.entries(guest)) {
-      if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
+      if (key && key.toLowerCase().includes('pizza')) {
         return 'Pizza';
       }
-      if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
+      // Also check string values for pizza content
+      if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
         return 'Pizza';
       }
     }
@@ -284,10 +285,10 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Also check ticket_data if it exists
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
       for (const [key, value] of Object.entries(guest.ticket_data)) {
-        if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
+        if (key && key.toLowerCase().includes('pizza')) {
           return 'Pizza';
         }
-        if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
+        if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
           return 'Pizza';
         }
       }
