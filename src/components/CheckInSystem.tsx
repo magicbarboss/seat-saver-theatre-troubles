@@ -470,7 +470,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
         return 'Show + 9" Pizza';
       } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza') || field.includes('2 Drinks + 9 Pizza')) {
-        return '2 Drinks + 9" Pizza';
+        return '2 Drinks + 9 Pizza';
       } else if (field.includes('& 2 Drinks')) {
         return '2 Drinks';
       } else if (field.includes('& 2 soft drinks + 9')) {
@@ -636,7 +636,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     }
     
     // Extract pizza quantities (for non-Pints/Cocktails packages)
-    const pizzaCondition = packageInfo.includes('9" Pizza') && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza';
+    const pizzaCondition = (packageInfo.includes('9 Pizza') || packageInfo.includes('9" Pizza')) && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza';
     
     // DEBUG: Log pizza condition evaluation for Kelly Foote
     if (guest?.booker_name === "Kelly Foote") {
