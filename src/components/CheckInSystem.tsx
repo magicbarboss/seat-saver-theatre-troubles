@@ -267,12 +267,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Helper function to get pizza information from guest data - UNIVERSAL DEBUG
+  // Helper function to get pizza information from guest data - BULLETPROOF
   const getPizzaInfo = (guest: Guest): string => {
     const totalQty = guest.total_quantity || 1;
     const bookerName = guest.booker_name || 'UNKNOWN';
     
-    // UNIVERSAL DEBUG - Log ALL guests to catch Kelly Foote
     console.log(`🍕 PIZZA CHECK for ${bookerName}:`, {
       booker_name: bookerName,
       total_quantity: totalQty,
@@ -286,23 +285,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       return '';
     }
     
-    // Check EVERY field for "pizza" (case insensitive)
-    const allKeys = Object.keys(guest.ticket_data);
-    console.log(`🔍 ${bookerName}: Checking ${allKeys.length} fields:`, allKeys);
-    
-    for (const key of allKeys) {
-      const value = guest.ticket_data[key];
-      console.log(`🔍 ${bookerName}: Field "${key}" = "${value}"`);
-      
-      if (key.toLowerCase().includes('pizza')) {
-        console.log(`✅ ${bookerName}: FOUND PIZZA FIELD: "${key}" with value: "${value}"`);
+    // BULLETPROOF: Check EVERY field for "pizza" and numeric value > 0
+    for (const [key, value] of Object.entries(guest.ticket_data)) {
+      if (key.toLowerCase().includes('pizza') && value && Number(value) > 0) {
+        console.log(`✅ ${bookerName}: FOUND PIZZA! Field: "${key}", Value: "${value}"`);
         const result = `${totalQty} × Pizza`;
         console.log(`🍕 ${bookerName}: RETURNING: "${result}"`);
         return result;
       }
     }
     
-    console.log(`❌ ${bookerName}: NO PIZZA FIELDS FOUND`);
+    console.log(`❌ ${bookerName}: NO VALID PIZZA FIELDS FOUND`);
     return '';
   };
 
@@ -540,25 +533,32 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const ticketData = guest.ticket_data as { [key: string]: string };
       console.log(`🎫 Processing ticket_data for ${guestName}:`, ticketData);
       
-      // Parse all ticket types and calculate drinks
+      // BULLETPROOF drinks detection - check EVERY field for drink patterns
       Object.entries(ticketData).forEach(([ticketType, quantity]) => {
         const qty = parseInt(quantity) || 0;
+        console.log(`🔍 ${guestName}: Checking "${ticketType}" = "${quantity}"`);
         
-        // Check for various drink patterns in ticket names
-        if (qty > 0 && (
-          ticketType.includes('& 2 Drinks') || 
-          ticketType.includes('includes 2 Drinks') ||
-          ticketType.includes('+ 2 Drinks')
-        )) {
-          calculatedDrinks += qty * 2; // qty people × 2 drinks each
-          console.log(`🍺 Found drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
-        } else if (qty > 0 && (
-          ticketType.includes('& 2 soft drinks') ||
-          ticketType.includes('includes 2 soft drinks') ||
-          ticketType.includes('+ 2 soft drinks')
-        )) {
-          calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
-          console.log(`🥤 Found soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
+        if (qty > 0) {
+          // Match any variation of "X Drinks" patterns (e.g., "2 Drinks", "2 soft drinks")
+          const drinkMatch = ticketType.match(/(\d+)\s+(Drinks?|drinks?)/i);
+          if (drinkMatch) {
+            const drinksPerTicket = parseInt(drinkMatch[1]);
+            const totalDrinks = qty * drinksPerTicket;
+            calculatedDrinks += totalDrinks;
+            console.log(`🍺 BULLETPROOF drinks for ${guestName}: ${qty} tickets × ${drinksPerTicket} drinks = ${totalDrinks} total drinks`);
+          }
+          // Also check legacy patterns for backward compatibility
+          else if (
+            ticketType.includes('& 2 Drinks') || 
+            ticketType.includes('includes 2 Drinks') ||
+            ticketType.includes('+ 2 Drinks') ||
+            ticketType.includes('& 2 soft drinks') ||
+            ticketType.includes('includes 2 soft drinks') ||
+            ticketType.includes('+ 2 soft drinks')
+          ) {
+            calculatedDrinks += qty * 2;
+            console.log(`🍺 LEGACY drinks for ${guestName}: ${qty} tickets × 2 drinks = ${qty * 2} total drinks`);
+          }
         }
       });
     } else if (bookingGroup?.mainBooking) {
@@ -566,17 +566,26 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const mainBooking = bookingGroup.mainBooking;
       console.log(`🔄 FALLBACK processing for ${guestName}:`, mainBooking);
       
-      // Look for ticket columns in main booking and extract drinks
+      // BULLETPROOF fallback - check ALL fields for drink patterns
       Object.entries(mainBooking).forEach(([key, value]) => {
         console.log(`🔍 Checking key: "${key}" with value: "${value}"`);
-        if (key.includes('House Magicians Show Ticket') && value && parseInt(value as string) > 0) {
-          const qty = parseInt(value as string);
-          console.log(`🎟️ Found ticket: ${key} with qty: ${qty}`);
-          if (key.includes('& 2 Drinks') || key.includes('includes 2 Drinks') || key.includes('+ 2 Drinks')) {
-            calculatedDrinks += qty * 2; // qty people × 2 drinks each
+        const qty = parseInt(value as string) || 0;
+        
+        if (qty > 0) {
+          // Match any variation of "X Drinks" patterns
+          const drinkMatch = key.match(/(\d+)\s+(Drinks?|drinks?)/i);
+          if (drinkMatch) {
+            const drinksPerTicket = parseInt(drinkMatch[1]);
+            const totalDrinks = qty * drinksPerTicket;
+            calculatedDrinks += totalDrinks;
+            console.log(`🍺 FALLBACK BULLETPROOF drinks for ${guestName}: ${qty} tickets × ${drinksPerTicket} drinks = ${totalDrinks} total drinks`);
+          }
+          // Legacy patterns
+          else if (key.includes('& 2 Drinks') || key.includes('includes 2 Drinks') || key.includes('+ 2 Drinks')) {
+            calculatedDrinks += qty * 2;
             console.log(`🍺 FALLBACK drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
           } else if (key.includes('& 2 soft drinks') || key.includes('includes 2 soft drinks') || key.includes('+ 2 soft drinks')) {
-            calculatedDrinks += qty * 2; // qty people × 2 soft drinks each
+            calculatedDrinks += qty * 2;
             console.log(`🥤 FALLBACK soft drinks for ${guestName}: ${qty}x 2 drinks = ${qty * 2} total drinks`);
           }
         }
