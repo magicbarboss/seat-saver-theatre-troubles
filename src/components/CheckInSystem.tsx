@@ -469,7 +469,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       // Return the appropriate package based on the field name
       if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
         return 'Show + 9" Pizza';
-      } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza')) {
+      } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza') || field.includes('2 Drinks + 9 Pizza')) {
         return '2 Drinks + 9" Pizza';
       } else if (field.includes('& 2 Drinks')) {
         return '2 Drinks';
