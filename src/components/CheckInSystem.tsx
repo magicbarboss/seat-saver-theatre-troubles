@@ -574,9 +574,9 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     const quantities = [];
     
-    // DEBUG: Add comprehensive logging for Kelly Foote specifically
-    if (guest?.booker_name === "Kelly Foote") {
-      console.log(`🔍 KELLY FOOTE DEBUG - calculatePackageQuantities:`, {
+    // DEBUG: Add comprehensive logging for target guests
+    if (guest?.booker_name === "Kelly Foote" || guest?.booker_name?.includes("Emma McNab")) {
+      console.log(`🔍🔍🔍 ${guest?.booker_name} DEBUG - calculatePackageQuantities START:`, {
         packageInfo,
         packageInfoType: typeof packageInfo,
         guestCount,
@@ -584,7 +584,8 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         includesPizza: packageInfo.includes('9" Pizza'),
         isPintsPackage: packageInfo.includes('Pints Package'),
         isCocktailsPackage: packageInfo.includes('Cocktails Package'),
-        isShowPizza: packageInfo === 'Show + 9" Pizza'
+        isShowPizza: packageInfo === 'Show + 9" Pizza',
+        is2DrinksPizza: packageInfo === '2 Drinks + 9" Pizza'
       });
     }
     
@@ -626,9 +627,12 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const totalPizzas = 1 * guestCount; // 1 pizza per person
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
       
-      if (isTargetGuest) {
-        console.log(`✅ ADDED PIZZAS: ${totalPizzas} × 9" Pizza for ${guest?.booker_name}`);
-      }
+      console.log(`🍕🍕🍕 PIZZA SECTION 1 - ${guest?.booker_name || 'Unknown'}:`);
+      console.log(`    Package: ${packageInfo}`);
+      console.log(`    Guest Count: ${guestCount}`);
+      console.log(`    Total Pizzas: ${totalPizzas}`);
+      console.log(`    Added to quantities: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      console.log(`    Current quantities array:`, quantities);
     }
     
     // Extract pizza quantities (for other pizza packages)
@@ -636,7 +640,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     // DEBUG: Log pizza condition evaluation for Kelly Foote and Mrs Emma McNab
     if (guest?.booker_name === "Kelly Foote" || guest?.booker_name?.includes("Emma McNab")) {
-      console.log(`🍕 ${guest?.booker_name} Pizza Debug:`, {
+      console.log(`🍕🍕🍕 PIZZA SECTION 2 - ${guest?.booker_name} Pizza Debug:`, {
         packageInfo,
         pizzaCondition,
         includesPizza: packageInfo.includes('9 Pizza'),
@@ -654,9 +658,10 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const totalPizzas = 1 * guestCount; // 1 pizza per person for these packages
       quantities.push(`${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
       
-      if (guest?.booker_name === "Kelly Foote") {
-        console.log(`🍕 KELLY FOOTE PIZZA ADDED: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
-      }
+      console.log(`🍕🍕🍕 PIZZA SECTION 2 EXECUTED for ${guest?.booker_name}:`);
+      console.log(`    Total Pizzas: ${totalPizzas}`);
+      console.log(`    Added to quantities: ${totalPizzas} × 9" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      console.log(`    Current quantities array:`, quantities);
     }
     
     // Handle special packages
@@ -680,9 +685,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       quantities.push('Show Ticket Only');
     }
     
-    // DEBUG: Final quantities for Kelly Foote
-    if (guest?.booker_name === "Kelly Foote") {
-      console.log(`🔍 KELLY FOOTE FINAL QUANTITIES:`, {
+    // DEBUG: Final quantities for target guests
+    if (guest?.booker_name === "Kelly Foote" || guest?.booker_name?.includes("Emma McNab")) {
+      console.log(`🔍🔍🔍 ${guest?.booker_name} FINAL QUANTITIES:`, {
+        packageInfo,
+        guestCount,
         quantities,
         finalResult: quantities.length > 0 ? quantities : ['Show Ticket Only']
       });
