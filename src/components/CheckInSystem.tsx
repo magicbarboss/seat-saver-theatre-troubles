@@ -267,54 +267,42 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Helper function to get pizza information from guest data - SIMPLIFIED
+  // Helper function to get pizza information from guest data - UNIVERSAL DEBUG
   const getPizzaInfo = (guest: Guest): string => {
     const totalQty = guest.total_quantity || 1;
+    const bookerName = guest.booker_name || 'UNKNOWN';
     
-    // Kelly Foote specific debugging
-    if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-      console.log('🔍 KELLY FOOTE FULL DEBUG:', {
-        hasTicketData: !!guest.ticket_data,
-        ticketDataType: typeof guest.ticket_data,
-        fullTicketData: guest.ticket_data,
-        totalQuantity: totalQty,
-        allKeys: guest.ticket_data ? Object.keys(guest.ticket_data) : 'NO KEYS'
-      });
-    }
+    // UNIVERSAL DEBUG - Log ALL guests to catch Kelly Foote
+    console.log(`🍕 PIZZA CHECK for ${bookerName}:`, {
+      booker_name: bookerName,
+      total_quantity: totalQty,
+      hasTicketData: !!guest.ticket_data,
+      ticketDataType: typeof guest.ticket_data,
+      ticketData: guest.ticket_data
+    });
     
     if (!guest?.ticket_data || typeof guest.ticket_data !== 'object') {
-      if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-        console.log('❌ Kelly Foote: Invalid or missing ticket data');
-      }
+      console.log(`❌ ${bookerName}: No valid ticket data`);
       return '';
     }
     
-    // ULTRA SIMPLE: Find ANY field containing "pizza" (case insensitive)
-    let foundPizzaField = false;
+    // Check EVERY field for "pizza" (case insensitive)
+    const allKeys = Object.keys(guest.ticket_data);
+    console.log(`🔍 ${bookerName}: Checking ${allKeys.length} fields:`, allKeys);
     
-    for (const key of Object.keys(guest.ticket_data)) {
+    for (const key of allKeys) {
+      const value = guest.ticket_data[key];
+      console.log(`🔍 ${bookerName}: Field "${key}" = "${value}"`);
+      
       if (key.toLowerCase().includes('pizza')) {
-        foundPizzaField = true;
-        if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-          console.log('✅ Kelly Foote: FOUND PIZZA FIELD:', { key, value: guest.ticket_data[key] });
-        }
-        break; // Found one, that's enough
+        console.log(`✅ ${bookerName}: FOUND PIZZA FIELD: "${key}" with value: "${value}"`);
+        const result = `${totalQty} × Pizza`;
+        console.log(`🍕 ${bookerName}: RETURNING: "${result}"`);
+        return result;
       }
     }
     
-    // RESULT: If ANY pizza field exists, return total_quantity × Pizza
-    if (foundPizzaField) {
-      const result = `${totalQty} × Pizza`;
-      if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-        console.log('🍕 Kelly Foote: RETURNING PIZZA COUNT:', result);
-      }
-      return result;
-    }
-    
-    if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-      console.log('❌ Kelly Foote: NO PIZZA FIELDS FOUND IN TICKET DATA');
-    }
-    
+    console.log(`❌ ${bookerName}: NO PIZZA FIELDS FOUND`);
     return '';
   };
 
