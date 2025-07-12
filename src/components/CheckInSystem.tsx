@@ -267,42 +267,31 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Helper function to get pizza information from guest data - UNIVERSAL LOGGING
+  // Simplified pizza detection - just check for "pizza" in any field
   const getPizzaInfo = (guest: Guest): string => {
-    const totalQty = guest.total_quantity || 1;
-    const bookerName = guest.booker_name || 'UNKNOWN';
+    if (!guest || typeof guest !== 'object') return '';
     
-    // UNIVERSAL LOG: Track EVERY guest that reaches this function
-    console.log(`🍕 UNIVERSAL PIZZA CHECK for ${bookerName}:`, {
-      booker_name: bookerName,
-      total_quantity: totalQty,
-      hasTicketData: !!guest.ticket_data,
-      ticketDataType: typeof guest.ticket_data,
-      fullGuestObject: guest
-    });
-    
-    if (!guest?.ticket_data || typeof guest.ticket_data !== 'object') {
-      console.log(`❌ ${bookerName}: No valid ticket data`);
-      return '';
-    }
-    
-    console.log(`🔍 ${bookerName}: Processing ticket_data:`, guest.ticket_data);
-    
-    // BULLETPROOF: Check EVERY field for "pizza" and numeric value > 0
-    for (const [key, value] of Object.entries(guest.ticket_data)) {
-      console.log(`🔍 ${bookerName}: Field "${key}" = "${value}" (type: ${typeof value})`);
-      if (key.toLowerCase().includes('pizza') && value && Number(value) > 0) {
-        console.log(`✅ ${bookerName}: FOUND PIZZA! Field: "${key}", Value: "${value}"`);
-        const result = `${totalQty} × Pizza`;
-        console.log(`🍕 ${bookerName}: RETURNING: "${result}"`);
-        return result;
+    // Check all fields in the guest object for the word "pizza" (case-insensitive)
+    for (const [key, value] of Object.entries(guest)) {
+      if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
+        return 'Pizza';
+      }
+      if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
+        return 'Pizza';
       }
     }
     
-    // EXTENSIVE FALLBACK LOGGING
-    const allFields = Object.keys(guest.ticket_data).join(', ');
-    console.log(`❌ ${bookerName}: NO PIZZA FOUND. All fields: ${allFields}`);
-    console.log(`🚨 ${bookerName}: Full ticket data analysis:`, Object.entries(guest.ticket_data));
+    // Also check ticket_data if it exists
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      for (const [key, value] of Object.entries(guest.ticket_data)) {
+        if (value && typeof value === 'string' && value.toLowerCase().includes('pizza')) {
+          return 'Pizza';
+        }
+        if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
+          return 'Pizza';
+        }
+      }
+    }
     
     return '';
   };
