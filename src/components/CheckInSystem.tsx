@@ -369,7 +369,21 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan') || guestName.includes('rena') || guestName.includes('kelly');
     
     if (isTargetGuest) {
-      console.log('=== PACKAGE INFO DEBUG FOR', guest.booker_name, '===');
+      console.log('=== COMPLETE DATA DUMP FOR', guest.booker_name, '===');
+      console.log('🔍 GUEST OBJECT:', guest);
+      
+      // Get the booking group for this guest
+      const booking = groupedBookings[guest.booking_code];
+      console.log('🔍 BOOKING GROUP:', booking);
+      
+      // Log ALL fields in the booking object
+      if (booking) {
+        console.log('📋 ALL BOOKING FIELDS:');
+        Object.keys(booking).forEach(key => {
+          console.log(`  "${key}": "${booking[key]}"`);
+        });
+      }
+      
       console.log('Guest data keys:', Object.keys(guest));
       console.log('Booking code:', guest.booking_code);
       console.log('Ticket data:', guest.ticket_data);
