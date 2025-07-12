@@ -366,7 +366,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     if (!guest || typeof guest !== 'object') return 'Show Only';
     
     const guestName = extractGuestName(guest.booker_name || '').toLowerCase();
-    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan') || guestName.includes('rena');
+    const isTargetGuest = guestName.includes('andrew') || guestName.includes('chris') || guestName.includes('luke') || guestName.includes('orla') || guestName.includes('josh') || guestName.includes('ewan') || guestName.includes('rena') || guestName.includes('kelly');
     
     if (isTargetGuest) {
       console.log('=== PACKAGE INFO DEBUG FOR', guest.booker_name, '===');
@@ -464,12 +464,18 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const ticket = activeTicketTypes[0];
       const field = ticket.field;
       
+      if (isTargetGuest) console.log(`🎯 KELLY DEBUG: Processing field "${field}" with quantity ${ticket.quantity}`);
+      
       if (isTargetGuest) console.log(`SUCCESS: Found single ticket type: ${field} with value: ${ticket.quantity}`);
       
       // Return the appropriate package based on the field name
+      if (isTargetGuest) console.log(`🔍 KELLY DEBUG: Testing field "${field}" against conditions...`);
+      
       if (field.includes('& 9" Pizza') && !field.includes('Drinks')) {
+        if (isTargetGuest) console.log(`✅ KELLY DEBUG: Matched "& 9" Pizza" without Drinks - returning "Show + 9" Pizza"`);
         return 'Show + 9" Pizza';
       } else if (field.includes('& 2 Drinks + 9') || field.includes('+ 9 Pizza') || field.includes('2 Drinks + 9 Pizza')) {
+        if (isTargetGuest) console.log(`✅ KELLY DEBUG: Matched drinks + pizza condition - returning "2 Drinks + 9" Pizza"`);
         return '2 Drinks + 9" Pizza';
       } else if (field.includes('& 2 Drinks')) {
         return '2 Drinks';
