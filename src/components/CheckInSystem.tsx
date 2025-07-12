@@ -267,6 +267,31 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
+  // Helper function to get pizza information from guest data
+  const getPizzaInfo = (guest: Guest): string => {
+    if (!guest?.ticket_data) return '';
+    
+    const totalQty = guest.total_quantity || 1;
+    
+    // Look for pizza-related fields in ticket_data
+    for (const [key, value] of Object.entries(guest.ticket_data)) {
+      if (value && value !== '' && key.toLowerCase().includes('pizza')) {
+        const pizzaText = key.toLowerCase();
+        
+        // Extract pizza size/details from the key
+        if (pizzaText.includes('9')) {
+          return `${totalQty} × 9" Pizzas`;
+        } else if (pizzaText.includes('12')) {
+          return `${totalQty} × 12" Pizzas`;
+        } else if (pizzaText.includes('pizza')) {
+          return `${totalQty} × Pizzas`;
+        }
+      }
+    }
+    
+    return '';
+  };
+
   // Party detection logic - Fixed variable initialization
   const detectPartyConnections = useMemo(() => {
     if (!guests || guests.length === 0) return new Map<string, PartyGroup>();
@@ -1391,6 +1416,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                   <TableHead className="font-semibold text-gray-700">Booker Name</TableHead>
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700 min-w-[200px]">Package & Totals</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Pizzas</TableHead>
                   <TableHead className="font-semibold text-gray-700">Addons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
@@ -1446,6 +1472,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                   const totalQty = booking.mainBooking.total_quantity || 1;
                   const packageInfo = getPackageInfo(booking.mainBooking);
                   const packageQuantities = calculatePackageQuantities(packageInfo, totalQty);
+                  const pizzaInfo = getPizzaInfo(booking.mainBooking);
                   const addons = getAddons(booking.mainBooking, booking);
                   const showTime = getShowTime(booking.mainBooking);
                   const allNotes = getAllNotes(booking);
@@ -1589,6 +1616,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                                 ))}
                               </div>
                             </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-center">
+                          {pizzaInfo ? (
+                            <div className="bg-orange-50 px-3 py-2 rounded-lg border border-orange-200">
+                              <span className="text-sm font-semibold text-orange-800">{pizzaInfo}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">No Pizzas</span>
                           )}
                         </div>
                       </TableCell>
