@@ -273,19 +273,20 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     
     const totalQty = guest.total_quantity || 1;
     
-    // Look for pizza-related fields in ticket_data
+    // First priority: Look for pizza fields with actual values
     for (const [key, value] of Object.entries(guest.ticket_data)) {
       if (value && value !== '' && key.toLowerCase().includes('pizza')) {
-        const pizzaText = key.toLowerCase();
-        
-        // Extract pizza size/details from the key
-        if (pizzaText.includes('9')) {
-          return `${totalQty} × 9" Pizzas`;
-        } else if (pizzaText.includes('12')) {
-          return `${totalQty} × 12" Pizzas`;
-        } else if (pizzaText.includes('pizza')) {
-          return `${totalQty} × Pizzas`;
+        const numericValue = parseInt(value as string, 10);
+        if (!isNaN(numericValue)) {
+          return `${numericValue} × Pizza`;
         }
+      }
+    }
+    
+    // Second priority: Look for pizza fields regardless of value (use total_quantity)
+    for (const [key] of Object.entries(guest.ticket_data)) {
+      if (key.toLowerCase().includes('pizza')) {
+        return `${totalQty} × Pizza`;
       }
     }
     
