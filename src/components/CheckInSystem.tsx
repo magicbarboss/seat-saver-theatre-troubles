@@ -284,27 +284,43 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       });
     }
     
-    // First priority: Look for pizza fields with actual values
+    // Collect all pizza-related fields with their values
+    const pizzaFields: Array<{key: string, value: string | number, hasValue: boolean}> = [];
+    
     for (const [key, value] of Object.entries(guest.ticket_data)) {
-      if (value && value !== '' && key.toLowerCase().includes('pizza')) {
-        const numericValue = parseInt(value as string, 10);
-        if (!isNaN(numericValue)) {
+      if (key.toLowerCase().includes('pizza')) {
+        const hasValue = value && value !== '' && value !== '0';
+        pizzaFields.push({
+          key,
+          value: value as string | number,
+          hasValue
+        });
+      }
+    }
+    
+    if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+      console.log('🍕 Kelly Foote Pizza Fields Found:', pizzaFields);
+    }
+    
+    // First priority: Find pizza fields with actual non-zero values
+    for (const field of pizzaFields) {
+      if (field.hasValue) {
+        const numericValue = parseInt(field.value as string, 10);
+        if (!isNaN(numericValue) && numericValue > 0) {
           if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-            console.log('🍕 Kelly Foote FIRST PRIORITY match:', { key, value, numericValue });
+            console.log('🍕 Kelly Foote FIRST PRIORITY match:', { key: field.key, value: field.value, numericValue });
           }
           return `${numericValue} × Pizza`;
         }
       }
     }
     
-    // Second priority: Look for pizza fields regardless of value (use total_quantity)
-    for (const [key] of Object.entries(guest.ticket_data)) {
-      if (key.toLowerCase().includes('pizza')) {
-        if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
-          console.log('🍕 Kelly Foote SECOND PRIORITY match:', { key, totalQty });
-        }
-        return `${totalQty} × Pizza`;
+    // Second priority: If any pizza field exists (even with empty value), use total_quantity
+    if (pizzaFields.length > 0) {
+      if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
+        console.log('🍕 Kelly Foote SECOND PRIORITY match using total_quantity:', { totalQty, pizzaFields: pizzaFields.map(f => f.key) });
       }
+      return `${totalQty} × Pizza`;
     }
     
     if (guest.booker_name?.toLowerCase().includes('kelly foote')) {
