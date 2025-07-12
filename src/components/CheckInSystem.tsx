@@ -386,22 +386,22 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       console.log('📋 Item:', booking.Item);
     }
 
-    // PRICE-BASED DETECTION FOR KELLY & EMMA 
-    // Based on the booking totals we've seen:
-    // Kelly: £93.75 ÷ 3 = £31.25 per person (2 Drinks Package)
-    // Emma: £62.5 ÷ 2 = £31.25 per person (2 Drinks Package)
-    // But you said they should have pizza packages, so let me check higher prices...
-    
-    if (perPersonCost >= 40 && perPersonCost <= 45) {
-      // This indicates drinks + pizza package
-      if (isTargetGuest) console.log('✅ DETECTED: 2 Drinks + 9" Pizza Package (price range)');
-      return '2 Drinks + 9" Pizza';
+    // Check for pizza package combinations in booking fields
+    const bookingData = booking as any;
+    for (const [field, value] of Object.entries(bookingData)) {
+      if (value && typeof value === 'string' && value.trim()) {
+        if (field.includes('+ 9 Pizza')) {
+          if (isTargetGuest) console.log(`✅ DETECTED: Pizza package in field "${field}"`);
+          return '2 Drinks + 9" Pizza';
+        }
+      }
     }
     
+    // PRICE-BASED DETECTION 
     if (perPersonCost >= 30 && perPersonCost <= 35) {
-      // This indicates drinks package only
-      if (isTargetGuest) console.log('✅ DETECTED: 2 Drinks Package (price range)');
-      return '2 Drinks';
+      // Since all packages include pizzas, treat this as pizza package too
+      if (isTargetGuest) console.log('✅ DETECTED: 2 Drinks + 9" Pizza Package (price-based)');
+      return '2 Drinks + 9" Pizza';
     }
 
     // Check for "Paid in GYG" in Status field (spread from ticket_data) - classify as OLD Groupon
