@@ -638,16 +638,18 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Extract pizza quantities (for non-Pints/Cocktails packages)
     const pizzaCondition = (packageInfo.includes('9 Pizza') || packageInfo.includes('9" Pizza')) && !packageInfo.includes('Pints Package') && !packageInfo.includes('Cocktails Package') && packageInfo !== 'Show + 9" Pizza';
     
-    // DEBUG: Log pizza condition evaluation for Kelly Foote
-    if (guest?.booker_name === "Kelly Foote") {
-      console.log(`🍕 KELLY FOOTE PIZZA DEBUG:`, {
+    // DEBUG: Log pizza condition evaluation for Kelly Foote and Mrs Emma McNab
+    if (guest?.booker_name === "Kelly Foote" || guest?.booker_name?.includes("Emma McNab")) {
+      console.log(`🍕 ${guest?.booker_name} Pizza Debug:`, {
         packageInfo,
-        includes9Pizza: packageInfo.includes('9" Pizza'),
-        includesPintsPackage: packageInfo.includes('Pints Package'),
-        includesCocktailsPackage: packageInfo.includes('Cocktails Package'),
-        isShowPizza: packageInfo === 'Show + 9" Pizza',
-        pizzaConditionMet: pizzaCondition,
-        guestCount
+        pizzaCondition,
+        includesPizza: packageInfo.includes('9 Pizza'),
+        includesPizzaQuoted: packageInfo.includes('9" Pizza'),
+        excludesPints: !packageInfo.includes('Pints Package'),
+        excludesCocktails: !packageInfo.includes('Cocktails Package'),
+        notShowPizza: packageInfo !== 'Show + 9" Pizza',
+        guestCount,
+        fullGuestData: guest
       });
     }
     
