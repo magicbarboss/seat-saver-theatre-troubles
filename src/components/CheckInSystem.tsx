@@ -330,13 +330,14 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.pizza) {
-        totalPizzas += quantity; // quantity already includes the correct count from extracted_tickets
+        // For pizza tickets, quantity represents number of tickets, each ticket has pizza.quantity pizzas
+        totalPizzas += quantity * (mapping.pizza.quantity || 1);
       }
     });
     
-    // Fallback to guest count if no tickets found
+    // Fallback to 1 pizza if no tickets found
     if (totalPizzas === 0) {
-      totalPizzas = guest.total_quantity || 1;
+      totalPizzas = 1;
     }
     
     return totalPizzas > 1 ? `${totalPizzas} Pizzas` : '1 Pizza';
@@ -346,20 +347,21 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   const getDrinksInfo = (guest: Guest): string => {
     if (!guest.interval_drinks_order) return '';
     
-    // Get drink quantities from extracted tickets
+    // Get drink quantities directly from extracted tickets
     const allTickets = getAllTicketTypes(guest);
     let totalDrinks = 0;
     
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.drinks) {
-        totalDrinks += quantity * mapping.drinks.quantity; // multiply by drinks per ticket
+        // For drinks tickets, quantity represents number of tickets, each ticket has drinks.quantity drinks
+        totalDrinks += quantity * (mapping.drinks.quantity || 2);
       }
     });
     
-    // Fallback to standard 2 drinks per person if no tickets found
+    // Fallback to 2 drinks if no tickets found
     if (totalDrinks === 0) {
-      totalDrinks = (guest.total_quantity || 1) * 2;
+      totalDrinks = 2;
     }
     
     return `${totalDrinks} Drinks`;
