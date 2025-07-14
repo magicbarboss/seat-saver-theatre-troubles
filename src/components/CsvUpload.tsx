@@ -221,12 +221,45 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         note: noteIndex
       });
 
+      // TICKET_TYPE_MAPPING - needs to match CheckInSystem exactly
+      const TICKET_TYPE_MAPPING = [
+        'House Magicians Show Ticket & 2 Drinks',
+        'House Magicians Show Ticket & 1 Pizza',
+        'House Magicians Show Ticket includes 2 Drinks + 1 Pizza',
+        'Groupon Offer Prosecco Package (per person)',
+        'Smoke Offer Ticket includes Drink (minimum x2)',
+        'Groupon Magic & Pints Package (per person)',
+        'Groupon Magic & Cocktails Package (per person)',
+        'Wowcher Magic & Cocktails Package (per person)',
+        'Adult Show Ticket includes 2 Drinks',
+        'Adult Show Ticket includes 2 Drinks + 9" Pizza',
+        'Adult Show Ticket induces 2 soft drinks',
+        'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
+        'Comedy ticket plus 9" Pizza',
+        'Adult Comedy & Magic Show Ticket + 9" Pizza',
+        'Adult Comedy Magic Show ticket',
+        'OLD Groupon Offer (per person - extras are already included)',
+        'Groupon Magic Show, Snack and Loaded Fries Package (per person)'
+      ];
+
       // Prepare guest data with proper field mapping and enhanced validation
       const guestsData = csvData.rows.map((row, index) => {
         const ticketData: any = {};
+        const extractedTickets: any = {};
+
+        // Process each header and extract ticket quantities
         csvData.headers.forEach((header, headerIndex) => {
           const cellValue = row[headerIndex] || '';
           ticketData[header] = cellValue;
+
+          // Check if this header matches a known ticket type and has a quantity > 0
+          if (TICKET_TYPE_MAPPING.includes(header)) {
+            const quantity = parseInt(cellValue) || 0;
+            if (quantity > 0) {
+              extractedTickets[header] = quantity;
+              console.log(`Found ticket type "${header}" with quantity ${quantity} for row ${index}`);
+            }
+          }
         });
 
         // Extract key fields from the correct columns
@@ -250,7 +283,10 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           show_time: '', // This can be extracted from item details if needed
           item_details: itemDetails,
           notes: notes,
-          ticket_data: ticketData,
+          ticket_data: { 
+            ...ticketData, // Keep all original CSV data
+            extracted_tickets: extractedTickets // Add structured ticket quantities
+          },
           original_row_index: index
         };
         

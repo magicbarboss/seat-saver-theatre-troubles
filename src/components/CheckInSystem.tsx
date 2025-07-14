@@ -317,7 +317,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   };
 
 
-  // Pizza detection based on ticket type mapping
+  // Pizza detection based on ticket type mapping  
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest || typeof guest !== 'object') return '';
     
@@ -329,19 +329,38 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       return pizzaText;
     }
     
-    // Fallback: check for pizza fields with actual values
-    for (const [key, value] of Object.entries(guest)) {
-      if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
-        return 'Pizza';
-      }
-    }
-    
-    // Also check ticket_data if it exists
+    // Check if any ticket type the guest has includes pizza
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
-      for (const [key, value] of Object.entries(guest.ticket_data)) {
+      const ticketData = guest.ticket_data as Record<string, any>;
+      
+      // Check extracted_tickets structure
+      if (ticketData.extracted_tickets && typeof ticketData.extracted_tickets === 'object') {
+        for (const [ticketType, quantity] of Object.entries(ticketData.extracted_tickets)) {
+          if (quantity && parseInt(String(quantity)) > 0) {
+            const mapping = TICKET_TYPE_MAPPING[ticketType];
+            if (mapping?.pizza) {
+              return mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
+            }
+            // Also check if ticket type name includes pizza
+            if (ticketType.toLowerCase().includes('pizza')) {
+              return 'Pizza';
+            }
+          }
+        }
+      }
+      
+      // Fallback: check ticket_data directly for pizza fields
+      for (const [key, value] of Object.entries(ticketData)) {
         if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
           return 'Pizza';
         }
+      }
+    }
+    
+    // Check guest fields directly for pizza
+    for (const [key, value] of Object.entries(guest)) {
+      if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
+        return 'Pizza';
       }
     }
     
@@ -567,17 +586,41 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // First check if there's a direct item_details field
     if (guest.item_details) return guest.item_details;
     
-    // Check ticket_data for item information
+    // Check ticket_data for extracted tickets (new structure)
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as Record<string, any>;
+      
+      // Check for extracted_tickets structure first
+      if (ticketData.extracted_tickets && typeof ticketData.extracted_tickets === 'object') {
+        const extractedTickets = ticketData.extracted_tickets;
+        // Return the first ticket type found with quantity > 0
+        for (const [ticketType, quantity] of Object.entries(extractedTickets)) {
+          if (quantity && parseInt(String(quantity)) > 0) {
+            console.log(`Found ticket type from extracted_tickets: ${ticketType} (quantity: ${quantity})`);
+            return ticketType;
+          }
+        }
+      }
+      
+      // Legacy fallback - check ticket_data directly for ticket types
+      for (const ticketType of Object.keys(TICKET_TYPE_MAPPING)) {
+        if (ticketData[ticketType] && parseInt(String(ticketData[ticketType])) > 0) {
+          console.log(`Found ticket type from ticket_data: ${ticketType}`);
+          return ticketType;
+        }
+      }
+      
+      // Check for item field
       if (ticketData.item) return ticketData.item;
       if (ticketData.Item) return ticketData.Item;
     }
     
-    // Check all fields for ticket type headers using the new mapping
-    for (const [key, value] of Object.entries(guest)) {
-      if (key && TICKET_TYPE_MAPPING[key] && value && value !== '0' && value !== '') {
-        return key;
+    // Check guest fields directly for ticket types (backwards compatibility)
+    for (const ticketType of Object.keys(TICKET_TYPE_MAPPING)) {
+      const value = guest[ticketType as keyof Guest];
+      if (value && String(value) !== '0' && String(value) !== '') {
+        console.log(`Found ticket type from guest field: ${ticketType}`);
+        return ticketType;
       }
     }
     
