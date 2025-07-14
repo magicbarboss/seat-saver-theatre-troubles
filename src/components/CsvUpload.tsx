@@ -275,6 +275,16 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           return null;
         }
 
+        // Detect if guest has pizza tickets
+        const hasPizzaTickets = Object.keys(extractedTickets).some(ticketType => 
+          ticketType.toLowerCase().includes('pizza')
+        );
+
+        // Detect if guest has drink tickets
+        const hasDrinkTickets = Object.keys(extractedTickets).some(ticketType => 
+          ticketType.toLowerCase().includes('drink')
+        );
+
         const guestRecord = {
           guest_list_id: guestList.id,
           booking_code: bookingCode,
@@ -283,6 +293,8 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           show_time: '', // This can be extracted from item details if needed
           item_details: itemDetails,
           notes: notes,
+          interval_pizza_order: hasPizzaTickets,
+          interval_drinks_order: hasDrinkTickets,
           ticket_data: { 
             ...ticketData, // Keep all original CSV data
             extracted_tickets: extractedTickets // Add structured ticket quantities
