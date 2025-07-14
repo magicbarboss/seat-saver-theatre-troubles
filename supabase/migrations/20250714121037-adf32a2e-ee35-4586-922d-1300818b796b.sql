@@ -1,26 +1,34 @@
--- Fix pizza and drinks detection based on actual ticket data
+-- Fix pizza and drinks detection by checking keys and extracted_tickets
 UPDATE guests 
 SET 
   interval_pizza_order = CASE
     WHEN EXISTS (
       SELECT 1 
       FROM jsonb_each_text(ticket_data) 
-      WHERE value ILIKE '%pizza%'
-        AND value IS NOT NULL 
-        AND value != '' 
-        AND value != '0'
-    ) THEN true
+      WHERE key ILIKE '%pizza%'
+    ) 
+    OR EXISTS (
+      SELECT 1
+      FROM jsonb_each_text(ticket_data->'extracted_tickets')
+      WHERE key ILIKE '%pizza%' 
+        AND value::int > 0
+    )
+    THEN true
     ELSE false
   END,
   interval_drinks_order = CASE
     WHEN EXISTS (
       SELECT 1 
       FROM jsonb_each_text(ticket_data) 
-      WHERE value ILIKE '%drink%'
-        AND value IS NOT NULL 
-        AND value != '' 
-        AND value != '0'
-    ) THEN true
+      WHERE key ILIKE '%drink%'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM jsonb_each_text(ticket_data->'extracted_tickets')
+      WHERE key ILIKE '%drink%' 
+        AND value::int > 0
+    )
+    THEN true
     ELSE false
   END
 WHERE ticket_data IS NOT NULL;
