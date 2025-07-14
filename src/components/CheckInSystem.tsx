@@ -319,9 +319,25 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   };
 
 
-  // Pizza detection using database flags
+  // Pizza detection using database flags with quantities
   const getPizzaInfo = (guest: Guest): string => {
-    return guest.interval_pizza_order ? 'Pizza' : '';
+    if (!guest.interval_pizza_order) return '';
+    
+    // Calculate pizza quantity from ticket data
+    const allTickets = getAllTicketTypes(guest);
+    let totalPizzas = 0;
+    
+    allTickets.forEach(({ type, quantity }) => {
+      const mapping = TICKET_TYPE_MAPPING[type];
+      if (mapping?.pizza) {
+        totalPizzas += quantity;
+      }
+    });
+    
+    // Fallback to 1 pizza if we can't determine from tickets
+    if (totalPizzas === 0) totalPizzas = 1;
+    
+    return totalPizzas > 1 ? `${totalPizzas} Pizzas` : '1 Pizza';
   };
 
   // Drinks detection using database flags
@@ -1350,6 +1366,32 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     }, 0);
   };
 
+  // Calculate total pizzas needed for all guests
+  const getTotalPizzasNeeded = () => {
+    let totalPizzas = 0;
+    
+    // Count pizzas from regular guests
+    guests.forEach(guest => {
+      if (guest.interval_pizza_order) {
+        const allTickets = getAllTicketTypes(guest);
+        let guestPizzas = 0;
+        
+        allTickets.forEach(({ type, quantity }) => {
+          const mapping = TICKET_TYPE_MAPPING[type];
+          if (mapping?.pizza) {
+            guestPizzas += quantity;
+          }
+        });
+        
+        // Fallback to 1 pizza if we can't determine from tickets
+        if (guestPizzas === 0) guestPizzas = 1;
+        totalPizzas += guestPizzas;
+      }
+    });
+    
+    return totalPizzas;
+  };
+
   const getShowTimeStats = () => {
     const stats = { '7pm': 0, '8pm': 0, '9pm': 0, 'Unknown': 0 };
     
@@ -1487,6 +1529,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
               <Radio className="h-5 w-5 text-purple-600" />
               <span className="font-semibold text-gray-700">{getAvailablePagers().length}</span>
               <span className="text-gray-500">Pagers Free</span>
+            </div>
+            <div className="flex items-center space-x-2 bg-orange-50 px-4 py-2 rounded-lg shadow-sm border border-orange-200">
+              <span className="text-lg">🍕</span>
+              <span className="font-semibold text-orange-700">{getTotalPizzasNeeded()}</span>
+              <span className="text-orange-600">Pizzas Needed</span>
             </div>
           </div>
         </div>
