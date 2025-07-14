@@ -337,12 +337,22 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Fallback to 1 pizza if we can't determine from tickets
     if (totalPizzas === 0) totalPizzas = 1;
     
-    return totalPizzas > 1 ? `${totalPizzas} Pizzas` : '1 Pizza';
+    // CRITICAL FIX: Multiply by total_quantity for correct guest count
+    const totalGuestCount = guest.total_quantity || 1;
+    const finalPizzaCount = totalPizzas * totalGuestCount;
+    
+    return finalPizzaCount > 1 ? `${finalPizzaCount} Pizzas` : '1 Pizza';
   };
 
-  // Drinks detection using database flags
+  // Drinks detection using database flags with quantities
   const getDrinksInfo = (guest: Guest): string => {
-    return guest.interval_drinks_order ? 'Drinks' : '';
+    if (!guest.interval_drinks_order) return '';
+    
+    // Get the total guest count and multiply by 2 drinks per person (standard package)
+    const totalGuestCount = guest.total_quantity || 1;
+    const totalDrinks = totalGuestCount * 2; // Standard package is 2 drinks per person
+    
+    return `${totalDrinks} Drinks`;
   };
 
   // Party detection logic - Fixed variable initialization
