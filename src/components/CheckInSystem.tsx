@@ -267,11 +267,69 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Pizza detection - only show "Pizza" if there's an actual quantity/value in a pizza field
+  // Ticket type mapping for all inclusions
+  const TICKET_TYPE_MAPPING: Record<string, {
+    drinks?: { type: string; quantity: number; perPerson?: boolean };
+    pizza?: { quantity: number; shared?: boolean };
+    extras?: string[];
+  }> = {
+    'House Magicians Show Ticket & 2 Drinks': {
+      drinks: { type: 'Drinks', quantity: 2, perPerson: true }
+    },
+    'Groupon Offer Prosecco Package (per person)': {
+      drinks: { type: 'Prosecco', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Salt & Pepper Fries (shared)']
+    },
+    'House Magicians Show Ticket & 1 Pizza': {
+      pizza: { quantity: 1, shared: false }
+    },
+    'House Magicians Show Ticket includes 2 Drinks +  1 Pizza': {
+      drinks: { type: 'Drinks', quantity: 2, perPerson: true },
+      pizza: { quantity: 1, shared: false }
+    },
+    'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
+      drinks: { type: 'Drinks', quantity: 2, perPerson: true },
+      pizza: { quantity: 1, shared: false }
+    },
+    'House Magicians Show Ticket & 2 soft drinks': {
+      drinks: { type: 'Soft Drinks', quantity: 2, perPerson: true }
+    },
+    'House Magicians Show Ticket': {},
+    'Smoke Offer Ticket & 1x Drink': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true }
+    },
+    'Groupon Magic & Pints Package (per person)': {
+      drinks: { type: 'Pint', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Fries (shared)']
+    },
+    'Groupon Magic & Cocktails Package (per person)': {
+      drinks: { type: 'Cocktail', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Loaded Fries (shared)']
+    },
+    'Wowcher Magic & Cocktails Package (per person)': {
+      drinks: { type: 'Cocktail', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Loaded Fries (shared)']
+    }
+  };
+
+
+  // Pizza detection based on ticket type mapping
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest || typeof guest !== 'object') return '';
     
-    // Check all fields in the guest object for pizza fields with actual values
+    const ticketType = getTicketType(guest);
+    const mapping = TICKET_TYPE_MAPPING[ticketType];
+    
+    if (mapping?.pizza) {
+      const pizzaText = mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
+      return pizzaText;
+    }
+    
+    // Fallback: check for pizza fields with actual values
     for (const [key, value] of Object.entries(guest)) {
       if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
         return 'Pizza';
@@ -396,69 +454,134 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return result;
   }, [guests]);
 
-  // Simple package detection based on active field names
+  // Package detection using new ticket type mapping
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Ticket Only';
     
-    // Look for active fields in guest.ticket_data to determine package
+    const ticketType = getTicketType(guest);
+    const mapping = TICKET_TYPE_MAPPING[ticketType];
+    
+    if (mapping) {
+      const parts: string[] = ['Show Ticket'];
+      
+      if (mapping.drinks) {
+        const drinkText = mapping.drinks.perPerson 
+          ? `${mapping.drinks.quantity} ${mapping.drinks.type}${mapping.drinks.quantity > 1 ? 's' : ''}`
+          : `${mapping.drinks.type}`;
+        parts.push(drinkText);
+      }
+      
+      if (mapping.pizza) {
+        const pizzaText = mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
+        parts.push(pizzaText);
+      }
+      
+      if (mapping.extras) {
+        parts.push(...mapping.extras);
+      }
+      
+      return parts.join(' + ');
+    }
+    
+    // Fallback: Look for active fields in guest.ticket_data
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
       const ticketData = guest.ticket_data as any;
       
-      // Find fields with actual values (not empty or zero)
       for (const [field, value] of Object.entries(ticketData)) {
         if (value && String(value).trim() !== '' && String(value) !== '0') {
-          // Return the field name as the package type - this shows what they actually ordered
           return field;
         }
       }
     }
     
-    // Fallback to Show Ticket Only if no active fields found
-    return 'Show Ticket Only';
+    return ticketType || 'Show Ticket Only';
   };
 
-  // Simple package calculation based on header text parsing
+  // Package calculation using new ticket type mapping
   const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
     const quantities = [];
     
-    // Parse header text directly to determine quantities
-    // Show Tickets: Any header with "Show" or "Ticket" = 1 show per person
-    if (packageInfo.includes('Show') || packageInfo.includes('Ticket')) {
-      quantities.push(`${guestCount} Show Ticket${guestCount > 1 ? 's' : ''}`);
+    // Always include show tickets
+    quantities.push(`${guestCount} Show Ticket${guestCount > 1 ? 's' : ''}`);
+    
+    // Try to find the ticket type in our mapping
+    const mapping = Object.values(TICKET_TYPE_MAPPING).find((_, index) => {
+      const ticketType = Object.keys(TICKET_TYPE_MAPPING)[index];
+      return packageInfo.includes(ticketType) || ticketType === packageInfo;
+    });
+    
+    if (mapping) {
+      // Calculate drinks
+      if (mapping.drinks) {
+        const totalDrinks = mapping.drinks.perPerson ? mapping.drinks.quantity * guestCount : mapping.drinks.quantity;
+        const drinkType = mapping.drinks.type.includes('Soft') ? 'Soft Drink Tokens' : 
+                         mapping.drinks.type.includes('Pint') ? 'Pint Tokens' :
+                         mapping.drinks.type.includes('Cocktail') ? 'Cocktail Tokens' :
+                         mapping.drinks.type.includes('Prosecco') ? 'Prosecco Glasses' : 'Drink Tokens';
+        quantities.push(`${totalDrinks} ${drinkType}`);
+      }
+      
+      // Calculate pizzas
+      if (mapping.pizza) {
+        const totalPizzas = mapping.pizza.shared ? Math.ceil(guestCount / 2) : guestCount;
+        const pizzaText = mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
+        quantities.push(`${totalPizzas} ${pizzaText}`);
+      }
+      
+      // Add extras
+      if (mapping.extras) {
+        mapping.extras.forEach(extra => {
+          quantities.push(extra);
+        });
+      }
+    } else {
+      // Fallback to legacy parsing for backwards compatibility
+      const drinkMatch = packageInfo.match(/(\d+)\s*(Drink|drink)/i);
+      if (drinkMatch) {
+        const drinksPerPerson = parseInt(drinkMatch[1]);
+        const totalDrinks = drinksPerPerson * guestCount;
+        const drinkType = packageInfo.includes('soft') ? 'Soft Drink Tokens' : 'Drink Tokens';
+        quantities.push(`${totalDrinks} ${drinkType}`);
+      }
+      
+      const pizzaMatch = packageInfo.match(/(\d+)["']?\s*Pizza/i);
+      if (pizzaMatch) {
+        const pizzaSize = pizzaMatch[1];
+        const totalPizzas = guestCount;
+        quantities.push(`${totalPizzas} × ${pizzaSize}" Pizza${totalPizzas > 1 ? 's' : ''}`);
+      }
+      
+      if (packageInfo.includes('OLD Groupon')) {
+        quantities.push('OLD Groupon Package');
+      }
     }
     
-    // Drinks: Extract number from headers like "2 Drinks"
-    const drinkMatch = packageInfo.match(/(\d+)\s*(Drink|drink)/i);
-    if (drinkMatch) {
-      const drinksPerPerson = parseInt(drinkMatch[1]);
-      const totalDrinks = drinksPerPerson * guestCount;
-      const drinkType = packageInfo.includes('soft') ? 'Soft Drink Tokens' : 'Drink Tokens';
-      quantities.push(`${totalDrinks} ${drinkType}`);
-    }
-    
-    // Pizzas: Extract size and quantity from headers like "9 Pizza" or "9\" Pizza"
-    const pizzaMatch = packageInfo.match(/(\d+)["']?\s*Pizza/i);
-    if (pizzaMatch) {
-      const pizzaSize = pizzaMatch[1];
-      const totalPizzas = guestCount;
-      quantities.push(`${totalPizzas} × ${pizzaSize}" Pizza${totalPizzas > 1 ? 's' : ''}`);
-    }
-    
-    // Special packages: Display as-is
-    if (packageInfo.includes('OLD Groupon')) {
-      quantities.push('OLD Groupon Package');
-    }
-    
-    // Return at least show tickets if nothing else found
-    return quantities.length > 0 ? quantities : [`${guestCount} Show Ticket${guestCount > 1 ? 's' : ''}`];
+    return quantities;
   };
 
-  // Extract ticket type - focus on package information (drinks + pizza)
-  const getTicketType = (guest: Guest) => {
+  // Extract ticket type - updated for new ticket type mapping
+  const getTicketType = (guest: Guest): string => {
     if (!guest || typeof guest !== 'object') return 'Show Ticket';
     
-    // All the possible ticket type fields from the data
-    const ticketTypeFields = [
+    // First check if there's a direct item_details field
+    if (guest.item_details) return guest.item_details;
+    
+    // Check ticket_data for item information
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      const ticketData = guest.ticket_data as Record<string, any>;
+      if (ticketData.item) return ticketData.item;
+      if (ticketData.Item) return ticketData.Item;
+    }
+    
+    // Check all fields for ticket type headers using the new mapping
+    for (const [key, value] of Object.entries(guest)) {
+      if (key && TICKET_TYPE_MAPPING[key] && value && value !== '0' && value !== '') {
+        return key;
+      }
+    }
+    
+    // Legacy ticket type fields for backward compatibility
+    const legacyTicketTypeFields = [
       'Adult Show Ticket includes 2 Drinks',
       'Comedy ticket plus 9" Pizza', 
       'OLD Groupon Offer (per person - extras are already included)',
@@ -476,8 +599,8 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     // Debug: Log guest data to see what fields are available
     console.log('Checking ticket type for guest:', guest.booker_name, Object.keys(guest));
     
-    // Find the ticket type and extract package info
-    for (const field of ticketTypeFields) {
+    // Find the ticket type and extract package info - legacy support
+    for (const field of legacyTicketTypeFields) {
       const value = guest[field];
       console.log(`Checking field "${field}": value = "${value}"`);
       if (value && value !== '' && value !== '0' && parseInt(value) > 0) {

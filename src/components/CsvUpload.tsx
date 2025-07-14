@@ -49,14 +49,19 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         
         if (jsonData.length === 0) return;
         
-        // Find the header row by looking for a row that contains 'Booker' or 'booking'
+        // Find the header row by looking for key header indicators
         let headerRowIndex = -1;
         for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
           const row = jsonData[i] as any[];
-          if (row && row.some(cell => 
-            String(cell || '').toLowerCase().includes('booker') || 
-            String(cell || '').toLowerCase().includes('booking')
-          )) {
+          if (row && row.some(cell => {
+            const cellText = String(cell || '').toLowerCase();
+            return cellText.includes('booker') || 
+                   cellText.includes('booking') ||
+                   cellText.includes('ticket') ||
+                   cellText.includes('item') ||
+                   cellText.includes('guests') ||
+                   cellText.includes('code');
+          })) {
             headerRowIndex = i;
             console.log('Found header row at index:', i, 'with data:', row);
             break;
