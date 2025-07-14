@@ -330,7 +330,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.pizza) {
-        totalPizzas += quantity; // quantity already includes the correct count from extracted_tickets
+        totalPizzas += quantity * mapping.pizza.quantity; // multiply by pizzas per ticket
       }
     });
     
