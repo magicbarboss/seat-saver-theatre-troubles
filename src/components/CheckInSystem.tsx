@@ -465,9 +465,10 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       const parts: string[] = ['Show Ticket'];
       
       if (mapping.drinks) {
+        const drinkType = mapping.drinks.type;
         const drinkText = mapping.drinks.perPerson 
-          ? `${mapping.drinks.quantity} ${mapping.drinks.type}${mapping.drinks.quantity > 1 ? 's' : ''}`
-          : `${mapping.drinks.type}`;
+          ? `${mapping.drinks.quantity} ${drinkType}${mapping.drinks.quantity > 1 && !drinkType.endsWith('s') ? 's' : ''}`
+          : `${drinkType}`;
         parts.push(drinkText);
       }
       
