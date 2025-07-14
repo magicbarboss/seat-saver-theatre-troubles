@@ -319,38 +319,48 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   };
 
 
-  // Pizza detection using database flags with quantities
+  // Pizza detection using extracted ticket data
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest.interval_pizza_order) return '';
     
-    // Calculate pizza quantity from ticket data
+    // Get pizza quantities directly from extracted tickets
     const allTickets = getAllTicketTypes(guest);
     let totalPizzas = 0;
     
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.pizza) {
-        totalPizzas += quantity;
+        totalPizzas += quantity; // quantity already includes the correct count from extracted_tickets
       }
     });
     
-    // Fallback to 1 pizza if we can't determine from tickets
-    if (totalPizzas === 0) totalPizzas = 1;
+    // Fallback to guest count if no tickets found
+    if (totalPizzas === 0) {
+      totalPizzas = guest.total_quantity || 1;
+    }
     
-    // CRITICAL FIX: Multiply by total_quantity for correct guest count
-    const totalGuestCount = guest.total_quantity || 1;
-    const finalPizzaCount = totalPizzas * totalGuestCount;
-    
-    return finalPizzaCount > 1 ? `${finalPizzaCount} Pizzas` : '1 Pizza';
+    return totalPizzas > 1 ? `${totalPizzas} Pizzas` : '1 Pizza';
   };
 
-  // Drinks detection using database flags with quantities
+  // Drinks detection using extracted ticket data
   const getDrinksInfo = (guest: Guest): string => {
     if (!guest.interval_drinks_order) return '';
     
-    // Get the total guest count and multiply by 2 drinks per person (standard package)
-    const totalGuestCount = guest.total_quantity || 1;
-    const totalDrinks = totalGuestCount * 2; // Standard package is 2 drinks per person
+    // Get drink quantities from extracted tickets
+    const allTickets = getAllTicketTypes(guest);
+    let totalDrinks = 0;
+    
+    allTickets.forEach(({ type, quantity }) => {
+      const mapping = TICKET_TYPE_MAPPING[type];
+      if (mapping?.drinks) {
+        totalDrinks += quantity * mapping.drinks.quantity; // multiply by drinks per ticket
+      }
+    });
+    
+    // Fallback to standard 2 drinks per person if no tickets found
+    if (totalDrinks === 0) {
+      totalDrinks = (guest.total_quantity || 1) * 2;
+    }
     
     return `${totalDrinks} Drinks`;
   };
@@ -589,6 +599,19 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         for (const [ticketType, quantity] of Object.entries(extractedTickets)) {
           if (quantity && parseInt(String(quantity)) > 0) {
             ticketTypes.push({ type: ticketType, quantity: parseInt(String(quantity)) });
+          }
+        }
+      }
+      
+      // If no extracted_tickets, parse directly from ticket_data headers
+      if (ticketTypes.length === 0) {
+        for (const [key, value] of Object.entries(ticketData)) {
+          // Look for ticket type keys that have quantities (like "House Magicians Show Ticket includes 2 Drinks +  1 Pizza:3")
+          if (typeof value === 'string' || typeof value === 'number') {
+            const quantity = parseInt(String(value));
+            if (quantity > 0 && TICKET_TYPE_MAPPING[key]) {
+              ticketTypes.push({ type: key, quantity: quantity });
+            }
           }
         }
       }
