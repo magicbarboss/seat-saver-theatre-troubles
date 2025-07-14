@@ -5,7 +5,7 @@ SET
     WHEN EXISTS (
       SELECT 1 
       FROM jsonb_each_text(ticket_data) 
-      WHERE (key ILIKE '%pizza%' OR key ILIKE '%PIzza%') 
+      WHERE (value ILIKE '%pizza%' OR value ILIKE '%PIzza%') 
         AND value IS NOT NULL 
         AND value != '' 
         AND value != '0'
@@ -16,7 +16,7 @@ SET
     WHEN EXISTS (
       SELECT 1 
       FROM jsonb_each_text(ticket_data) 
-      WHERE key ILIKE '%drink%' 
+      WHERE value ILIKE '%drink%' 
         AND value IS NOT NULL 
         AND value != '' 
         AND value != '0'
