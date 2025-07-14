@@ -323,20 +323,44 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest.interval_pizza_order) return '';
     
+    const guestName = extractGuestName(guest.booker_name || '');
+    
     // Get pizza quantities directly from extracted tickets
     const allTickets = getAllTicketTypes(guest);
     let totalPizzas = 0;
     
+    // Debug logging for problematic cases
+    if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+      console.log(`🍕 DEBUG ${guestName} Pizza Calculation:`, {
+        interval_pizza_order: guest.interval_pizza_order,
+        allTickets,
+        total_quantity: guest.total_quantity
+      });
+    }
+    
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.pizza) {
-        totalPizzas += quantity; // quantity already includes the correct count from extracted_tickets
+        totalPizzas += mapping.pizza.quantity; // Use the pizza quantity from mapping, not ticket quantity
+        
+        if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+          console.log(`🍕 DEBUG ${guestName} Found pizza ticket:`, {
+            ticketType: type,
+            ticketQuantity: quantity,
+            pizzaFromMapping: mapping.pizza.quantity,
+            runningTotal: totalPizzas
+          });
+        }
       }
     });
     
     // Fallback to guest count if no tickets found
     if (totalPizzas === 0) {
       totalPizzas = guest.total_quantity || 1;
+    }
+    
+    if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+      console.log(`🍕 DEBUG ${guestName} Final pizza result: ${totalPizzas}`);
     }
     
     return totalPizzas > 1 ? `${totalPizzas} Pizzas` : '1 Pizza';
@@ -346,20 +370,47 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   const getDrinksInfo = (guest: Guest): string => {
     if (!guest.interval_drinks_order) return '';
     
+    const guestName = extractGuestName(guest.booker_name || '');
+    
     // Get drink quantities from extracted tickets
     const allTickets = getAllTicketTypes(guest);
     let totalDrinks = 0;
     
+    // Debug logging for problematic cases
+    if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+      console.log(`🥤 DEBUG ${guestName} Drinks Calculation:`, {
+        interval_drinks_order: guest.interval_drinks_order,
+        allTickets,
+        total_quantity: guest.total_quantity
+      });
+    }
+    
     allTickets.forEach(({ type, quantity }) => {
       const mapping = TICKET_TYPE_MAPPING[type];
       if (mapping?.drinks) {
-        totalDrinks += quantity * mapping.drinks.quantity; // multiply by drinks per ticket
+        // For drinks: ticket quantity × drinks per ticket
+        const drinksFromThisTicket = quantity * mapping.drinks.quantity;
+        totalDrinks += drinksFromThisTicket;
+        
+        if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+          console.log(`🥤 DEBUG ${guestName} Found drinks ticket:`, {
+            ticketType: type,
+            ticketQuantity: quantity,
+            drinksPerTicket: mapping.drinks.quantity,
+            drinksFromThisTicket: drinksFromThisTicket,
+            runningTotal: totalDrinks
+          });
+        }
       }
     });
     
     // Fallback to standard 2 drinks per person if no tickets found
     if (totalDrinks === 0) {
       totalDrinks = (guest.total_quantity || 1) * 2;
+    }
+    
+    if (guestName.toLowerCase().includes('dominic') || guestName.toLowerCase().includes('kelly') || guestName.toLowerCase().includes('emma')) {
+      console.log(`🥤 DEBUG ${guestName} Final drinks result: ${totalDrinks}`);
     }
     
     return `${totalDrinks} Drinks`;
@@ -583,11 +634,35 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return quantities;
   };
 
-  // Extract ALL ticket types - updated for multiple ticket handling
+  // Extract ALL ticket types - updated for multiple ticket handling with fuzzy matching
   const getAllTicketTypes = (guest: Guest): Array<{type: string, quantity: number}> => {
     if (!guest || typeof guest !== 'object') return [];
     
     const ticketTypes: Array<{type: string, quantity: number}> = [];
+    
+    // Helper function to normalize ticket names (remove extra spaces)
+    const normalizeTicketName = (name: string): string => {
+      return name.replace(/\s+/g, ' ').trim();
+    };
+    
+    // Helper function to find matching ticket type with fuzzy matching
+    const findMatchingTicketType = (ticketName: string): string | null => {
+      const normalizedName = normalizeTicketName(ticketName);
+      
+      // First try exact match
+      if (TICKET_TYPE_MAPPING[normalizedName]) {
+        return normalizedName;
+      }
+      
+      // Try fuzzy matching - look for tickets with same content but different spacing
+      for (const mappedType of Object.keys(TICKET_TYPE_MAPPING)) {
+        if (normalizeTicketName(mappedType) === normalizedName) {
+          return mappedType;
+        }
+      }
+      
+      return null;
+    };
     
     // Check ticket_data for extracted tickets (new structure)
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
@@ -598,19 +673,23 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         const extractedTickets = ticketData.extracted_tickets;
         for (const [ticketType, quantity] of Object.entries(extractedTickets)) {
           if (quantity && parseInt(String(quantity)) > 0) {
-            ticketTypes.push({ type: ticketType, quantity: parseInt(String(quantity)) });
+            const matchingType = findMatchingTicketType(ticketType) || ticketType;
+            ticketTypes.push({ type: matchingType, quantity: parseInt(String(quantity)) });
           }
         }
       }
       
-      // If no extracted_tickets, parse directly from ticket_data headers
+      // If no extracted_tickets, parse directly from ticket_data headers with fuzzy matching
       if (ticketTypes.length === 0) {
         for (const [key, value] of Object.entries(ticketData)) {
-          // Look for ticket type keys that have quantities (like "House Magicians Show Ticket includes 2 Drinks +  1 Pizza:3")
+          // Look for ticket type keys that have quantities
           if (typeof value === 'string' || typeof value === 'number') {
             const quantity = parseInt(String(value));
-            if (quantity > 0 && TICKET_TYPE_MAPPING[key]) {
-              ticketTypes.push({ type: key, quantity: quantity });
+            if (quantity > 0) {
+              const matchingType = findMatchingTicketType(key);
+              if (matchingType && TICKET_TYPE_MAPPING[matchingType]) {
+                ticketTypes.push({ type: matchingType, quantity: quantity });
+              }
             }
           }
         }
