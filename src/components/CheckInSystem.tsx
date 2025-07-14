@@ -317,16 +317,22 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   };
 
 
-  // Pizza detection based on ticket type mapping  
+  // Pizza detection based on ALL ticket types  
   const getPizzaInfo = (guest: Guest): string => {
     if (!guest || typeof guest !== 'object') return '';
     
-    const ticketType = getTicketType(guest);
-    const mapping = TICKET_TYPE_MAPPING[ticketType];
+    const allTickets = getAllTicketTypes(guest);
+    let totalPizzas = 0;
     
-    if (mapping?.pizza) {
-      const pizzaText = mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
-      return pizzaText;
+    allTickets.forEach(({ type, quantity }) => {
+      const mapping = TICKET_TYPE_MAPPING[type];
+      if (mapping?.pizza) {
+        totalPizzas += quantity;
+      }
+    });
+    
+    if (totalPizzas > 0) {
+      return totalPizzas > 1 ? `${totalPizzas} Pizzas` : 'Pizza';
     }
     
     // Check if any ticket type the guest has includes pizza
@@ -473,51 +479,57 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return result;
   }, [guests]);
 
-  // Package detection using new ticket type mapping
+  // Package detection using ALL ticket types
   const getPackageInfo = (guest: Guest) => {
     if (!guest || typeof guest !== 'object') return 'Show Ticket Only';
     
-    const ticketType = getTicketType(guest);
-    const mapping = TICKET_TYPE_MAPPING[ticketType];
+    const allTickets = getAllTicketTypes(guest);
     
-    if (mapping) {
-      const parts: string[] = ['Show Ticket'];
-      
-      if (mapping.drinks) {
-        const drinkType = mapping.drinks.type;
-        const drinkText = mapping.drinks.perPerson 
-          ? `${mapping.drinks.quantity} ${drinkType}${mapping.drinks.quantity > 1 && !drinkType.endsWith('s') ? 's' : ''}`
-          : `${drinkType}`;
-        parts.push(drinkText);
-      }
-      
-      if (mapping.pizza) {
-        const pizzaText = mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
-        parts.push(pizzaText);
-      }
-      
-      if (mapping.extras) {
-        parts.push(...mapping.extras);
-      }
-      
-      return parts.join(' + ');
+    if (allTickets.length === 0) {
+      return 'Show Ticket Only';
     }
     
-    // Fallback: Look for active fields in guest.ticket_data
-    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
-      const ticketData = guest.ticket_data as any;
-      
-      for (const [field, value] of Object.entries(ticketData)) {
-        if (value && String(value).trim() !== '' && String(value) !== '0') {
-          return field;
+    const parts: string[] = ['Show Ticket'];
+    let totalDrinks = 0;
+    let totalPizzas = 0;
+    const extras: string[] = [];
+    
+    // Combine all ticket types
+    allTickets.forEach(({ type, quantity }) => {
+      const mapping = TICKET_TYPE_MAPPING[type];
+      if (mapping) {
+        if (mapping.drinks) {
+          totalDrinks += mapping.drinks.quantity * quantity;
+        }
+        
+        if (mapping.pizza) {
+          totalPizzas += quantity;
+        }
+        
+        if (mapping.extras) {
+          extras.push(...mapping.extras);
         }
       }
+    });
+    
+    // Add drinks if any
+    if (totalDrinks > 0) {
+      parts.push(`${totalDrinks} Drink${totalDrinks > 1 ? 's' : ''}`);
     }
     
-    return ticketType || 'Show Ticket Only';
+    // Add pizzas if any
+    if (totalPizzas > 0) {
+      parts.push(`${totalPizzas} Pizza${totalPizzas > 1 ? 's' : ''}`);
+    }
+    
+    // Add unique extras
+    const uniqueExtras = [...new Set(extras)];
+    parts.push(...uniqueExtras);
+    
+    return parts.join(' + ');
   };
 
-  // Package calculation using new ticket type mapping
+  // Package calculation using ALL ticket types
   const calculatePackageQuantities = (packageInfo: string, guestCount: number) => {
     const quantities = [];
     
@@ -579,12 +591,11 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return quantities;
   };
 
-  // Extract ticket type - updated for new ticket type mapping
-  const getTicketType = (guest: Guest): string => {
-    if (!guest || typeof guest !== 'object') return 'Show Ticket';
+  // Extract ALL ticket types - updated for multiple ticket handling
+  const getAllTicketTypes = (guest: Guest): Array<{type: string, quantity: number}> => {
+    if (!guest || typeof guest !== 'object') return [];
     
-    // First check if there's a direct item_details field
-    if (guest.item_details) return guest.item_details;
+    const ticketTypes: Array<{type: string, quantity: number}> = [];
     
     // Check ticket_data for extracted tickets (new structure)
     if (guest.ticket_data && typeof guest.ticket_data === 'object') {
@@ -593,14 +604,33 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       // Check for extracted_tickets structure first
       if (ticketData.extracted_tickets && typeof ticketData.extracted_tickets === 'object') {
         const extractedTickets = ticketData.extracted_tickets;
-        // Return the first ticket type found with quantity > 0
         for (const [ticketType, quantity] of Object.entries(extractedTickets)) {
           if (quantity && parseInt(String(quantity)) > 0) {
-            console.log(`Found ticket type from extracted_tickets: ${ticketType} (quantity: ${quantity})`);
-            return ticketType;
+            ticketTypes.push({ type: ticketType, quantity: parseInt(String(quantity)) });
           }
         }
       }
+    }
+    
+    return ticketTypes;
+  };
+
+  // Extract ticket type - updated for new ticket type mapping (legacy support)
+  const getTicketType = (guest: Guest): string => {
+    if (!guest || typeof guest !== 'object') return 'Show Ticket';
+    
+    // First check if there's a direct item_details field
+    if (guest.item_details) return guest.item_details;
+    
+    // Get all ticket types and return the first one (for backward compatibility)
+    const allTickets = getAllTicketTypes(guest);
+    if (allTickets.length > 0) {
+      return allTickets[0].type;
+    }
+    
+    // Check ticket_data for extracted tickets (legacy fallback)
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      const ticketData = guest.ticket_data as Record<string, any>;
       
       // Legacy fallback - check ticket_data directly for ticket types
       for (const ticketType of Object.keys(TICKET_TYPE_MAPPING)) {
