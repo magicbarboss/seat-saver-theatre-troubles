@@ -7,11 +7,15 @@ SET
       FROM jsonb_each_text(ticket_data) 
       WHERE key ILIKE '%pizza%'
     ) 
-    OR EXISTS (
-      SELECT 1
-      FROM jsonb_each_text(ticket_data->'extracted_tickets')
-      WHERE key ILIKE '%pizza%' 
-        AND value::int > 0
+    OR (
+      ticket_data ? 'extracted_tickets' 
+      AND ticket_data->'extracted_tickets' IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_each_text(ticket_data->'extracted_tickets')
+        WHERE key ILIKE '%pizza%' 
+          AND value::int > 0
+      )
     )
     THEN true
     ELSE false
@@ -22,11 +26,15 @@ SET
       FROM jsonb_each_text(ticket_data) 
       WHERE key ILIKE '%drink%'
     )
-    OR EXISTS (
-      SELECT 1
-      FROM jsonb_each_text(ticket_data->'extracted_tickets')
-      WHERE key ILIKE '%drink%' 
-        AND value::int > 0
+    OR (
+      ticket_data ? 'extracted_tickets' 
+      AND ticket_data->'extracted_tickets' IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_each_text(ticket_data->'extracted_tickets')
+        WHERE key ILIKE '%drink%' 
+          AND value::int > 0
+      )
     )
     THEN true
     ELSE false
