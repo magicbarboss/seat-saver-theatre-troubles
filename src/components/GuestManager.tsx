@@ -29,6 +29,8 @@ interface Guest {
   pager_number: number;
   is_seated: boolean;
   table_assignments: number[];
+  interval_pizza_order?: boolean;
+  interval_drinks_order?: boolean;
 }
 
 const GuestManager = () => {
@@ -176,7 +178,9 @@ const GuestManager = () => {
         is_checked_in: guest.is_checked_in,
         pager_number: guest.pager_number,
         table_assignments: guest.table_assignments,
-        show_time: guest.show_time
+        show_time: guest.show_time,
+        interval_pizza_order: guest.interval_pizza_order,
+        interval_drinks_order: guest.interval_drinks_order
       };
     });
 
