@@ -21,6 +21,8 @@ interface Guest {
   is_checked_in: boolean;
   pager_number: number | null;
   table_assignments: number[] | null;
+  interval_pizza_order?: boolean;
+  interval_drinks_order?: boolean;
 }
 
 interface CheckInSystemProps {
@@ -317,60 +319,14 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
   };
 
 
-  // Pizza detection based on ALL ticket types  
+  // Pizza detection using database flags
   const getPizzaInfo = (guest: Guest): string => {
-    if (!guest || typeof guest !== 'object') return '';
-    
-    const allTickets = getAllTicketTypes(guest);
-    let totalPizzas = 0;
-    
-    allTickets.forEach(({ type, quantity }) => {
-      const mapping = TICKET_TYPE_MAPPING[type];
-      if (mapping?.pizza) {
-        totalPizzas += quantity;
-      }
-    });
-    
-    if (totalPizzas > 0) {
-      return totalPizzas > 1 ? `${totalPizzas} Pizzas` : 'Pizza';
-    }
-    
-    // Check if any ticket type the guest has includes pizza
-    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
-      const ticketData = guest.ticket_data as Record<string, any>;
-      
-      // Check extracted_tickets structure
-      if (ticketData.extracted_tickets && typeof ticketData.extracted_tickets === 'object') {
-        for (const [ticketType, quantity] of Object.entries(ticketData.extracted_tickets)) {
-          if (quantity && parseInt(String(quantity)) > 0) {
-            const mapping = TICKET_TYPE_MAPPING[ticketType];
-            if (mapping?.pizza) {
-              return mapping.pizza.shared ? 'Pizza (shared)' : 'Pizza';
-            }
-            // Also check if ticket type name includes pizza
-            if (ticketType.toLowerCase().includes('pizza')) {
-              return 'Pizza';
-            }
-          }
-        }
-      }
-      
-      // Fallback: check ticket_data directly for pizza fields
-      for (const [key, value] of Object.entries(ticketData)) {
-        if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
-          return 'Pizza';
-        }
-      }
-    }
-    
-    // Check guest fields directly for pizza
-    for (const [key, value] of Object.entries(guest)) {
-      if (key && key.toLowerCase().includes('pizza') && value && value !== '0' && value !== '') {
-        return 'Pizza';
-      }
-    }
-    
-    return '';
+    return guest.interval_pizza_order ? 'Pizza' : '';
+  };
+
+  // Drinks detection using database flags
+  const getDrinksInfo = (guest: Guest): string => {
+    return guest.interval_drinks_order ? 'Drinks' : '';
   };
 
   // Party detection logic - Fixed variable initialization
@@ -1649,6 +1605,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                   <TableHead className="font-semibold text-gray-700">Total Quantity</TableHead>
                   <TableHead className="font-semibold text-gray-700 min-w-[200px]">Package & Totals</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pizzas</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Drinks</TableHead>
                   <TableHead className="font-semibold text-gray-700">Addons</TableHead>
                   <TableHead className="font-semibold text-gray-700">Show Time</TableHead>
                   <TableHead className="font-semibold text-gray-700">Pager</TableHead>
@@ -1876,6 +1833,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400">No Pizzas</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-center">
+                          {getDrinksInfo(booking.mainBooking) ? (
+                            <div className="bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+                              <span className="text-sm font-semibold text-blue-800">{getDrinksInfo(booking.mainBooking)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">No Drinks</span>
                           )}
                         </div>
                       </TableCell>
