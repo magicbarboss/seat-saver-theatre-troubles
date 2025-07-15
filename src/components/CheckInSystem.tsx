@@ -524,9 +524,27 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary for direct display
   const getOrderSummary = (guest: Guest): string => {
-    const tickets = getAllTicketTypes(guest);
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
+    
+    // Check if this is a GYG (GetYourGuide) payment - treat as Groupon Offer Prosecco Package
+    const ticketDataStr = JSON.stringify(guest.ticket_data || {});
+    const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg');
+    
+    if (isGYGPayment) {
+      // Apply GYG rules: 1 prosecco per person, 1 pizza per couple, 1 fries per couple
+      const totalProseccos = guestCount;
+      const couples = Math.ceil(guestCount / 2);
+      
+      orderItems.push(`${totalProseccos} Prosecco${totalProseccos > 1 ? 's' : ''}`);
+      orderItems.push(`${couples} Pizza${couples > 1 ? 's' : ''}`);
+      orderItems.push(`${couples} Fries`);
+      
+      return orderItems.join(', ');
+    }
+    
+    // Normal processing for non-GYG bookings
+    const tickets = getAllTicketTypes(guest);
     
     tickets.forEach(ticket => {
       const packageInfo = TICKET_TYPE_MAPPING[ticket.type];
