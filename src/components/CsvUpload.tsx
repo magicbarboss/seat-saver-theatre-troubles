@@ -292,12 +292,20 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
             const cellValue = row[headerIndex] || '';
             ticketData[header] = cellValue;
 
-            // Check if this header matches a known ticket type and has a quantity > 0
+            // Check if this header matches a known ticket type
             if (TICKET_TYPE_MAPPING.includes(header)) {
-              const quantity = parseInt(cellValue) || 0;
-              if (quantity > 0) {
-                extractedTickets[header] = quantity;
-                console.log(`Found ticket type "${header}" with quantity ${quantity} for row ${index}`);
+              // If the cell has any non-empty value (text or number), this ticket type is present
+              if (cellValue && cellValue.toString().trim() !== '') {
+                const numericValue = parseInt(cellValue);
+                if (!isNaN(numericValue) && numericValue > 0) {
+                  // If it's a valid number, use that as quantity
+                  extractedTickets[header] = numericValue;
+                  console.log(`Found ticket type "${header}" with numeric quantity ${numericValue} for row ${index}`);
+                } else {
+                  // If it's text (like guest names), assign the total booking quantity
+                  extractedTickets[header] = totalQuantity;
+                  console.log(`Found ticket type "${header}" with text value "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
+                }
               }
             }
           });
