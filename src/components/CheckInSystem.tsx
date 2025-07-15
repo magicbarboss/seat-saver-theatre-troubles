@@ -94,7 +94,101 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     });
   };
 
-  // Load state from Supabase
+  // Migrate session data from another guest list to current one by matching booking codes
+  const migrateSessionData = async (fromSession: any, currentGuests: Guest[]) => {
+    // First, we need to get the old guest list to match booking codes properly
+    try {
+      const { data: oldGuests } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('guest_list_id', fromSession.guest_list_id)
+        .order('original_row_index');
+
+      if (!oldGuests || oldGuests.length === 0) {
+        console.log('No old guests found for migration');
+        return;
+      }
+
+      // Create mapping from booking_code to original index in old list
+      const oldGuestsByBookingCode = new Map<string, number>();
+      oldGuests.forEach((guest, index) => {
+        if (guest.booking_code && guest.booker_name) {
+          const key = `${guest.booking_code}_${guest.booker_name}`;
+          oldGuestsByBookingCode.set(key, index);
+        }
+      });
+
+      // Migrate data for matching guests
+      const migratedCheckedIn = new Set<number>();
+      const migratedPagers = new Map<number, number>();
+      const migratedSeated = new Set<number>();
+      const migratedAllocated = new Set<number>();
+      const migratedTableAllocations = new Map<number, number[]>();
+      const migratedComments = new Map<number, string>();
+
+      const oldCheckedIn = fromSession.checked_in_guests || [];
+      const oldPagerAssignments = fromSession.pager_assignments || {};
+      const oldSeated = fromSession.seated_guests || [];
+      const oldAllocated = fromSession.allocated_guests || [];
+      const oldTableAllocations = fromSession.guest_table_allocations || {};
+      const oldComments = fromSession.booking_comments || {};
+
+      // Match current guests with old guests by booking code + booker name
+      currentGuests.forEach((guest, currentIndex) => {
+        if (!guest.booking_code || !guest.booker_name) return;
+
+        const key = `${guest.booking_code}_${guest.booker_name}`;
+        const oldIndex = oldGuestsByBookingCode.get(key);
+
+        if (oldIndex !== undefined) {
+          // Migrate data from old index to current index
+          if (oldCheckedIn.includes(oldIndex)) {
+            migratedCheckedIn.add(currentIndex);
+          }
+          
+          if (oldSeated.includes(oldIndex)) {
+            migratedSeated.add(currentIndex);
+          }
+          
+          if (oldAllocated.includes(oldIndex)) {
+            migratedAllocated.add(currentIndex);
+          }
+
+          if (oldPagerAssignments[oldIndex]) {
+            migratedPagers.set(currentIndex, oldPagerAssignments[oldIndex]);
+          }
+          
+          if (oldTableAllocations[oldIndex]) {
+            migratedTableAllocations.set(currentIndex, oldTableAllocations[oldIndex]);
+          }
+          
+          if (oldComments[oldIndex]) {
+            migratedComments.set(currentIndex, oldComments[oldIndex]);
+          }
+        }
+      });
+
+      // Apply migrated data
+      setCheckedInGuests(migratedCheckedIn);
+      setPagerAssignments(migratedPagers);
+      setSeatedGuests(migratedSeated);
+      setAllocatedGuests(migratedAllocated);
+      setGuestTableAllocations(migratedTableAllocations);
+      setBookingComments(migratedComments);
+      
+      // Reset other data
+      setSeatedSections(new Set());
+      setPartyGroups(new Map());
+      setWalkInGuests([]);
+      setSessionDate(new Date().toISOString().split('T')[0]);
+
+      console.log(`Migrated data for ${migratedCheckedIn.size} checked-in guests, ${migratedSeated.size} seated guests`);
+    } catch (error) {
+      console.error('Error during migration:', error);
+    }
+  };
+
+  // Load state from Supabase with smart migration for guest list changes
   useEffect(() => {
     const loadState = async () => {
       if (!user?.id) {
@@ -105,7 +199,8 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       try {
         const today = new Date().toISOString().split('T')[0];
         
-        const { data, error } = await supabase
+        // Try to load session for this specific guest list
+        const { data: currentSession, error } = await supabase
           .from('checkin_sessions')
           .select('*')
           .eq('user_id', user.id)
@@ -120,30 +215,53 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
           return;
         }
 
-        if (data) {
-          setCheckedInGuests(new Set(data.checked_in_guests || []));
+        if (currentSession) {
+          // Session exists for this guest list, restore it
+          setCheckedInGuests(new Set(currentSession.checked_in_guests || []));
           setPagerAssignments(new Map(
-            Object.entries(data.pager_assignments || {}).map(([k, v]) => [parseInt(k), v as number])
+            Object.entries(currentSession.pager_assignments || {}).map(([k, v]) => [parseInt(k), v as number])
           ));
-          setSeatedGuests(new Set(data.seated_guests || []));
-          setSeatedSections(new Set(data.seated_sections || []));
-          setAllocatedGuests(new Set(data.allocated_guests || []));
+          setSeatedGuests(new Set(currentSession.seated_guests || []));
+          setSeatedSections(new Set(currentSession.seated_sections || []));
+          setAllocatedGuests(new Set(currentSession.allocated_guests || []));
           setGuestTableAllocations(new Map(
-            Object.entries(data.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])
+            Object.entries(currentSession.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])
           ));
-          setPartyGroups(new Map(Object.entries(data.party_groups || {}) as [string, PartyGroup][]));
+          setPartyGroups(new Map(Object.entries(currentSession.party_groups || {}) as [string, PartyGroup][]));
           setBookingComments(new Map(
-            Object.entries(data.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])
+            Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])
           ));
-          setWalkInGuests((data.walk_in_guests as Guest[]) || []);
+          setWalkInGuests((currentSession.walk_in_guests as Guest[]) || []);
           setSessionDate(today);
           
           toast({
-            title: "🔄 Today's Session Restored",
-            description: `Previous data loaded from ${new Date(data.updated_at).toLocaleTimeString()}`,
+            title: "🔄 Session Restored",
+            description: `Previous data loaded from ${new Date(currentSession.updated_at).toLocaleTimeString()}`,
           });
         } else {
-          setSessionDate(today);
+          // No session for this guest list, check if we can migrate from other sessions
+          const { data: otherSessions } = await supabase
+            .from('checkin_sessions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('session_date', today)
+            .neq('guest_list_id', guestListId);
+
+          if (otherSessions && otherSessions.length > 0 && guests && guests.length > 0) {
+            // Try to migrate data from the most recent session
+            const mostRecentSession = otherSessions.reduce((latest, session) => 
+              new Date(session.updated_at) > new Date(latest.updated_at) ? session : latest
+            );
+
+            await migrateSessionData(mostRecentSession, guests);
+            
+            toast({
+              title: "📋 Data Migrated",
+              description: "Check-in data migrated from previous guest list for matching guests",
+            });
+          } else {
+            setSessionDate(today);
+          }
         }
       } catch (error) {
         console.error('Failed to load saved state:', error);
@@ -153,7 +271,7 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     };
 
     loadState();
-  }, [user?.id, guestListId]);
+  }, [user?.id, guestListId, guests]);
 
   // Auto-save to Supabase
   useEffect(() => {

@@ -137,11 +137,43 @@ const GuestManager = () => {
     }
   };
 
-  const handleGuestListCreated = (newGuestList: GuestList) => {
+  const handleGuestListCreated = async (newGuestList: GuestList) => {
     console.log('New guest list created:', newGuestList);
     setGuestLists(prev => [newGuestList, ...prev]);
     setActiveGuestList(newGuestList);
     setShowUpload(false);
+    
+    // Clear any conflicting session data for the same date but different guest list
+    if (user?.id) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        await supabase
+          .from('checkin_sessions')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('session_date', today)
+          .neq('guest_list_id', newGuestList.id);
+        
+        console.log('Cleared conflicting session data for new guest list');
+      } catch (error) {
+        console.error('Error clearing conflicting session data:', error);
+      }
+    }
+  };
+
+  const handleGuestListSelection = async (selectedList: GuestList) => {
+    if (activeGuestList?.id === selectedList.id) return;
+    
+    console.log('Switching to guest list:', selectedList.name);
+    setActiveGuestList(selectedList);
+    
+    // Show notification when switching to a different guest list
+    if (activeGuestList) {
+      toast({
+        title: "📋 Guest List Changed", 
+        description: `Switched to "${selectedList.name}". Previous check-in data will be preserved.`,
+      });
+    }
   };
 
   if (showUpload) {
@@ -276,12 +308,21 @@ const GuestManager = () => {
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:bg-accent'
                     }`}
-                    onClick={() => setActiveGuestList(list)}
+                    onClick={() => handleGuestListSelection(list)}
                   >
-                    <h3 className="font-medium">{list.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(list.uploaded_at).toLocaleDateString()}
-                    </p>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-medium">{list.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(list.uploaded_at).toLocaleDateString()} - {new Date(list.uploaded_at).toLocaleTimeString()}
+                        </p>
+                      </div>
+                      {new Date(list.uploaded_at) > new Date(Date.now() - 2 * 60 * 60 * 1000) && (
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                          New
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
                 
