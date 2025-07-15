@@ -33,21 +33,21 @@ export const KitchenPrepSummary = ({
             const orderSummary = getOrderSummary(guest);
             
             // Extract pizza count
-            const pizzaMatch = orderSummary.match(/(\d+)\s+pizza/i);
+            const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
             if (pizzaMatch) {
               totalPizzas += parseInt(pizzaMatch[1]);
             }
             
-            // Extract fries count (but not loaded fries)
-            const friesMatch = orderSummary.match(/(\d+)\s+fries(?!\s+\(loaded\))/i);
-            if (friesMatch) {
-              totalFries += parseInt(friesMatch[1]);
+            // Extract loaded fries count (process first to avoid double-counting)
+            const loadedFriesMatch = orderSummary.match(/(\d+)\s*loaded\s*fries/i);
+            if (loadedFriesMatch) {
+              totalLoadedFries += parseInt(loadedFriesMatch[1]);
             }
             
-            // Extract loaded fries count
-            const loadedFriesMatch = orderSummary.match(/(\d+)\s+(?:loaded\s+)?fries\s+\(loaded\)|(\d+)\s+loaded\s+fries/i);
-            if (loadedFriesMatch) {
-              totalLoadedFries += parseInt(loadedFriesMatch[1] || loadedFriesMatch[2]);
+            // Extract fries count (excluding loaded fries)
+            const friesMatch = orderSummary.match(/(\d+)\s*fries(?!.*loaded)/i);
+            if (friesMatch) {
+              totalFries += parseInt(friesMatch[1]);
             }
           });
         }
@@ -60,21 +60,21 @@ export const KitchenPrepSummary = ({
         const orderSummary = getOrderSummary(guest);
         
         // Extract pizza count
-        const pizzaMatch = orderSummary.match(/(\d+)\s+pizza/i);
+        const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
         if (pizzaMatch) {
           totalPizzas += parseInt(pizzaMatch[1]);
         }
         
-        // Extract fries count (but not loaded fries)
-        const friesMatch = orderSummary.match(/(\d+)\s+fries(?!\s+\(loaded\))/i);
-        if (friesMatch) {
-          totalFries += parseInt(friesMatch[1]);
+        // Extract loaded fries count (process first to avoid double-counting)
+        const loadedFriesMatch = orderSummary.match(/(\d+)\s*loaded\s*fries/i);
+        if (loadedFriesMatch) {
+          totalLoadedFries += parseInt(loadedFriesMatch[1]);
         }
         
-        // Extract loaded fries count
-        const loadedFriesMatch = orderSummary.match(/(\d+)\s+(?:loaded\s+)?fries\s+\(loaded\)|(\d+)\s+loaded\s+fries/i);
-        if (loadedFriesMatch) {
-          totalLoadedFries += parseInt(loadedFriesMatch[1] || loadedFriesMatch[2]);
+        // Extract fries count (excluding loaded fries)
+        const friesMatch = orderSummary.match(/(\d+)\s*fries(?!.*loaded)/i);
+        if (friesMatch) {
+          totalFries += parseInt(friesMatch[1]);
         }
       });
     }
