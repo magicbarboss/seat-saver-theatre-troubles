@@ -91,7 +91,7 @@ export const GuestRow = ({
       
       <TableCell>
         <div className="flex items-center gap-2">
-          <div className="text-sm font-medium text-foreground">
+          <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
             {orderSummary}
           </div>
           {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
