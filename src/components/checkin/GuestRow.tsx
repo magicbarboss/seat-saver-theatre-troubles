@@ -2,7 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, User, Radio, MessageSquare } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CheckCircle, User, Radio, MessageSquare, Info } from 'lucide-react';
 
 interface Guest {
   [key: string]: any;
@@ -27,6 +28,11 @@ interface GuestRowProps {
   tableNumbers: number[];
   pizzaInfo: string;
   drinksInfo: string;
+  packageDetails: Array<{
+    type: string;
+    quantity: number;
+    details: string[];
+  }>;
   comment?: string;
   isWalkIn?: boolean;
   partyInfo?: {
@@ -51,6 +57,7 @@ export const GuestRow = ({
   tableNumbers,
   pizzaInfo,
   drinksInfo,
+  packageDetails,
   comment,
   isWalkIn,
   partyInfo,
@@ -86,8 +93,43 @@ export const GuestRow = ({
       
       <TableCell>
         <div className="space-y-1">
-          {pizzaInfo && <div className="text-sm text-orange-600">{pizzaInfo}</div>}
-          {drinksInfo && <div className="text-sm text-blue-600">{drinksInfo}</div>}
+          <div className="flex items-center gap-2">
+            <div className="space-y-1">
+              {pizzaInfo && <div className="text-sm text-orange-600">{pizzaInfo}</div>}
+              {drinksInfo && <div className="text-sm text-blue-600">{drinksInfo}</div>}
+            </div>
+            {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    <Info className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="space-y-3">
+                    <h4 className="font-medium">What's included:</h4>
+                    {packageDetails.map((pkg, idx) => (
+                      pkg.details.length > 0 && (
+                        <div key={idx} className="space-y-1">
+                          <div className="text-sm font-medium text-muted-foreground">
+                            {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
+                          </div>
+                          <ul className="space-y-1">
+                            {pkg.details.map((detail, detailIdx) => (
+                              <li key={detailIdx} className="text-sm flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
+                                {detail}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         </div>
       </TableCell>
 

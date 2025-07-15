@@ -530,6 +530,72 @@ const CheckInSystem = ({
     }
   };
 
+  // Extract detailed package information for staff display
+  const getPackageDetails = (guest: Guest): Array<{
+    type: string;
+    quantity: number;
+    details: string[];
+  }> => {
+    const tickets = getAllTicketTypes(guest);
+    
+    return tickets.map(ticket => {
+      const packageInfo = TICKET_TYPE_MAPPING[ticket.type];
+      const details: string[] = [];
+      
+      if (packageInfo) {
+        // Add drink details
+        if (packageInfo.drinks) {
+          const drinkText = packageInfo.drinks.perPerson 
+            ? `${packageInfo.drinks.quantity} ${packageInfo.drinks.type.toLowerCase()} per person`
+            : `${packageInfo.drinks.quantity} ${packageInfo.drinks.type.toLowerCase()}`;
+          details.push(drinkText);
+        }
+        
+        // Add pizza details
+        if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
+          const pizzaText = packageInfo.pizza.shared
+            ? packageInfo.pizza.quantity === 0.5
+              ? "1 pizza per couple"
+              : packageInfo.pizza.quantity === 1
+                ? "1 pizza per couple"
+                : `${packageInfo.pizza.quantity} pizzas per couple`
+            : `${packageInfo.pizza.quantity} pizza${packageInfo.pizza.quantity > 1 ? 's' : ''} per person`;
+          details.push(pizzaText);
+        }
+        
+        // Add extras
+        if (packageInfo.extras && packageInfo.extras.length > 0) {
+          packageInfo.extras.forEach(extra => {
+            if (extra.includes('per couple')) {
+              details.push(extra.toLowerCase());
+            } else if (extra.includes('shared')) {
+              details.push(extra.toLowerCase());
+            } else {
+              details.push(`${extra.toLowerCase()} per couple`);
+            }
+          });
+        }
+      } else {
+        // Handle basic tickets with no mapping
+        if (ticket.type.includes('Drinks') || ticket.type.includes('drinks')) {
+          const drinkMatch = ticket.type.match(/(\d+)\s*drinks?/i);
+          if (drinkMatch) {
+            details.push(`${drinkMatch[1]} drinks per person`);
+          }
+        }
+        if (ticket.type.includes('Pizza') || ticket.type.includes('pizza')) {
+          details.push('1 pizza per person');
+        }
+      }
+      
+      return {
+        type: ticket.type,
+        quantity: ticket.quantity,
+        details
+      };
+    });
+  };
+
   // Get all ticket types for a guest - improved parsing logic
   const getAllTicketTypes = (guest: Guest): Array<{
     type: string;
@@ -975,7 +1041,7 @@ const CheckInSystem = ({
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getPizzaInfo={getPizzaInfo} getDrinksInfo={getDrinksInfo} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} />
+            <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getPizzaInfo={getPizzaInfo} getDrinksInfo={getDrinksInfo} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} />
           </div>
         </TabsContent>
 

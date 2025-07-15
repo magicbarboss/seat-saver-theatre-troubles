@@ -42,6 +42,11 @@ interface GuestTableProps {
   walkInGuests: Guest[];
   getPizzaInfo: (guest: Guest) => string;
   getDrinksInfo: (guest: Guest) => string;
+  getPackageDetails: (guest: Guest) => Array<{
+    type: string;
+    quantity: number;
+    details: string[];
+  }>;
   extractGuestName: (name: string) => string;
   onCheckIn: (index: number) => void;
   onPagerAction: (index: number, pagerNumber?: number) => void;
@@ -62,6 +67,7 @@ export const GuestTable = ({
   walkInGuests,
   getPizzaInfo,
   getDrinksInfo,
+  getPackageDetails,
   extractGuestName,
   onCheckIn,
   onPagerAction,
@@ -110,6 +116,7 @@ export const GuestTable = ({
             tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
             pizzaInfo={getPizzaInfo(group.mainBooking)}
             drinksInfo={getDrinksInfo(group.mainBooking)}
+            packageDetails={getPackageDetails(group.mainBooking)}
             comment={bookingComments.get(group.originalIndex)}
             partyInfo={getPartyInfo(group.originalIndex)}
             onCheckIn={onCheckIn}
@@ -134,6 +141,7 @@ export const GuestTable = ({
               tableNumbers={guestTableAllocations.get(walkInIndex) || []}
               pizzaInfo={getPizzaInfo(walkIn)}
               drinksInfo={getDrinksInfo(walkIn)}
+              packageDetails={getPackageDetails(walkIn)}
               comment={bookingComments.get(walkInIndex)}
               isWalkIn={true}
               onCheckIn={onCheckIn}
