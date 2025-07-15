@@ -261,32 +261,56 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         'Smoke Offer Ticket includes Drink (minimum x2)'
       ];
 
-      // Prepare guest data with proper field mapping and enhanced validation
-      const guestsData = csvData.rows.map((row, index) => {
-        const ticketData: any = {};
-        const extractedTickets: any = {};
-
-        // Process each header and extract ticket quantities
-        csvData.headers.forEach((header, headerIndex) => {
-          const cellValue = row[headerIndex] || '';
-          ticketData[header] = cellValue;
-
-          // Check if this header matches a known ticket type and has a quantity > 0
-          if (TICKET_TYPE_MAPPING.includes(header)) {
-            const quantity = parseInt(cellValue) || 0;
-            if (quantity > 0) {
-              extractedTickets[header] = quantity;
-              console.log(`Found ticket type "${header}" with quantity ${quantity} for row ${index}`);
-            }
+        // Function to extract show time from item details
+        const extractShowTime = (itemDetails: string): string => {
+          if (!itemDetails) return '';
+          
+          // Extract time from formats like [7:00pm], [8:00pm], [9:00pm]
+          const timeMatch = itemDetails.match(/\[(\d+):00pm\]/i);
+          if (timeMatch) {
+            const hour = timeMatch[1];
+            return `${hour}pm`;
           }
-        });
+          
+          // Fallback: look for standalone time patterns like 7:00pm, 8:00pm, 9:00pm
+          const fallbackMatch = itemDetails.match(/(\d+):00pm/i);
+          if (fallbackMatch) {
+            const hour = fallbackMatch[1];
+            return `${hour}pm`;
+          }
+          
+          return '';
+        };
 
-        // Extract key fields from the correct columns
-        const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
-        const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
-        const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
-        const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
-        const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
+        // Prepare guest data with proper field mapping and enhanced validation
+        const guestsData = csvData.rows.map((row, index) => {
+          const ticketData: any = {};
+          const extractedTickets: any = {};
+
+          // Process each header and extract ticket quantities
+          csvData.headers.forEach((header, headerIndex) => {
+            const cellValue = row[headerIndex] || '';
+            ticketData[header] = cellValue;
+
+            // Check if this header matches a known ticket type and has a quantity > 0
+            if (TICKET_TYPE_MAPPING.includes(header)) {
+              const quantity = parseInt(cellValue) || 0;
+              if (quantity > 0) {
+                extractedTickets[header] = quantity;
+                console.log(`Found ticket type "${header}" with quantity ${quantity} for row ${index}`);
+              }
+            }
+          });
+
+          // Extract key fields from the correct columns
+          const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
+          const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
+          const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
+          const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
+          const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
+          
+          // Extract show time from item details
+          const showTime = extractShowTime(itemDetails);
 
         // Enhanced validation - skip rows with no meaningful data
         if (!bookerName && !bookingCode && totalQuantity <= 0) {
@@ -309,7 +333,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           booking_code: bookingCode,
           booker_name: bookerName,
           total_quantity: totalQuantity,
-          show_time: '', // This can be extracted from item details if needed
+          show_time: showTime, // Extract show time from item details
           item_details: itemDetails,
           notes: notes,
           interval_pizza_order: hasPizzaTickets,
