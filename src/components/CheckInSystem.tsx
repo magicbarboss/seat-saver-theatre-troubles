@@ -433,7 +433,7 @@ const CheckInSystem = ({
       }
     },
     'Adult Comedy Magic Show ticket': {},
-    // Groupon packages
+    // Groupon packages - CORRECTED DEFINITIONS
     'Groupon Offer Prosecco Package (per person)': {
       drinks: {
         type: 'Prosecco',
@@ -441,10 +441,10 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 1,
+        quantity: 0.5, // 1 pizza per couple (shared between 2 people)
         shared: true
       },
-      extras: ['Salt & Pepper Fries (shared)']
+      extras: ['Salt & Pepper Fries (per couple)']
     },
     'Groupon Magic & Pints Package (per person)': {
       drinks: {
@@ -453,10 +453,10 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 1,
-        shared: true
+        quantity: 1, // 1 pizza per person (not shared)
+        shared: false
       },
-      extras: ['Fries (shared)']
+      extras: ['Fries (per couple)']
     },
     'Groupon Magic & Cocktails Package (per person)': {
       drinks: {
@@ -465,10 +465,10 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 1,
+        quantity: 0.5, // 1 pizza per couple (shared between 2 people)
         shared: true
       },
-      extras: ['Loaded Fries (shared)']
+      extras: ['Loaded Fries (per couple)']
     },
     'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
       drinks: {
