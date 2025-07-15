@@ -527,9 +527,23 @@ const CheckInSystem = ({
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
     
+    // Debug logging for MVDT-110525
+    if (guest.booking_code === 'MVDT-110525') {
+      console.log('🔍 Debugging MVDT-110525:');
+      console.log('Guest data:', guest);
+      console.log('Ticket data raw:', guest.ticket_data);
+    }
+    
     // Check if this is a GYG (GetYourGuide) payment - treat as Groupon Offer Prosecco Package
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
     const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg');
+    
+    // Debug logging for GYG detection
+    if (guest.booking_code === 'MVDT-110525') {
+      console.log('Ticket data string:', ticketDataStr);
+      console.log('Contains "paid in gyg"?', isGYGPayment);
+      console.log('Guest count:', guestCount);
+    }
     
     if (isGYGPayment) {
       // Apply GYG rules: 1 prosecco per person, 1 pizza per couple, 1 fries per couple
