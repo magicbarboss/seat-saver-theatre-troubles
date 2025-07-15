@@ -190,12 +190,17 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
 
   // Load state from Supabase with smart migration for guest list changes
   useEffect(() => {
-    const loadState = async () => {
-      if (!user?.id) {
+    if (!user?.id || !guestListId || !guests || guests.length === 0) {
+      if (user?.id && guestListId) {
         setIsInitialized(true);
-        return;
+        setSessionDate(new Date().toISOString().split('T')[0]);
       }
+      return;
+    }
 
+    let isCancelled = false;
+
+    const loadState = async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
         
@@ -207,6 +212,8 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
           .eq('guest_list_id', guestListId)
           .eq('session_date', today)
           .maybeSingle();
+
+        if (isCancelled) return;
 
         if (error) {
           console.error('Error loading session:', error);
@@ -234,10 +241,13 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
           setWalkInGuests((currentSession.walk_in_guests as Guest[]) || []);
           setSessionDate(today);
           
-          toast({
-            title: "🔄 Session Restored",
-            description: `Previous data loaded from ${new Date(currentSession.updated_at).toLocaleTimeString()}`,
-          });
+          const savedDataCount = (currentSession.checked_in_guests || []).length;
+          if (savedDataCount > 0) {
+            toast({
+              title: "🔄 Session Restored",
+              description: `Previous data loaded from ${new Date(currentSession.updated_at).toLocaleTimeString()}`,
+            });
+          }
         } else {
           // No session for this guest list, check if we can migrate from other sessions
           const { data: otherSessions } = await supabase
@@ -247,7 +257,9 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
             .eq('session_date', today)
             .neq('guest_list_id', guestListId);
 
-          if (otherSessions && otherSessions.length > 0 && guests && guests.length > 0) {
+          if (isCancelled) return;
+
+          if (otherSessions && otherSessions.length > 0) {
             // Try to migrate data from the most recent session
             const mostRecentSession = otherSessions.reduce((latest, session) => 
               new Date(session.updated_at) > new Date(latest.updated_at) ? session : latest
@@ -255,10 +267,14 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
 
             await migrateSessionData(mostRecentSession, guests);
             
-            toast({
-              title: "📋 Data Migrated",
-              description: "Check-in data migrated from previous guest list for matching guests",
-            });
+            // Only show migration toast if data was actually migrated
+            const migratedCount = (mostRecentSession.checked_in_guests || []).length;
+            if (migratedCount > 0) {
+              toast({
+                title: "📋 Data Migrated",
+                description: "Check-in data migrated from previous guest list for matching guests",
+              });
+            }
           } else {
             setSessionDate(today);
           }
@@ -267,11 +283,18 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         console.error('Failed to load saved state:', error);
         setSessionDate(new Date().toISOString().split('T')[0]);
       }
-      setIsInitialized(true);
+      
+      if (!isCancelled) {
+        setIsInitialized(true);
+      }
     };
 
     loadState();
-  }, [user?.id, guestListId, guests]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id, guestListId, guests?.length]);
 
   // Auto-save to Supabase
   useEffect(() => {
