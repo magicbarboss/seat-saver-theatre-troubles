@@ -221,25 +221,44 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         note: noteIndex
       });
 
-      // TICKET_TYPE_MAPPING - needs to match CheckInSystem exactly
+      // TICKET_TYPE_MAPPING - standardized list matching CheckInSystem exactly
       const TICKET_TYPE_MAPPING = [
+        // Standard House Magicians tickets
+        'House Magicians Show Ticket',
         'House Magicians Show Ticket & 2 Drinks',
         'House Magicians Show Ticket & 1 Pizza',
+        'House Magicians Show Ticket includes 2 Drinks +  1 Pizza',
         'House Magicians Show Ticket includes 2 Drinks + 1 Pizza',
-        'Groupon Offer Prosecco Package (per person)',
-        'Smoke Offer Ticket includes Drink (minimum x2)',
-        'Groupon Magic & Pints Package (per person)',
-        'Groupon Magic & Cocktails Package (per person)',
-        'Wowcher Magic & Cocktails Package (per person)',
+        'House Magicians Show Ticket & 2 soft drinks',
+        
+        // Adult Show tickets
         'Adult Show Ticket includes 2 Drinks',
         'Adult Show Ticket includes 2 Drinks + 9" Pizza',
         'Adult Show Ticket induces 2 soft drinks',
         'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
+        'Adult Show Ticket induces 2 soft drinks + 9 PIzza',
+        
+        // Comedy tickets
         'Comedy ticket plus 9" Pizza',
+        'Comedy ticket plus 9 Pizza',
         'Adult Comedy & Magic Show Ticket + 9" Pizza',
+        'Adult Comedy & Magic Show Ticket + 9 Pizza',
         'Adult Comedy Magic Show ticket',
+        
+        // Groupon packages
+        'Groupon Offer Prosecco Package (per person)',
+        'Groupon Magic & Pints Package (per person)',
+        'Groupon Magic & Cocktails Package (per person)',
+        'Groupon Magic Show, Snack and Loaded Fries Package (per person)',
         'OLD Groupon Offer (per person - extras are already included)',
-        'Groupon Magic Show, Snack and Loaded Fries Package (per person)'
+        
+        // Wowcher packages
+        'Wowcher Magic & Cocktails Package (per person)',
+        
+        // Smoke offers
+        'Smoke Offer Ticket & 1x Drink',
+        'Smoke Offer Ticket & 1x Drink (minimum x2 people)',
+        'Smoke Offer Ticket includes Drink (minimum x2)'
       ];
 
       // Prepare guest data with proper field mapping and enhanced validation

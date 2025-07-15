@@ -205,19 +205,16 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     return bookerName.trim();
   };
 
-  // Ticket type mapping for pizza/drinks calculation
+  // Ticket type mapping for pizza/drinks calculation - standardized names
   const TICKET_TYPE_MAPPING: Record<string, {
     drinks?: { type: string; quantity: number; perPerson?: boolean };
     pizza?: { quantity: number; shared?: boolean };
     extras?: string[];
   }> = {
+    // Standard House Magicians tickets
+    'House Magicians Show Ticket': {},
     'House Magicians Show Ticket & 2 Drinks': {
       drinks: { type: 'Drinks', quantity: 2, perPerson: true }
-    },
-    'Groupon Offer Prosecco Package (per person)': {
-      drinks: { type: 'Prosecco', quantity: 1, perPerson: true },
-      pizza: { quantity: 1, shared: true },
-      extras: ['Salt & Pepper Fries (shared)']
     },
     'House Magicians Show Ticket & 1 Pizza': {
       pizza: { quantity: 1, shared: false }
@@ -233,9 +230,47 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     'House Magicians Show Ticket & 2 soft drinks': {
       drinks: { type: 'Soft Drinks', quantity: 2, perPerson: true }
     },
-    'House Magicians Show Ticket': {},
-    'Smoke Offer Ticket & 1x Drink': {
-      drinks: { type: 'Drink', quantity: 1, perPerson: true }
+    
+    // Adult Show tickets
+    'Adult Show Ticket includes 2 Drinks': {
+      drinks: { type: 'Drinks', quantity: 2, perPerson: true }
+    },
+    'Adult Show Ticket includes 2 Drinks + 9" Pizza': {
+      drinks: { type: 'Drinks', quantity: 2, perPerson: true },
+      pizza: { quantity: 1, shared: false }
+    },
+    'Adult Show Ticket induces 2 soft drinks': {
+      drinks: { type: 'Soft Drinks', quantity: 2, perPerson: true }
+    },
+    'Adult Show Ticket induces 2 soft drinks + 9" PIzza': {
+      drinks: { type: 'Soft Drinks', quantity: 2, perPerson: true },
+      pizza: { quantity: 1, shared: false }
+    },
+    'Adult Show Ticket induces 2 soft drinks + 9 PIzza': {
+      drinks: { type: 'Soft Drinks', quantity: 2, perPerson: true },
+      pizza: { quantity: 1, shared: false }
+    },
+    
+    // Comedy tickets
+    'Comedy ticket plus 9" Pizza': {
+      pizza: { quantity: 1, shared: false }
+    },
+    'Comedy ticket plus 9 Pizza': {
+      pizza: { quantity: 1, shared: false }
+    },
+    'Adult Comedy & Magic Show Ticket + 9" Pizza': {
+      pizza: { quantity: 1, shared: false }
+    },
+    'Adult Comedy & Magic Show Ticket + 9 Pizza': {
+      pizza: { quantity: 1, shared: false }
+    },
+    'Adult Comedy Magic Show ticket': {},
+    
+    // Groupon packages
+    'Groupon Offer Prosecco Package (per person)': {
+      drinks: { type: 'Prosecco', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Salt & Pepper Fries (shared)']
     },
     'Groupon Magic & Pints Package (per person)': {
       drinks: { type: 'Pint', quantity: 1, perPerson: true },
@@ -247,19 +282,53 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       pizza: { quantity: 1, shared: true },
       extras: ['Loaded Fries (shared)']
     },
+    'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true },
+      extras: ['Loaded Fries (shared)']
+    },
+    'OLD Groupon Offer (per person - extras are already included)': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true },
+      pizza: { quantity: 1, shared: true }
+    },
+    
+    // Wowcher packages
     'Wowcher Magic & Cocktails Package (per person)': {
       drinks: { type: 'Cocktail', quantity: 1, perPerson: true },
       pizza: { quantity: 1, shared: true },
       extras: ['Loaded Fries (shared)']
+    },
+    
+    // Smoke offers
+    'Smoke Offer Ticket & 1x Drink': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true }
+    },
+    'Smoke Offer Ticket & 1x Drink (minimum x2 people)': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true }
+    },
+    'Smoke Offer Ticket includes Drink (minimum x2)': {
+      drinks: { type: 'Drink', quantity: 1, perPerson: true }
     }
   };
 
-  // Get all ticket types for a guest
+  // Get all ticket types for a guest - improved parsing logic
   const getAllTicketTypes = (guest: Guest): Array<{type: string, quantity: number}> => {
     const tickets: Array<{type: string, quantity: number}> = [];
     
-    // Try to get from extracted_tickets first
-    if (guest.extracted_tickets && typeof guest.extracted_tickets === 'object') {
+    // First try: extracted_tickets from ticket_data (nested structure)
+    if (guest.ticket_data && typeof guest.ticket_data === 'object') {
+      const extractedTickets = (guest.ticket_data as any).extracted_tickets;
+      if (extractedTickets && typeof extractedTickets === 'object') {
+        Object.entries(extractedTickets).forEach(([type, quantity]) => {
+          if (type && type !== '' && typeof quantity === 'number' && quantity > 0) {
+            tickets.push({ type, quantity });
+          }
+        });
+      }
+    }
+    
+    // Second try: direct extracted_tickets property
+    if (tickets.length === 0 && guest.extracted_tickets && typeof guest.extracted_tickets === 'object') {
       Object.entries(guest.extracted_tickets).forEach(([type, quantity]) => {
         if (type && type !== '' && typeof quantity === 'number' && quantity > 0) {
           tickets.push({ type, quantity });
@@ -267,15 +336,30 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
       });
     }
     
-    // Fallback to parsing ticket_data
+    // Fallback: parse all ticket_data fields with fuzzy matching
     if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
       Object.entries(guest.ticket_data).forEach(([key, value]) => {
-        if (key && key !== '' && 
-            !['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets'].includes(key) &&
-            value !== null && value !== undefined) {
-          
-          const quantity = typeof value === 'number' ? value : 1;
-          tickets.push({ type: key, quantity });
+        // Skip non-ticket fields
+        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 
+                     'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 
+                     'Total Quantity', 'DIET', 'Friends', 'Guests', 'Magic', 'TERMS'].includes(key)) {
+          return;
+        }
+        
+        // Parse quantity - handle various formats
+        let quantity = 0;
+        if (typeof value === 'number' && value > 0) {
+          quantity = value;
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          const parsed = parseInt(value);
+          if (!isNaN(parsed) && parsed > 0) {
+            quantity = parsed;
+          }
+        }
+        
+        // If we found a quantity or this looks like a ticket type, add it
+        if (quantity > 0 || Object.keys(TICKET_TYPE_MAPPING).includes(key)) {
+          tickets.push({ type: key, quantity: quantity || 1 });
         }
       });
     }
