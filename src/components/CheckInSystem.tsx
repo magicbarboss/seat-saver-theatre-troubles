@@ -763,6 +763,10 @@ const CheckInSystem = ({
       newCheckedIn.delete(guestIndex);
     } else {
       newCheckedIn.add(guestIndex);
+      // Auto-open pager assignment dialog when checking in
+      setTimeout(() => {
+        setSelectedGuestForPager(guestIndex);
+      }, 100); // Small delay to ensure UI updates properly
     }
     setCheckedInGuests(newCheckedIn);
   };
