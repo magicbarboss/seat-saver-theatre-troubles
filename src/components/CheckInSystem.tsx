@@ -822,6 +822,86 @@ const CheckInSystem = ({
       description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}`
     });
   };
+  // Convert checked-in guests set to array format expected by TableAllocation
+  const checkedInGuestsArray = Array.from(checkedInGuests).map(index => {
+    // Handle walk-in guests
+    if (index >= 10000) {
+      const walkInIndex = index - 10000;
+      const walkInGuest = walkInGuests[walkInIndex];
+      if (walkInGuest) {
+        return {
+          name: walkInGuest.booker_name || 'Unknown',
+          count: walkInGuest.total_quantity || 1,
+          showTime: walkInGuest.show_time || '7pm',
+          originalIndex: index,
+          pagerNumber: pagerAssignments.get(index),
+          hasBeenSeated: seatedGuests.has(index),
+          hasTableAllocated: allocatedGuests.has(index),
+          notes: walkInGuest.notes,
+          isWalkIn: true
+        };
+      }
+    }
+    
+    // Handle regular guests
+    const booking = groupedBookings.find(b => b.originalIndex === index);
+    if (booking?.mainBooking) {
+      return {
+        name: extractGuestName(booking.mainBooking.booker_name || ''),
+        count: booking.mainBooking.total_quantity || 1,
+        showTime: booking.mainBooking.show_time || '7pm',
+        originalIndex: index,
+        pagerNumber: pagerAssignments.get(index),
+        hasBeenSeated: seatedGuests.has(index),
+        hasTableAllocated: allocatedGuests.has(index),
+        notes: booking.mainBooking.notes,
+        isWalkIn: false
+      };
+    }
+    
+    return null;
+  }).filter(Boolean) as any[];
+
+  // Table allocation handlers
+  const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
+    // This function is called when a table is assigned to a guest
+    console.log(`Assigning table ${tableId} to ${guestName} (${guestCount} people) for ${showTime}`);
+  };
+
+  const handlePagerRelease = (pagerNumber: number) => {
+    // Find and release the pager assignment
+    const entries = Array.from(pagerAssignments.entries());
+    const entry = entries.find(([_, number]) => number === pagerNumber);
+    if (entry) {
+      const newAssignments = new Map(pagerAssignments);
+      newAssignments.delete(entry[0]);
+      setPagerAssignments(newAssignments);
+    }
+  };
+
+  const handleGuestSeated = (sectionInfo: { originalIndex: number; sectionId: string; guestCount: number }) => {
+    // Mark guest as seated
+    const newSeated = new Set(seatedGuests);
+    newSeated.add(sectionInfo.originalIndex);
+    setSeatedGuests(newSeated);
+    
+    // Add section to seated sections
+    const newSeatedSections = new Set(seatedSections);
+    newSeatedSections.add(sectionInfo.sectionId);
+    setSeatedSections(newSeatedSections);
+  };
+
+  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
+    // Mark guest as allocated and store table assignments
+    const newAllocated = new Set(allocatedGuests);
+    newAllocated.add(guestIndex);
+    setAllocatedGuests(newAllocated);
+    
+    const newTableAllocations = new Map(guestTableAllocations);
+    newTableAllocations.set(guestIndex, tableIds);
+    setGuestTableAllocations(newTableAllocations);
+  };
+
   const saveComment = () => {
     if (selectedGuestForComment !== null) {
       const newComments = new Map(bookingComments);
@@ -867,10 +947,15 @@ const CheckInSystem = ({
         </TabsContent>
 
         <TabsContent value="tables">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-xl font-semibold mb-4">Table Management</h3>
-            <p className="text-muted-foreground">Table allocation functionality will be implemented here.</p>
-          </div>
+          <TableAllocation
+            checkedInGuests={checkedInGuestsArray}
+            onTableAssign={handleTableAssign}
+            onPagerRelease={handlePagerRelease}
+            onGuestSeated={handleGuestSeated}
+            onTableAllocated={handleTableAllocated}
+            onAddWalkIn={handleAddWalkIn}
+            currentShowTime={showFilter}
+          />
         </TabsContent>
 
         <TabsContent value="stats">
