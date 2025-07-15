@@ -466,11 +466,12 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
     });
   }, [groupedBookings, searchTerm, showFilter]);
 
-  // Statistics calculations
+  // Statistics calculations - use actual guest data
   const getTotalGuests = () => {
-    return groupedBookings.reduce((total, booking) => {
-      return total + (booking?.mainBooking?.total_quantity || 0);
-    }, 0) + walkInGuests.reduce((total, guest) => total + (guest.total_quantity || 0), 0);
+    if (!guests || guests.length === 0) return 0;
+    const guestTotal = guests.reduce((total, guest) => total + (guest.total_quantity || 1), 0);
+    const walkInTotal = walkInGuests.reduce((total, guest) => total + (guest.total_quantity || 0), 0);
+    return guestTotal + walkInTotal;
   };
 
   const getCheckedInGuestsCount = () => {
