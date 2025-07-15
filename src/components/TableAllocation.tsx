@@ -384,7 +384,7 @@ const TableAllocation = ({
     localStorage.setItem(joinedTablesKey, JSON.stringify(joinedTables));
   }, [joinedTables, currentShowTime]);
 
-  // Update table statuses based on current guest states - SHOW TIME AWARE
+  // Update table statuses based on current guest states - SHOW TIME AWARE + DATABASE SYNC
   useEffect(() => {
     console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
     
@@ -393,10 +393,24 @@ const TableAllocation = ({
       currentShowTime === 'all' || guest.showTime === currentShowTime
     );
     
+    console.log('DEBUG: Current show filtered guests:', showFilteredGuests.map(g => ({
+      name: g.name,
+      index: g.originalIndex,
+      hasBeenSeated: g.hasBeenSeated,
+      hasTableAllocated: g.hasTableAllocated
+    })));
+    
     setTables(prevTables => 
       prevTables.map(table => ({
         ...table,
         sections: table.sections.map(section => {
+          // Check if this section should be marked as occupied based on parent state
+          const isSeatedFromParent = showFilteredGuests.some(guest => 
+            guest.hasBeenSeated && guest.originalIndex !== undefined
+          );
+          
+          console.log(`DEBUG: Section ${section.id} - checking seated guests from parent`);
+          
           if (section.allocatedGuest) {
             const currentGuest = showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
             
@@ -415,6 +429,7 @@ const TableAllocation = ({
             
             // Update status based on guest state
             if (currentGuest.hasBeenSeated) {
+              console.log(`DEBUG: Guest ${currentGuest.name} is seated, marking section ${section.id} as OCCUPIED`);
               return { ...section, status: 'OCCUPIED' as const };
             } else if (!currentGuest.hasTableAllocated) {
               // Guest lost table allocation, clear it
@@ -770,7 +785,8 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
 
-    onTableAssign(table.id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+    // REMOVED onTableAssign call to prevent auto-seating during allocation
+    console.log(`Section allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
     const sectionDisplay = section.section === 'whole' ? '' : ` ${section.section}`;
     const availableAfter = getSectionAvailableCapacity(section) - selectedGuest.count;
@@ -1393,7 +1409,8 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
 
-    onTableAssign(table.id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+    // REMOVED onTableAssign call to prevent auto-seating during allocation
+    console.log(`Whole table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
     toast({
       title: "📍 Whole Table Allocated",
@@ -1478,8 +1495,8 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
 
-    // Call onTableAssign for the first table (for compatibility)
-    onTableAssign(tablesToAssign[0].id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+    // REMOVED onTableAssign call to prevent auto-seating during allocation
+    console.log(`Table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
     const tableNames = tablesToAssign.map(t => t.name).join(' + ');
     toast({
@@ -1568,8 +1585,8 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
 
-    // Call onTableAssign for the first table (for compatibility)
-    onTableAssign(tablesToAssign[0].id, selectedGuest.name, selectedGuest.count, selectedGuest.showTime);
+    // REMOVED onTableAssign call to prevent auto-seating during allocation
+    console.log(`Joined table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
     const tableNames = tablesToAssign.map(t => t.name).join(' + ');
     toast({
