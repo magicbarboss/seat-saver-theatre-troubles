@@ -550,7 +550,7 @@ const CheckInSystem = ({
     if (isGYGPayment) {
       // Apply GYG rules: 1 prosecco per person, 1 pizza per couple, 1 fries per couple
       const totalProseccos = guestCount;
-      const couples = Math.ceil(guestCount / 2);
+      const couples = Math.floor(guestCount / 2); // Only whole pairs get shared items
       
       orderItems.push(`${totalProseccos} Prosecco${totalProseccos > 1 ? 's' : ''}`);
       orderItems.push(`${couples} Pizza${couples > 1 ? 's' : ''}`);
