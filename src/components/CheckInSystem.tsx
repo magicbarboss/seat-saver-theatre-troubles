@@ -602,11 +602,13 @@ const CheckInSystem = ({
             if (extra.includes('per couple') || extra.includes('(shared)')) {
               const couples = Math.ceil(guestCount / 2);
               const extraName = extra.replace(/\s*per couple|\s*\(shared\)/g, '');
-              orderItems.push(`${couples} ${extraName}${couples > 1 ? 's' : ''}`);
+              const pluralSuffix = couples > 1 && !extraName.endsWith('s') ? 's' : '';
+              orderItems.push(`${couples} ${extraName}${pluralSuffix}`);
             } else {
               // Per person extras
               const extraName = extra.replace(/\s*per person/g, '');
-              orderItems.push(`${guestCount} ${extraName}${guestCount > 1 ? 's' : ''}`);
+              const pluralSuffix = guestCount > 1 && !extraName.endsWith('s') ? 's' : '';
+              orderItems.push(`${guestCount} ${extraName}${pluralSuffix}`);
             }
           });
         }

@@ -31,8 +31,6 @@ export const KitchenPrepSummary = ({
         if (group && group.bookings && Array.isArray(group.bookings)) {
           group.bookings.forEach((guest: any) => {
             const orderSummary = getOrderSummary(guest);
-            console.log('ORDER SUMMARY:', orderSummary);
-            console.log('GUEST:', guest);
             
             // Extract pizza count
             const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
