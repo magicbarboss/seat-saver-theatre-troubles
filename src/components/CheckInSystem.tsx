@@ -302,7 +302,7 @@ const CheckInSystem = ({
     return bookerName.trim();
   };
 
-  // Ticket type mapping for pizza/drinks calculation - standardized names
+  // Enhanced ticket type mapping for pizza/drinks calculation
   const TICKET_TYPE_MAPPING: Record<string, {
     drinks?: {
       type: string;
@@ -314,12 +314,13 @@ const CheckInSystem = ({
       shared?: boolean;
     };
     extras?: string[];
+    minimum_people?: number;
   }> = {
     // Standard House Magicians tickets
     'House Magicians Show Ticket': {},
     'House Magicians Show Ticket & 2 Drinks': {
       drinks: {
-        type: 'Drinks',
+        type: 'drinks',
         quantity: 2,
         perPerson: true
       }
@@ -330,20 +331,9 @@ const CheckInSystem = ({
         shared: false
       }
     },
-    'House Magicians Show Ticket includes 2 Drinks +  1 Pizza': {
-      drinks: {
-        type: 'Drinks',
-        quantity: 2,
-        perPerson: true
-      },
-      pizza: {
-        quantity: 1,
-        shared: false
-      }
-    },
     'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
       drinks: {
-        type: 'Drinks',
+        type: 'drinks',
         quantity: 2,
         perPerson: true
       },
@@ -354,7 +344,7 @@ const CheckInSystem = ({
     },
     'House Magicians Show Ticket & 2 soft drinks': {
       drinks: {
-        type: 'Soft Drinks',
+        type: 'soft drinks',
         quantity: 2,
         perPerson: true
       }
@@ -433,42 +423,42 @@ const CheckInSystem = ({
       }
     },
     'Adult Comedy Magic Show ticket': {},
-    // Groupon packages - CORRECTED DEFINITIONS
+    // Groupon packages
     'Groupon Offer Prosecco Package (per person)': {
       drinks: {
-        type: 'Prosecco',
+        type: 'glass of prosecco',
         quantity: 1,
         perPerson: true
       },
       pizza: {
-        quantity: 0.5, // 1 pizza per couple (shared between 2 people)
+        quantity: 0.5,
         shared: true
       },
-      extras: ['Salt & Pepper Fries (per couple)']
+      extras: ['portion of fries per couple']
     },
     'Groupon Magic & Pints Package (per person)': {
       drinks: {
-        type: 'Pint',
+        type: 'house pint',
         quantity: 1,
         perPerson: true
       },
       pizza: {
-        quantity: 1, // 1 pizza per person (not shared)
-        shared: false
+        quantity: 0.5,
+        shared: true
       },
-      extras: ['Fries (per couple)']
+      extras: ['fries per couple']
     },
     'Groupon Magic & Cocktails Package (per person)': {
       drinks: {
-        type: 'Cocktail',
+        type: 'house cocktail',
         quantity: 1,
         perPerson: true
       },
       pizza: {
-        quantity: 0.5, // 1 pizza per couple (shared between 2 people)
+        quantity: 0.5,
         shared: true
       },
-      extras: ['Loaded Fries (per couple)']
+      extras: ['loaded fries per couple']
     },
     'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
       drinks: {
@@ -509,24 +499,26 @@ const CheckInSystem = ({
     // Smoke offers
     'Smoke Offer Ticket & 1x Drink': {
       drinks: {
-        type: 'Drink',
+        type: 'drink',
         quantity: 1,
         perPerson: true
       }
     },
     'Smoke Offer Ticket & 1x Drink (minimum x2 people)': {
       drinks: {
-        type: 'Drink',
+        type: 'drink',
         quantity: 1,
         perPerson: true
-      }
+      },
+      minimum_people: 2
     },
     'Smoke Offer Ticket includes Drink (minimum x2)': {
       drinks: {
-        type: 'Drink',
+        type: 'drink',
         quantity: 1,
         perPerson: true
-      }
+      },
+      minimum_people: 2
     }
   };
 
@@ -546,8 +538,8 @@ const CheckInSystem = ({
         // Add drink details
         if (packageInfo.drinks) {
           const drinkText = packageInfo.drinks.perPerson 
-            ? `${packageInfo.drinks.quantity} ${packageInfo.drinks.type.toLowerCase()} per person`
-            : `${packageInfo.drinks.quantity} ${packageInfo.drinks.type.toLowerCase()}`;
+            ? `${packageInfo.drinks.quantity} ${packageInfo.drinks.type} per person`
+            : `${packageInfo.drinks.quantity} ${packageInfo.drinks.type}`;
           details.push(drinkText);
         }
         
@@ -566,25 +558,62 @@ const CheckInSystem = ({
         // Add extras
         if (packageInfo.extras && packageInfo.extras.length > 0) {
           packageInfo.extras.forEach(extra => {
-            if (extra.includes('per couple')) {
-              details.push(extra.toLowerCase());
-            } else if (extra.includes('shared')) {
-              details.push(extra.toLowerCase());
-            } else {
-              details.push(`${extra.toLowerCase()} per couple`);
-            }
+            details.push(extra);
           });
         }
+
+        // Add minimum people requirement
+        if (packageInfo.minimum_people) {
+          details.push(`Valid only for bookings of ${packageInfo.minimum_people} or more people`);
+        }
       } else {
-        // Handle basic tickets with no mapping
-        if (ticket.type.includes('Drinks') || ticket.type.includes('drinks')) {
-          const drinkMatch = ticket.type.match(/(\d+)\s*drinks?/i);
-          if (drinkMatch) {
-            details.push(`${drinkMatch[1]} drinks per person`);
+        // Enhanced fallback parsing for unmapped tickets
+        const ticketType = ticket.type.toLowerCase();
+        
+        // Parse drinks patterns
+        const drinkPatterns = [
+          /(\d+)\s*drinks?/i,
+          /(\d+)\s*soft\s*drinks?/i,
+          /&\s*(\d+)\s*drinks?/i,
+          /includes?\s*(\d+)\s*drinks?/i
+        ];
+        
+        for (const pattern of drinkPatterns) {
+          const match = ticketType.match(pattern);
+          if (match) {
+            const quantity = parseInt(match[1]);
+            const drinkType = ticketType.includes('soft') ? 'soft drinks' : 'drinks';
+            details.push(`${quantity} ${drinkType} per person`);
+            break;
           }
         }
-        if (ticket.type.includes('Pizza') || ticket.type.includes('pizza')) {
-          details.push('1 pizza per person');
+        
+        // Parse pizza patterns
+        const pizzaPatterns = [
+          /(\d+)\s*pizza/i,
+          /&\s*(\d+)\s*pizza/i,
+          /includes?\s*(\d+)\s*pizza/i
+        ];
+        
+        for (const pattern of pizzaPatterns) {
+          const match = ticketType.match(pattern);
+          if (match) {
+            const quantity = parseInt(match[1]);
+            details.push(`${quantity} pizza${quantity > 1 ? 's' : ''} per person`);
+            break;
+          }
+        }
+
+        // Check for minimum people requirement
+        const minPeopleMatch = ticketType.match(/minimum\s*x?(\d+)/i);
+        if (minPeopleMatch) {
+          const minPeople = parseInt(minPeopleMatch[1]);
+          details.push(`Valid only for bookings of ${minPeople} or more people`);
+        }
+
+        // If no specifics found and it's just a show ticket
+        if (details.length === 0 && (ticketType.includes('show') || ticketType.includes('ticket'))) {
+          details.push('Show ticket only (no extras)');
         }
       }
       
