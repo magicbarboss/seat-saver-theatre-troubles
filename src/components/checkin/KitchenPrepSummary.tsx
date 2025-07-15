@@ -25,9 +25,38 @@ export const KitchenPrepSummary = ({
     let totalFries = 0;
     let totalLoadedFries = 0;
 
-    // Process booking groups
-    filteredBookings.forEach(group => {
-      group.bookings.forEach((guest: any) => {
+    // Process booking groups - add null checks
+    if (filteredBookings && Array.isArray(filteredBookings)) {
+      filteredBookings.forEach(group => {
+        if (group && group.bookings && Array.isArray(group.bookings)) {
+          group.bookings.forEach((guest: any) => {
+            const orderSummary = getOrderSummary(guest);
+            
+            // Extract pizza count
+            const pizzaMatch = orderSummary.match(/(\d+)\s+pizza/i);
+            if (pizzaMatch) {
+              totalPizzas += parseInt(pizzaMatch[1]);
+            }
+            
+            // Extract fries count (but not loaded fries)
+            const friesMatch = orderSummary.match(/(\d+)\s+fries(?!\s+\(loaded\))/i);
+            if (friesMatch) {
+              totalFries += parseInt(friesMatch[1]);
+            }
+            
+            // Extract loaded fries count
+            const loadedFriesMatch = orderSummary.match(/(\d+)\s+(?:loaded\s+)?fries\s+\(loaded\)|(\d+)\s+loaded\s+fries/i);
+            if (loadedFriesMatch) {
+              totalLoadedFries += parseInt(loadedFriesMatch[1] || loadedFriesMatch[2]);
+            }
+          });
+        }
+      });
+    }
+
+    // Process walk-in guests - add null checks
+    if (walkInGuests && Array.isArray(walkInGuests)) {
+      walkInGuests.forEach(guest => {
         const orderSummary = getOrderSummary(guest);
         
         // Extract pizza count
@@ -48,30 +77,7 @@ export const KitchenPrepSummary = ({
           totalLoadedFries += parseInt(loadedFriesMatch[1] || loadedFriesMatch[2]);
         }
       });
-    });
-
-    // Process walk-in guests
-    walkInGuests.forEach(guest => {
-      const orderSummary = getOrderSummary(guest);
-      
-      // Extract pizza count
-      const pizzaMatch = orderSummary.match(/(\d+)\s+pizza/i);
-      if (pizzaMatch) {
-        totalPizzas += parseInt(pizzaMatch[1]);
-      }
-      
-      // Extract fries count (but not loaded fries)
-      const friesMatch = orderSummary.match(/(\d+)\s+fries(?!\s+\(loaded\))/i);
-      if (friesMatch) {
-        totalFries += parseInt(friesMatch[1]);
-      }
-      
-      // Extract loaded fries count
-      const loadedFriesMatch = orderSummary.match(/(\d+)\s+(?:loaded\s+)?fries\s+\(loaded\)|(\d+)\s+loaded\s+fries/i);
-      if (loadedFriesMatch) {
-        totalLoadedFries += parseInt(loadedFriesMatch[1] || loadedFriesMatch[2]);
-      }
-    });
+    }
 
     return { totalPizzas, totalFries, totalLoadedFries };
   };
