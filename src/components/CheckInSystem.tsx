@@ -536,7 +536,9 @@ const CheckInSystem = ({
     
     // Check if this is a GYG (GetYourGuide) payment - treat as Groupon Offer Prosecco Package
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
-    const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg');
+    const statusStr = (guest as any).Status || '';
+    const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg') || 
+                        statusStr.toLowerCase().includes('paid in gyg');
     
     // Debug logging for GYG detection
     if (guest.booking_code === 'MVDT-110525') {
