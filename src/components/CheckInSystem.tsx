@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import TableAllocation from './TableAllocation';
+import { ErrorBoundary } from './ErrorBoundary';
 import { SearchAndFilters } from './checkin/SearchAndFilters';
 import { CheckInStats } from './checkin/CheckInStats';
 import { CheckInActions } from './checkin/CheckInActions';
@@ -823,44 +824,72 @@ const CheckInSystem = ({
     });
   };
   // Convert checked-in guests set to array format expected by TableAllocation
-  const checkedInGuestsArray = Array.from(checkedInGuests).map(index => {
-    // Handle walk-in guests
-    if (index >= 10000) {
-      const walkInIndex = index - 10000;
-      const walkInGuest = walkInGuests[walkInIndex];
-      if (walkInGuest) {
-        return {
-          name: walkInGuest.booker_name || 'Unknown',
-          count: walkInGuest.total_quantity || 1,
-          showTime: walkInGuest.show_time || '7pm',
-          originalIndex: index,
-          pagerNumber: pagerAssignments.get(index),
-          hasBeenSeated: seatedGuests.has(index),
-          hasTableAllocated: allocatedGuests.has(index),
-          notes: walkInGuest.notes,
-          isWalkIn: true
-        };
+  const checkedInGuestsArray = React.useMemo(() => {
+    console.log('Building checkedInGuestsArray, checkedInGuests:', checkedInGuests.size);
+    console.log('groupedBookings length:', groupedBookings?.length || 0);
+    console.log('walkInGuests length:', walkInGuests?.length || 0);
+    
+    try {
+      if (!groupedBookings || !Array.isArray(groupedBookings)) {
+        console.warn('groupedBookings is not valid:', groupedBookings);
+        return [];
       }
+
+      const result = Array.from(checkedInGuests).map(index => {
+        try {
+          // Handle walk-in guests
+          if (index >= 10000) {
+            const walkInIndex = index - 10000;
+            const walkInGuest = walkInGuests?.[walkInIndex];
+            if (walkInGuest) {
+              return {
+                name: String(walkInGuest.booker_name || 'Unknown Walk-in'),
+                count: Number(walkInGuest.total_quantity) || 1,
+                showTime: String(walkInGuest.show_time || '7pm'),
+                originalIndex: index,
+                pagerNumber: pagerAssignments.get(index) || undefined,
+                hasBeenSeated: seatedGuests.has(index),
+                hasTableAllocated: allocatedGuests.has(index),
+                notes: String(walkInGuest.notes || ''),
+                isWalkIn: true
+              };
+            } else {
+              console.warn(`Walk-in guest not found at index ${walkInIndex}`);
+              return null;
+            }
+          }
+          
+          // Handle regular guests
+          const booking = groupedBookings.find(b => b && b.originalIndex === index);
+          if (booking?.mainBooking) {
+            return {
+              name: extractGuestName(String(booking.mainBooking.booker_name || '')),
+              count: Number(booking.mainBooking.total_quantity) || 1,
+              showTime: String(booking.mainBooking.show_time || '7pm'),
+              originalIndex: index,
+              pagerNumber: pagerAssignments.get(index) || undefined,
+              hasBeenSeated: seatedGuests.has(index),
+              hasTableAllocated: allocatedGuests.has(index),
+              notes: String(booking.mainBooking.notes || ''),
+              isWalkIn: false
+            };
+          } else {
+            console.warn(`Booking not found for index ${index}`);
+            return null;
+          }
+        } catch (err) {
+          console.error(`Error processing guest at index ${index}:`, err);
+          return null;
+        }
+      }).filter((guest): guest is NonNullable<typeof guest> => guest !== null);
+
+      console.log('checkedInGuestsArray built successfully:', result.length, 'guests');
+      return result;
+    } catch (err) {
+      console.error('Error building checkedInGuestsArray:', err);
+      return [];
     }
-    
-    // Handle regular guests
-    const booking = groupedBookings.find(b => b.originalIndex === index);
-    if (booking?.mainBooking) {
-      return {
-        name: extractGuestName(booking.mainBooking.booker_name || ''),
-        count: booking.mainBooking.total_quantity || 1,
-        showTime: booking.mainBooking.show_time || '7pm',
-        originalIndex: index,
-        pagerNumber: pagerAssignments.get(index),
-        hasBeenSeated: seatedGuests.has(index),
-        hasTableAllocated: allocatedGuests.has(index),
-        notes: booking.mainBooking.notes,
-        isWalkIn: false
-      };
-    }
-    
-    return null;
-  }).filter(Boolean) as any[];
+  }, [checkedInGuests, groupedBookings, walkInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
 
   // Table allocation handlers
   const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {
@@ -947,15 +976,25 @@ const CheckInSystem = ({
         </TabsContent>
 
         <TabsContent value="tables">
-          <TableAllocation
-            checkedInGuests={checkedInGuestsArray}
-            onTableAssign={handleTableAssign}
-            onPagerRelease={handlePagerRelease}
-            onGuestSeated={handleGuestSeated}
-            onTableAllocated={handleTableAllocated}
-            onAddWalkIn={handleAddWalkIn}
-            currentShowTime={showFilter}
-          />
+          <ErrorBoundary fallback={
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <h3 className="text-xl font-semibold mb-4">Table Management</h3>
+              <p className="text-muted-foreground mb-4">Table allocation temporarily unavailable due to an error.</p>
+              <Button onClick={() => window.location.reload()}>
+                Reload Page
+              </Button>
+            </div>
+          }>
+            <TableAllocation
+              checkedInGuests={checkedInGuestsArray}
+              onTableAssign={handleTableAssign}
+              onPagerRelease={handlePagerRelease}
+              onGuestSeated={handleGuestSeated}
+              onTableAllocated={handleTableAllocated}
+              onAddWalkIn={handleAddWalkIn}
+              currentShowTime={showFilter}
+            />
+          </ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="stats">
