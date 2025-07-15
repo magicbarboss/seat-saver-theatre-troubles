@@ -601,7 +601,13 @@ const CheckInSystem = ({ guests, headers, showTimes, guestListId }: CheckInSyste
         extractGuestName(booking.mainBooking.booker_name || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
-      const matchesShow = showFilter === 'all' || guestShowTime === showFilter;
+      // If guest has no show time and we're filtering by a specific time, include them
+      // If showFilter is 'all' or empty, include all guests
+      // If guest has show time and it matches filter, include them
+      const matchesShow = showFilter === 'all' || 
+                         showFilter === '' || 
+                         guestShowTime === '' || 
+                         guestShowTime === showFilter;
       
       return matchesSearch && matchesShow;
     });
