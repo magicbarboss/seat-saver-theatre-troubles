@@ -40,8 +40,7 @@ interface GuestTableProps {
   partyGroups: Map<string, PartyGroup>;
   bookingComments: Map<number, string>;
   walkInGuests: Guest[];
-  getPizzaInfo: (guest: Guest) => string;
-  getDrinksInfo: (guest: Guest) => string;
+  getOrderSummary: (guest: Guest) => string;
   getPackageDetails: (guest: Guest) => Array<{
     type: string;
     quantity: number;
@@ -65,8 +64,7 @@ export const GuestTable = ({
   partyGroups,
   bookingComments,
   walkInGuests,
-  getPizzaInfo,
-  getDrinksInfo,
+  getOrderSummary,
   getPackageDetails,
   extractGuestName,
   onCheckIn,
@@ -114,8 +112,7 @@ export const GuestTable = ({
             isAllocated={allocatedGuests.has(group.originalIndex)}
             pagerNumber={pagerAssignments.get(group.originalIndex)}
             tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
-            pizzaInfo={getPizzaInfo(group.mainBooking)}
-            drinksInfo={getDrinksInfo(group.mainBooking)}
+            orderSummary={getOrderSummary(group.mainBooking)}
             packageDetails={getPackageDetails(group.mainBooking)}
             comment={bookingComments.get(group.originalIndex)}
             partyInfo={getPartyInfo(group.originalIndex)}
@@ -139,8 +136,7 @@ export const GuestTable = ({
               isAllocated={allocatedGuests.has(walkInIndex)}
               pagerNumber={pagerAssignments.get(walkInIndex)}
               tableNumbers={guestTableAllocations.get(walkInIndex) || []}
-              pizzaInfo={getPizzaInfo(walkIn)}
-              drinksInfo={getDrinksInfo(walkIn)}
+              orderSummary={getOrderSummary(walkIn)}
               packageDetails={getPackageDetails(walkIn)}
               comment={bookingComments.get(walkInIndex)}
               isWalkIn={true}

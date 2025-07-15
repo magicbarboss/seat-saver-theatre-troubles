@@ -26,8 +26,7 @@ interface GuestRowProps {
   isAllocated: boolean;
   pagerNumber?: number;
   tableNumbers: number[];
-  pizzaInfo: string;
-  drinksInfo: string;
+  orderSummary: string;
   packageDetails: Array<{
     type: string;
     quantity: number;
@@ -55,8 +54,7 @@ export const GuestRow = ({
   isAllocated,
   pagerNumber,
   tableNumbers,
-  pizzaInfo,
-  drinksInfo,
+  orderSummary,
   packageDetails,
   comment,
   isWalkIn,
@@ -92,44 +90,41 @@ export const GuestRow = ({
       <TableCell>{showTime}</TableCell>
       
       <TableCell>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="space-y-1">
-              {pizzaInfo && <div className="text-sm text-orange-600">{pizzaInfo}</div>}
-              {drinksInfo && <div className="text-sm text-blue-600">{drinksInfo}</div>}
-            </div>
-            {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <Info className="h-3 w-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80">
-                  <div className="space-y-3">
-                    <h4 className="font-medium">What's included:</h4>
-                    {packageDetails.map((pkg, idx) => (
-                      pkg.details.length > 0 && (
-                        <div key={idx} className="space-y-1">
-                          <div className="text-sm font-medium text-muted-foreground">
-                            {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
-                          </div>
-                          <ul className="space-y-1">
-                            {pkg.details.map((detail, detailIdx) => (
-                              <li key={detailIdx} className="text-sm flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
-                                {detail}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-medium text-foreground">
+            {orderSummary}
           </div>
+          {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                  <Info className="h-3 w-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-3">
+                  <h4 className="font-medium">Additional Info:</h4>
+                  {packageDetails.map((pkg, idx) => (
+                    pkg.details.length > 0 && (
+                      <div key={idx} className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
+                        </div>
+                        <ul className="space-y-1">
+                          {pkg.details.map((detail, detailIdx) => (
+                            <li key={detailIdx} className="text-sm flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
+                              {detail}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </TableCell>
 
