@@ -28,6 +28,9 @@ export const KitchenPrepSummary = ({
     let totalPizzas = 0;
     let totalFries = 0;
     let totalLoadedFries = 0;
+    
+    // Track processed guests to prevent duplicate counting
+    const processedGuests = new Set<string>();
 
     // Helper functions for regex matching
     const isPizza = (item: string) => item.match(/(\d+)\s*pizzas?/i);
@@ -35,7 +38,16 @@ export const KitchenPrepSummary = ({
     const isFries = (item: string) => item.match(/(\d+)\s*fries(?!.*loaded)/i);
 
     const processOrderSummary = (orderSummary: string, guest: any) => {
-      console.log("ORDER SUMMARY:", orderSummary);
+      // Create unique identifier for guest to prevent duplicates
+      const guestId = guest.id || `${guest.booking_code}-${guest.booker_name}`;
+      
+      if (processedGuests.has(guestId)) {
+        console.log("DUPLICATE DETECTED - Skipping guest:", guest.booker_name, guestId);
+        return;
+      }
+      
+      processedGuests.add(guestId);
+      console.log("Processing ORDER SUMMARY:", orderSummary, "for guest:", guest.booker_name);
 
       if (!orderSummary) {
         console.log("No order summary for guest:", guest.booker_name || guest.name);
@@ -52,37 +64,31 @@ export const KitchenPrepSummary = ({
         if (pizzaMatch) {
           const count = parseInt(pizzaMatch[1]);
           totalPizzas += count;
-          console.log(`Found ${count} pizza(s): "${item}"`);
+          console.log(`Found ${count} pizza(s): "${item}" for ${guest.booker_name}`);
         }
 
         if (loadedFriesMatch) {
           const count = parseInt(loadedFriesMatch[1]);
           totalLoadedFries += count;
-          console.log(`Found ${count} loaded fries: "${item}"`);
+          console.log(`Found ${count} loaded fries: "${item}" for ${guest.booker_name}`);
         }
 
         if (friesMatch) {
           const count = parseInt(friesMatch[1]);
           totalFries += count;
-          console.log(`Found ${count} fries: "${item}"`);
+          console.log(`Found ${count} fries: "${item}" for ${guest.booker_name}`);
         }
       });
     };
 
-    // Process booking groups
+    // Process booking groups - only main bookings to avoid double counting
     if (filteredBookings && Array.isArray(filteredBookings)) {
       filteredBookings.forEach(group => {
         if (group?.mainBooking) {
           const mainOrder = getOrderSummary(group.mainBooking);
           processOrderSummary(mainOrder, group.mainBooking);
         }
-
-        if (group?.addOns && Array.isArray(group.addOns)) {
-          group.addOns.forEach((addon: any) => {
-            const addOnOrder = getOrderSummary(addon);
-            processOrderSummary(addOnOrder, addon);
-          });
-        }
+        // Skip add-ons as they should be part of the main booking calculation
       });
     }
 
@@ -98,6 +104,7 @@ export const KitchenPrepSummary = ({
     console.log("Total Pizzas:", totalPizzas);
     console.log("Total Fries:", totalFries);
     console.log("Total Loaded Fries:", totalLoadedFries);
+    console.log("Processed Guests:", processedGuests.size);
     
     return { totalPizzas, totalFries, totalLoadedFries };
   };
