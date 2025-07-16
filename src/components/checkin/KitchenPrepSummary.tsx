@@ -29,6 +29,11 @@ export const KitchenPrepSummary = ({
     let totalFries = 0;
     let totalLoadedFries = 0;
 
+    // Helper functions for regex matching
+    const isPizza = (item: string) => item.match(/(\d+)\s*pizzas?/i);
+    const isLoadedFries = (item: string) => item.match(/(\d+)\s*loaded\s*fries/i);
+    const isFries = (item: string) => item.match(/(\d+)\s*fries(?!.*loaded)/i);
+
     const processOrderSummary = (orderSummary: string, guest: any) => {
       console.log("ORDER SUMMARY:", orderSummary);
 
@@ -40,9 +45,9 @@ export const KitchenPrepSummary = ({
       const items = orderSummary.split(',').map(item => item.trim());
 
       items.forEach(item => {
-        const pizzaMatch = item.match(/(\d+)\s*pizzas?/i);
-        const loadedFriesMatch = item.match(/(\d+)\s*loaded\s*fries/i);
-        const friesMatch = item.match(/(\d+)\s*fries(?!.*loaded)/i);
+        const pizzaMatch = isPizza(item);
+        const loadedFriesMatch = isLoadedFries(item);
+        const friesMatch = isFries(item);
 
         if (pizzaMatch) {
           const count = parseInt(pizzaMatch[1]);
