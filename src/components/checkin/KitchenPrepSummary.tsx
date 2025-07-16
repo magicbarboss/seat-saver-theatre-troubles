@@ -21,8 +21,9 @@ export const KitchenPrepSummary = ({
   getOrderSummary 
 }: KitchenPrepSummaryProps) => {
   const calculateTotals = () => {
-    // TEMPORARY HARDCODED TEST - uncomment to test component display
-    // return { totalPizzas: 4, totalFries: 2, totalLoadedFries: 1 };
+    console.log("=== KITCHEN PREP CALCULATION START ===");
+    console.log("Filtered Bookings:", filteredBookings?.length || 0);
+    console.log("Walk-in Guests:", walkInGuests?.length || 0);
     
     let totalPizzas = 0;
     let totalFries = 0;
@@ -34,25 +35,41 @@ export const KitchenPrepSummary = ({
         if (group && group.bookings && Array.isArray(group.bookings)) {
           group.bookings.forEach((guest: any) => {
             const orderSummary = getOrderSummary(guest);
-            console.log("SUMMARY FOR GUEST:", guest.booker_name || guest.name, "->", orderSummary);
+            console.log("ORDER SUMMARY:", orderSummary);
             
-            // Extract pizza count
-            const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
-            if (pizzaMatch) {
-              totalPizzas += parseInt(pizzaMatch[1]);
+            if (!orderSummary) {
+              console.log("No order summary for guest:", guest.booker_name || guest.name);
+              return;
             }
             
-            // Extract loaded fries count (process first to avoid double-counting)
-            const loadedFriesMatch = orderSummary.match(/(\d+)\s*loaded\s*fries/i);
-            if (loadedFriesMatch) {
-              totalLoadedFries += parseInt(loadedFriesMatch[1]);
-            }
+            // Split by commas to handle comma-separated items
+            const items = orderSummary.split(',').map(item => item.trim());
             
-            // Extract fries count (excluding loaded fries)
-            const friesMatch = orderSummary.match(/(\d+)\s*fries(?!.*loaded)/i);
-            if (friesMatch) {
-              totalFries += parseInt(friesMatch[1]);
-            }
+            items.forEach(item => {
+              // Extract pizza count - handles plural
+              const pizzaMatch = item.match(/(\d+)\s*pizzas?/i);
+              if (pizzaMatch) {
+                const count = parseInt(pizzaMatch[1]);
+                totalPizzas += count;
+                console.log(`Found ${count} pizza(s) in: "${item}"`);
+              }
+              
+              // Extract loaded fries count (process first to avoid double-counting)
+              const loadedFriesMatch = item.match(/(\d+)\s*loaded\s*fries/i);
+              if (loadedFriesMatch) {
+                const count = parseInt(loadedFriesMatch[1]);
+                totalLoadedFries += count;
+                console.log(`Found ${count} loaded fries in: "${item}"`);
+              }
+              
+              // Extract fries count (excluding loaded fries)
+              const friesMatch = item.match(/(\d+)\s*fries(?!.*loaded)/i);
+              if (friesMatch) {
+                const count = parseInt(friesMatch[1]);
+                totalFries += count;
+                console.log(`Found ${count} fries in: "${item}"`);
+              }
+            });
           });
         }
       });
@@ -62,28 +79,49 @@ export const KitchenPrepSummary = ({
     if (walkInGuests && Array.isArray(walkInGuests)) {
       walkInGuests.forEach(guest => {
         const orderSummary = getOrderSummary(guest);
-        console.log("SUMMARY FOR GUEST:", guest.booker_name || guest.name, "->", orderSummary);
+        console.log("ORDER SUMMARY (Walk-in):", orderSummary);
         
-        // Extract pizza count
-        const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
-        if (pizzaMatch) {
-          totalPizzas += parseInt(pizzaMatch[1]);
+        if (!orderSummary) {
+          console.log("No order summary for walk-in guest:", guest.booker_name || guest.name);
+          return;
         }
         
-        // Extract loaded fries count (process first to avoid double-counting)
-        const loadedFriesMatch = orderSummary.match(/(\d+)\s*loaded\s*fries/i);
-        if (loadedFriesMatch) {
-          totalLoadedFries += parseInt(loadedFriesMatch[1]);
-        }
+        // Split by commas to handle comma-separated items
+        const items = orderSummary.split(',').map(item => item.trim());
         
-        // Extract fries count (excluding loaded fries)
-        const friesMatch = orderSummary.match(/(\d+)\s*fries(?!.*loaded)/i);
-        if (friesMatch) {
-          totalFries += parseInt(friesMatch[1]);
-        }
+        items.forEach(item => {
+          // Extract pizza count - handles plural
+          const pizzaMatch = item.match(/(\d+)\s*pizzas?/i);
+          if (pizzaMatch) {
+            const count = parseInt(pizzaMatch[1]);
+            totalPizzas += count;
+            console.log(`Found ${count} pizza(s) in walk-in: "${item}"`);
+          }
+          
+          // Extract loaded fries count (process first to avoid double-counting)
+          const loadedFriesMatch = item.match(/(\d+)\s*loaded\s*fries/i);
+          if (loadedFriesMatch) {
+            const count = parseInt(loadedFriesMatch[1]);
+            totalLoadedFries += count;
+            console.log(`Found ${count} loaded fries in walk-in: "${item}"`);
+          }
+          
+          // Extract fries count (excluding loaded fries)
+          const friesMatch = item.match(/(\d+)\s*fries(?!.*loaded)/i);
+          if (friesMatch) {
+            const count = parseInt(friesMatch[1]);
+            totalFries += count;
+            console.log(`Found ${count} fries in walk-in: "${item}"`);
+          }
+        });
       });
     }
 
+    console.log("=== FINAL TOTALS ===");
+    console.log("Total Pizzas:", totalPizzas);
+    console.log("Total Fries:", totalFries);
+    console.log("Total Loaded Fries:", totalLoadedFries);
+    
     return { totalPizzas, totalFries, totalLoadedFries };
   };
 
