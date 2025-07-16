@@ -21,6 +21,9 @@ export const KitchenPrepSummary = ({
   getOrderSummary 
 }: KitchenPrepSummaryProps) => {
   const calculateTotals = () => {
+    // TEMPORARY HARDCODED TEST - uncomment to test component display
+    // return { totalPizzas: 4, totalFries: 2, totalLoadedFries: 1 };
+    
     let totalPizzas = 0;
     let totalFries = 0;
     let totalLoadedFries = 0;
@@ -31,6 +34,7 @@ export const KitchenPrepSummary = ({
         if (group && group.bookings && Array.isArray(group.bookings)) {
           group.bookings.forEach((guest: any) => {
             const orderSummary = getOrderSummary(guest);
+            console.log("SUMMARY FOR GUEST:", guest.booker_name || guest.name, "->", orderSummary);
             
             // Extract pizza count
             const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
@@ -58,6 +62,7 @@ export const KitchenPrepSummary = ({
     if (walkInGuests && Array.isArray(walkInGuests)) {
       walkInGuests.forEach(guest => {
         const orderSummary = getOrderSummary(guest);
+        console.log("SUMMARY FOR GUEST:", guest.booker_name || guest.name, "->", orderSummary);
         
         // Extract pizza count
         const pizzaMatch = orderSummary.match(/(\d+)\s*pizza/i);
