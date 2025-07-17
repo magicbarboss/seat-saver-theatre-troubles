@@ -935,6 +935,18 @@ const CheckInSystem = ({
     return `${totalDrinks} Drinks`;
   };
 
+  // Helper function to validate if text is actual dietary information
+  const isDietaryInformation = (text: string): boolean => {
+    const dietaryKeywords = [
+      'vegetarian', 'vegan', 'pescatarian', 'gluten', 'coeliac', 'celiac',
+      'dairy', 'lactose', 'nut', 'allergy', 'allergic', 'intolerant', 
+      'halal', 'kosher', 'diet', 'dietary', 'food', 'eating'
+    ];
+    
+    const lowerText = text.toLowerCase();
+    return dietaryKeywords.some(keyword => lowerText.includes(keyword));
+  };
+
   // Extract and process diet and magic information from guest data and save to database
   useEffect(() => {
     if (!guests || guests.length === 0) return;
@@ -948,22 +960,29 @@ const CheckInSystem = ({
         let hasUpdates = false;
         const updates: { id: string; diet_info?: string; magic_info?: string } = { id: guest.id };
         
-        // Extract diet information from ticket_data
+        // Extract diet information from ticket_data with validation
         const dietData = guest.ticket_data.DIET || guest.ticket_data.Diet || guest.ticket_data.diet;
         if (dietData && typeof dietData === 'string' && dietData.trim() !== '' && !guest.diet_info) {
-          updates.diet_info = dietData.trim();
-          guest.diet_info = dietData.trim(); // Update local state
-          hasUpdates = true;
-          console.log(`Found diet info for ${guest.booker_name}: ${guest.diet_info}`);
+          const trimmedDiet = dietData.trim();
+          // Only extract if it's actually dietary information
+          if (isDietaryInformation(trimmedDiet)) {
+            updates.diet_info = trimmedDiet;
+            guest.diet_info = trimmedDiet; // Update local state
+            hasUpdates = true;
+            console.log(`✅ Found valid diet info for ${guest.booker_name}: ${guest.diet_info}`);
+          } else {
+            console.log(`❌ Ignoring non-dietary text for ${guest.booker_name}: "${trimmedDiet}"`);
+          }
         }
         
         // Extract magic information from ticket_data
         const magicData = guest.ticket_data.Magic || guest.ticket_data.MAGIC || guest.ticket_data.magic;
         if (magicData && typeof magicData === 'string' && magicData.trim() !== '' && !guest.magic_info) {
-          updates.magic_info = magicData.trim();
-          guest.magic_info = magicData.trim(); // Update local state
+          const trimmedMagic = magicData.trim();
+          updates.magic_info = trimmedMagic;
+          guest.magic_info = trimmedMagic; // Update local state
           hasUpdates = true;
-          console.log(`Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
+          console.log(`✨ Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
         }
         
         if (hasUpdates) {
@@ -985,9 +1004,11 @@ const CheckInSystem = ({
             
             if (error) {
               console.error('Error updating guest with diet/magic info:', error);
+            } else {
+              console.log(`📝 Successfully updated database for guest ${guestUpdate.id}`);
             }
           }
-          console.log(`Updated ${guestsToUpdate.length} guests with diet/magic information`);
+          console.log(`🎉 Updated ${guestsToUpdate.length} guests with diet/magic information`);
         } catch (error) {
           console.error('Failed to update guests with diet/magic info:', error);
         }
