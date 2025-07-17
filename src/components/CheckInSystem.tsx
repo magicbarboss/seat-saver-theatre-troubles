@@ -565,25 +565,42 @@ const CheckInSystem = ({
     // Step 1: Detect booking type with enhanced detection
     const isGYGBooking =
       (guest?.ticket_data?.Status === "Paid in GYG") ||
-      (guest?.ticket_data?.Note?.includes("GYG")) ||
-      (ticketDataStr.toLowerCase().includes("paid in gyg"));
+      (guest?.ticket_data?.Note?.includes?.("GYG")) ||
+      (ticketDataStr.toLowerCase().includes("paid in gyg")) ||
+      (ticketDataStr.toLowerCase().includes("gyg")) ||
+      (bookerName.toLowerCase().includes("gyg")) ||
+      (itemDetails.toLowerCase().includes("gyg"));
 
     const isViatorBooking =
       (guest?.ticket_data?.Status === "VIATOR") ||
       (ticketDataStr.toLowerCase().includes("viator")) ||
-      (guest?.booking_source === "Viator");
+      (guest?.booking_source === "Viator") ||
+      (bookerName.toLowerCase().includes("viator")) ||
+      (itemDetails.toLowerCase().includes("viator"));
     
     // Add detailed debug logging for detection
     console.log("🔍 Guest Detection Debug:", {
       name: guest.booker_name,
       bookingCode: guest.booking_code,
       guestCount,
-      status: guest.ticket_data?.Status,
-      note: guest.ticket_data?.Note,
-      booking_source: guest?.booking_source,
+      status: {
+        _type: typeof guest.ticket_data?.Status,
+        value: guest.ticket_data?.Status
+      },
+      note: {
+        _type: typeof guest.ticket_data?.Note,
+        value: guest.ticket_data?.Note
+      },
+      booking_source: {
+        _type: typeof guest?.booking_source,
+        value: guest?.booking_source
+      },
       isGYGBooking,
       isViatorBooking,
-      ticketDataStr: ticketDataStr.substring(0, 200) + "..."
+      ticketDataStr: ticketDataStr.substring(0, 200) + "...",
+      fullTicketData: guest.ticket_data,
+      itemDetails: guest.item_details,
+      allTextContent: `${bookerName} ${itemDetails} ${ticketDataStr}`.toLowerCase()
     });
 
     // Fuzzy Package Detection for enhanced robustness
