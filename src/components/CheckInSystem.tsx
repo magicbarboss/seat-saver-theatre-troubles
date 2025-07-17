@@ -568,19 +568,21 @@ const CheckInSystem = ({
       ? String(statusRaw.value).toLowerCase()
       : String(statusRaw || '').toLowerCase();
     
-    // Enhanced Detection Logic
-    const ticketDataStr = JSON.stringify(guest.ticket_data || {});
+    // Enhanced Detection Logic with Full Ticket Search
+    const ticketDataStr = JSON.stringify(guest.ticket_data || {}).toLowerCase();
     const bookerName = guest.booker_name || '';
     const itemDetails = guest.item_details || '';
     
-    // Step 1: Simplified Detection using only extracted strings
+    // Step 1: Robust Detection with Full Ticket Search
     const isGYGBooking =
       statusStr.includes("paid in gyg") ||
-      noteStr.includes("gyg booking reference");
+      noteStr.includes("gyg booking reference") ||
+      ticketDataStr.includes("paid in gyg");
 
     const isViatorBooking =
       statusStr.includes("viator") ||
       noteStr.includes("viator") ||
+      ticketDataStr.includes("viator") ||
       (guest?.booking_source?.toLowerCase?.() === "viator");
     
     // Enhanced debug logging with extracted values
@@ -654,12 +656,7 @@ const CheckInSystem = ({
         orderItems.push(`${orderSummary.fries} Fries`);
       }
       
-      console.log("✅ GYG Path:", {
-        name: guest.booker_name,
-        bookingCode: guest.booking_code,
-        orderSummary,
-        result: orderItems.join(', ')
-      });
+      console.log(`🟢 GYG Detected for ${guest.booker_name}: ${guestCount} guests`);
       
       return orderItems.join(', ');
     }
@@ -676,12 +673,7 @@ const CheckInSystem = ({
       if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
       if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
       
-      console.log("✅ Viator Path:", {
-        name: guest.booker_name,
-        bookingCode: guest.booking_code,
-        orderSummary,
-        result: orderItems.join(', ')
-      });
+      console.log(`🔵 Viator Detected for ${guest.booker_name}: ${guestCount} guests`);
       
       return orderItems.join(', ');
     }
