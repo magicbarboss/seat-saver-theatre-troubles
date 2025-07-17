@@ -543,18 +543,68 @@ const CheckInSystem = ({
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Separate GYG and Viator Detection
+    // Enhanced Detection Logic
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
+    const bookerName = guest.booker_name || '';
+    const itemDetails = guest.item_details || '';
+    
+    // GYG Detection
     const isGYGBooking = 
       (guest.ticket_data && (guest.ticket_data as any).Status === "Paid in GYG") ||
       (guest.ticket_data && (guest.ticket_data as any).Note && 
        (guest.ticket_data as any).Note.includes("GYG Booking Reference")) ||
       ticketDataStr.toLowerCase().includes('paid in gyg');
     
+    // Viator Detection
     const isViatorBooking = 
       (guest.ticket_data && (guest.ticket_data as any).Status === "VIATOR") ||
       ((guest as any).booking_source === "Viator") ||
       ticketDataStr.toLowerCase().includes('viator');
+
+    // Fuzzy Package Detection for enhanced robustness
+    const allTextContent = `${bookerName} ${itemDetails} ${ticketDataStr}`.toLowerCase();
+    const isGrouponProsecco = allTextContent.includes('groupon prosecco');
+    const isWowcherProsecco = allTextContent.includes('wowcher prosecco');
+    const isGrouponPints = allTextContent.includes('groupon pints');
+    const isGrouponCocktail = allTextContent.includes('groupon cocktail');
+    const isWowcherCocktail = allTextContent.includes('wowcher cocktail');
+
+    // Enhanced Package Overrides (fuzzy detection)
+    if (isGrouponProsecco || isWowcherProsecco) {
+      const proseccoQuantity = guestCount; // 1 per person
+      const pizzaQuantity = Math.floor(guestCount / 2); // per couple
+      const friesQuantity = Math.floor(guestCount / 2); // per couple
+      
+      orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
+      
+      return orderItems.join(', ');
+    }
+
+    if (isGrouponPints) {
+      const pintsQuantity = guestCount; // 1 per person
+      const pizzaQuantity = Math.floor(guestCount / 2); // per couple
+      const friesQuantity = Math.floor(guestCount / 2); // per couple
+      
+      orderItems.push(`${pintsQuantity} House Pint${pintsQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
+      
+      return orderItems.join(', ');
+    }
+
+    if (isGrouponCocktail || isWowcherCocktail) {
+      const cocktailQuantity = guestCount; // 1 per person
+      const pizzaQuantity = Math.floor(guestCount / 2); // per couple
+      const loadedFriesQuantity = Math.floor(guestCount / 2); // per couple
+      
+      orderItems.push(`${cocktailQuantity} House Cocktail${cocktailQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (loadedFriesQuantity > 0) orderItems.push(`${loadedFriesQuantity} Loaded Fries`);
+      
+      return orderItems.join(', ');
+    }
     
     // GYG Special Logic (can have solo guests)
     if (isGYGBooking) {
@@ -662,9 +712,16 @@ const CheckInSystem = ({
             orderItems.push(extra);
           });
         }
+      } else {
+        // Log unmatched packages for system improvement
+        console.log(`🔍 Unmatched ticket type: "${ticket.type}" for guest "${guest.booker_name}" (${guest.total_quantity} people) - Consider adding to TICKET_TYPE_MAPPING`);
       }
-      // If ticket type not mapped, no fallback parsing - just skip it
     });
+
+    // Log if no order items found despite having ticket data (for troubleshooting)
+    if (orderItems.length === 0 && tickets.length > 0) {
+      console.log(`⚠️ No order summary generated for guest "${guest.booker_name}" despite having ${tickets.length} ticket types:`, tickets.map(t => t.type));
+    }
     
     return orderItems.length > 0 ? orderItems.join(', ') : 'Show ticket only';
   };
