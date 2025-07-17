@@ -982,6 +982,12 @@ const CheckInSystem = ({
         let hasUpdates = false;
         const updates: { id: string; diet_info?: string; magic_info?: string } = { id: guest.id };
         
+        // Helper function to check if message already exists
+        const messageAlreadyExists = (existingMagic: string, newMessage: string): boolean => {
+          if (!existingMagic) return false;
+          return existingMagic.includes(newMessage);
+        };
+
         // Extract diet information with validation
         const dietData = ticketData.DIET || ticketData.Diet || ticketData.diet;
         if (dietData && typeof dietData === 'string' && dietData.trim() !== '' && !guest.diet_info) {
@@ -995,26 +1001,35 @@ const CheckInSystem = ({
           } else {
             // If DIET column doesn't contain dietary keywords, move to magic_info
             console.log(`🔄 DIET column contains non-dietary content for ${guest.booker_name}, moving to magic_info: "${trimmedDiet}"`);
-            if (!guest.magic_info) {
-              updates.magic_info = trimmedDiet;
-              guest.magic_info = trimmedDiet; // Update local state
+            const existingMagic = guest.magic_info || updates.magic_info || '';
+            
+            // Only add if the message doesn't already exist
+            if (!messageAlreadyExists(existingMagic, trimmedDiet)) {
+              const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedDiet}` : trimmedDiet;
+              updates.magic_info = newMagicInfo;
+              guest.magic_info = newMagicInfo; // Update local state
               hasUpdates = true;
             }
           }
         }
-        
+
         // Extract magic information (messages for magicians)
         const magicData = ticketData.Magic || ticketData.MAGIC || ticketData.magic;
         if (magicData && typeof magicData === 'string' && magicData.trim() !== '') {
           const trimmedMagic = magicData.trim();
-          // Append to existing magic_info if any, or create new
           const existingMagic = guest.magic_info || updates.magic_info || '';
-          const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedMagic}` : trimmedMagic;
           
-          updates.magic_info = newMagicInfo;
-          guest.magic_info = newMagicInfo; // Update local state
-          hasUpdates = true;
-          console.log(`✨ Found magic info for ${guest.booker_name}: ${newMagicInfo}`);
+          // Only append if the message doesn't already exist
+          if (!messageAlreadyExists(existingMagic, trimmedMagic)) {
+            const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedMagic}` : trimmedMagic;
+            
+            updates.magic_info = newMagicInfo;
+            guest.magic_info = newMagicInfo; // Update local state
+            hasUpdates = true;
+            console.log(`✨ Found new magic info for ${guest.booker_name}: ${trimmedMagic}`);
+          } else {
+            console.log(`🔄 Magic message already exists for ${guest.booker_name}, skipping: "${trimmedMagic}"`);
+          }
         }
         
         if (hasUpdates) {
