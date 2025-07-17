@@ -132,21 +132,21 @@
 }
 
 @layer components {
-  /* Gradient backgrounds */
+  /* Gradient backgrounds using standard CSS */
   .bg-gradient-primary {
-    @apply bg-gradient-to-r from-[hsl(var(--gradient-primary))] to-[hsl(var(--gradient-secondary))];
+    background: linear-gradient(to right, hsl(var(--gradient-primary)), hsl(var(--gradient-secondary)));
   }
   
   .bg-gradient-success {
-    @apply bg-gradient-to-r from-[hsl(var(--gradient-success))] to-[hsl(var(--gradient-info))];
+    background: linear-gradient(to right, hsl(var(--gradient-success)), hsl(var(--gradient-info)));
   }
   
   .bg-gradient-warning {
-    @apply bg-gradient-to-r from-[hsl(var(--gradient-warning))] to-[hsl(var(--gradient-accent))];
+    background: linear-gradient(to right, hsl(var(--gradient-warning)), hsl(var(--gradient-accent)));
   }
   
   .bg-gradient-magical {
-    @apply bg-gradient-to-r from-[hsl(var(--gradient-accent))] to-[hsl(var(--gradient-primary))];
+    background: linear-gradient(to right, hsl(var(--gradient-accent)), hsl(var(--gradient-primary)));
   }
 
   /* Card styling variants */
@@ -155,28 +155,30 @@
   }
   
   .card-stat-success {
-    @apply border-l-4 border-l-[hsl(var(--success))];
+    border-left: 4px solid hsl(var(--success));
   }
   
   .card-stat-info {
-    @apply border-l-4 border-l-[hsl(var(--info))];
+    border-left: 4px solid hsl(var(--info));
   }
   
   .card-stat-warning {
-    @apply border-l-4 border-l-[hsl(var(--warning))];
+    border-left: 4px solid hsl(var(--warning));
   }
   
   .card-stat-magical {
-    @apply border-l-4 border-l-[hsl(var(--magical))];
+    border-left: 4px solid hsl(var(--magical));
   }
 
   /* Header styling */
   .header-gradient {
-    @apply bg-gradient-primary text-white py-4 px-6 shadow-md rounded-lg;
+    @apply py-4 px-6 shadow-md rounded-lg text-white;
+    background: linear-gradient(to right, hsl(var(--gradient-primary)), hsl(var(--gradient-secondary)));
   }
   
   /* Table header styling */
   .table-header-row {
-    @apply bg-gradient-to-r from-secondary to-muted border-b;
+    @apply border-b;
+    background: linear-gradient(to right, hsl(var(--secondary)), hsl(var(--muted)));
   }
 }
