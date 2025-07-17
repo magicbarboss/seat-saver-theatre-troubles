@@ -303,7 +303,7 @@ const CheckInSystem = ({
     return bookerName.trim();
   };
 
-  // Enhanced ticket type mapping for pizza/drinks calculation
+  // Enhanced ticket type mapping with perCouple support
   const TICKET_TYPE_MAPPING: Record<string, {
     drinks?: {
       type: string;
@@ -312,7 +312,15 @@ const CheckInSystem = ({
     };
     pizza?: {
       quantity: number;
-      shared?: boolean;
+      perCouple?: boolean;
+    };
+    fries?: {
+      quantity: number;
+      perCouple?: boolean;
+    };
+    prosecco?: {
+      quantity: number;
+      perPerson?: boolean;
     };
     extras?: string[];
     minimum_people?: number;
@@ -323,24 +331,24 @@ const CheckInSystem = ({
       drinks: {
         type: 'drinks',
         quantity: 2,
-        perPerson: true
+        perPerson: false
       }
     },
     'House Magicians Show Ticket & 1 Pizza': {
       pizza: {
         quantity: 1,
-        shared: true
+        perCouple: true
       }
     },
     'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
       drinks: {
         type: 'drinks',
         quantity: 2,
-        perPerson: true
+        perPerson: false
       },
       pizza: {
         quantity: 1,
-        shared: true
+        perCouple: true
       }
     },
     'House Magicians Show Ticket & 2 soft drinks': {
@@ -365,8 +373,7 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     'Adult Show Ticket induces 2 soft drinks': {
@@ -384,7 +391,6 @@ const CheckInSystem = ({
       },
       pizza: {
         quantity: 1,
-        shared: false
       }
     },
     'Adult Show Ticket induces 2 soft drinks + 9 PIzza': {
@@ -394,48 +400,45 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     // Comedy tickets
     'Comedy ticket plus 9" Pizza': {
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     'Comedy ticket plus 9 Pizza': {
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     'Adult Comedy & Magic Show Ticket + 9" Pizza': {
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     'Adult Comedy & Magic Show Ticket + 9 Pizza': {
       pizza: {
-        quantity: 1,
-        shared: false
+        quantity: 1
       }
     },
     'Adult Comedy Magic Show ticket': {},
     // Groupon packages
     'Groupon Offer Prosecco Package (per person)': {
-      drinks: {
-        type: 'glass of prosecco',
+      prosecco: {
         quantity: 1,
         perPerson: true
       },
       pizza: {
-        quantity: 0.5,
-        shared: true
+        quantity: 1,
+        perCouple: true
       },
-      extras: ['portion of fries per couple']
+      fries: {
+        quantity: 1,
+        perCouple: true
+      }
     },
     'Groupon Magic & Pints Package (per person)': {
       drinks: {
@@ -444,10 +447,13 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 0.5,
-        shared: true
+        quantity: 1,
+        perCouple: true
       },
-      extras: ['fries per couple']
+      fries: {
+        quantity: 1,
+        perCouple: true
+      }
     },
     'Groupon Magic & Cocktails Package (per person)': {
       drinks: {
@@ -456,10 +462,13 @@ const CheckInSystem = ({
         perPerson: true
       },
       pizza: {
-        quantity: 0.5,
-        shared: true
+        quantity: 1,
+        perCouple: true
       },
-      extras: ['loaded fries per couple']
+      fries: {
+        quantity: 1,
+        perCouple: true
+      }
     },
     'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
       drinks: {
@@ -469,9 +478,12 @@ const CheckInSystem = ({
       },
       pizza: {
         quantity: 1,
-        shared: true
+        perCouple: true
       },
-      extras: ['Loaded Fries (shared)']
+      fries: {
+        quantity: 1,
+        perCouple: true
+      }
     },
     'OLD Groupon Offer (per person - extras are already included)': {
       drinks: {
@@ -481,7 +493,7 @@ const CheckInSystem = ({
       },
       pizza: {
         quantity: 1,
-        shared: true
+        perCouple: true
       }
     },
     // Wowcher packages
@@ -493,9 +505,12 @@ const CheckInSystem = ({
       },
       pizza: {
         quantity: 1,
-        shared: true
+        perCouple: true
       },
-      extras: ['Loaded Fries (shared)']
+      fries: {
+        quantity: 1,
+        perCouple: true
+      }
     },
     // Smoke offers
     'Smoke Offer Ticket & 1x Drink': {
@@ -523,34 +538,36 @@ const CheckInSystem = ({
     }
   };
 
-  // Generate comprehensive order summary for direct display using only structured data
+  // Generate comprehensive order summary with enhanced Viator/GYG detection and new calculation logic
   const getOrderSummary = (guest: Guest): string => {
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Check if this is a GYG (GetYourGuide) payment - treat as Groupon Offer Prosecco Package
+    // Enhanced Viator & GYG Detection
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
-    const statusStr = (guest as any).Status || '';
-    const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg') || 
-                        statusStr.toLowerCase().includes('paid in gyg');
+    const isViatorBooking = 
+      (guest.ticket_data && (guest.ticket_data as any).Viator) ||
+      (guest.ticket_data && (guest.ticket_data as any).Status === "VIATOR") ||
+      (guest.ticket_data && (guest.ticket_data as any).Status === "Paid in GYG") ||
+      (guest.ticket_data && (guest.ticket_data as any).Note && 
+       (guest.ticket_data as any).Note.includes("GYG Booking Reference")) ||
+      ticketDataStr.toLowerCase().includes('paid in gyg') ||
+      ((guest as any).booking_source === "Viator");
     
-    if (isGYGPayment) {
-      // Apply GYG rules: 1 prosecco per person, pizza shared per couple, fries shared per couple
-      const totalProseccos = guestCount;
-      const couples = Math.ceil(guestCount / 2);
+    // If Viator/GYG detected, force treatment as "Groupon Offer Prosecco Package (per person)"
+    if (isViatorBooking) {
+      const proseccoQuantity = guestCount; // 1 per person
+      const pizzaQuantity = Math.ceil(guestCount / 2); // per couple
+      const friesQuantity = Math.ceil(guestCount / 2); // per couple
       
-      if (totalProseccos > 0) {
-        orderItems.push(`${totalProseccos} Prosecco${totalProseccos > 1 ? 's' : ''}`);
-      }
-      if (couples > 0) {
-        orderItems.push(`${couples} Pizza${couples > 1 ? 's' : ''}`);
-        orderItems.push(`${couples} Fries`);
-      }
+      orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
+      orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      orderItems.push(`${friesQuantity} Fries`);
       
       return orderItems.join(', ');
     }
     
-    // Process tickets using only structured TICKET_TYPE_MAPPING
+    // Process tickets using structured TICKET_TYPE_MAPPING with new calculation logic
     const tickets = getAllTicketTypes(guest);
     
     tickets.forEach(ticket => {
@@ -559,27 +576,72 @@ const CheckInSystem = ({
       if (packageInfo) {
         // Calculate drinks
         if (packageInfo.drinks) {
-          const totalDrinks = packageInfo.drinks.quantity * ticket.quantity;
+          let quantity;
+          if (packageInfo.drinks.perPerson) {
+            // perPerson: true - multiply by guest count
+            quantity = packageInfo.drinks.quantity * ticket.quantity * guestCount;
+          } else {
+            // Default: quantity = packageInfo[item].quantity * ticket.quantity (NO guest count)
+            quantity = packageInfo.drinks.quantity * ticket.quantity;
+          }
           
-          if (totalDrinks > 0) {
+          if (quantity > 0) {
             const drinkName = packageInfo.drinks.type;
-            orderItems.push(`${totalDrinks} ${drinkName}${totalDrinks > 1 && !drinkName.toLowerCase().endsWith('s') ? 's' : ''}`);
+            orderItems.push(`${quantity} ${drinkName}${quantity > 1 && !drinkName.toLowerCase().endsWith('s') ? 's' : ''}`);
+          }
+        }
+        
+        // Calculate prosecco
+        if (packageInfo.prosecco) {
+          let quantity;
+          if (packageInfo.prosecco.perPerson) {
+            // perPerson: true - multiply by guest count
+            quantity = packageInfo.prosecco.quantity * ticket.quantity * guestCount;
+          } else {
+            // Default calculation
+            quantity = packageInfo.prosecco.quantity * ticket.quantity;
+          }
+          
+          if (quantity > 0) {
+            orderItems.push(`${quantity} Prosecco${quantity > 1 ? 's' : ''}`);
           }
         }
         
         // Calculate pizzas
         if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
-          const totalPizzas = packageInfo.pizza.quantity * ticket.quantity;
+          let quantity;
+          if (packageInfo.pizza.perCouple) {
+            // perCouple: true - use Math.ceil(guestCount / 2) * ticket.quantity
+            quantity = Math.ceil(guestCount / 2) * ticket.quantity;
+          } else {
+            // Default: quantity = packageInfo[item].quantity * ticket.quantity (NO guest count)
+            quantity = packageInfo.pizza.quantity * ticket.quantity;
+          }
           
-          if (totalPizzas > 0) {
-            orderItems.push(`${totalPizzas} Pizza${totalPizzas > 1 ? 's' : ''}`);
+          if (quantity > 0) {
+            orderItems.push(`${quantity} Pizza${quantity > 1 ? 's' : ''}`);
           }
         }
         
-        // Calculate extras (like fries)
+        // Calculate fries
+        if (packageInfo.fries && packageInfo.fries.quantity > 0) {
+          let quantity;
+          if (packageInfo.fries.perCouple) {
+            // perCouple: true - use Math.ceil(guestCount / 2) * ticket.quantity
+            quantity = Math.ceil(guestCount / 2) * ticket.quantity;
+          } else {
+            // Default calculation
+            quantity = packageInfo.fries.quantity * ticket.quantity;
+          }
+          
+          if (quantity > 0) {
+            orderItems.push(`${quantity} Fries`);
+          }
+        }
+        
+        // Calculate extras (deprecated - replaced with specific fries calculations)
         if (packageInfo.extras && packageInfo.extras.length > 0) {
           packageInfo.extras.forEach(extra => {
-            // Just use the extra name as-is, no guest count multiplication
             orderItems.push(extra);
           });
         }
