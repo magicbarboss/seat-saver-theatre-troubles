@@ -149,9 +149,17 @@
     background: linear-gradient(to right, hsl(var(--gradient-accent)), hsl(var(--gradient-primary)));
   }
 
-  /* Card styling variants */
+  /* Card styling variants - using only standard CSS */
   .card-stat {
-    @apply rounded-lg shadow-md border border-border bg-card transition-all duration-200 hover:shadow-lg;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .card-stat:hover {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
   
   .card-stat-success {
@@ -170,15 +178,18 @@
     border-left: 4px solid hsl(var(--magical));
   }
 
-  /* Header styling */
+  /* Header styling - using only standard CSS */
   .header-gradient {
-    @apply py-4 px-6 shadow-md rounded-lg text-white;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    border-radius: 0.5rem;
+    color: white;
     background: linear-gradient(to right, hsl(var(--gradient-primary)), hsl(var(--gradient-secondary)));
   }
   
-  /* Table header styling */
+  /* Table header styling - using only standard CSS */
   .table-header-row {
-    @apply border-b;
+    border-bottom: 1px solid hsl(var(--border));
     background: linear-gradient(to right, hsl(var(--secondary)), hsl(var(--muted)));
   }
 }
