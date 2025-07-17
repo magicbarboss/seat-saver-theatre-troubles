@@ -40,6 +40,7 @@ const CheckInSystem = ({
   const [lastSaved, setLastSaved] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
   const [partyGroups, setPartyGroups] = useState<Map<string, PartyGroup>>(new Map());
+  const [friendshipGroups, setFriendshipGroups] = useState<Map<string, number[]>>(new Map());
   const [bookingComments, setBookingComments] = useState<Map<number, string>>(new Map());
   const [sessionDate, setSessionDate] = useState<string>('');
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -67,6 +68,7 @@ const CheckInSystem = ({
       setAllocatedGuests(new Set());
       setGuestTableAllocations(new Map());
       setPartyGroups(new Map());
+      setFriendshipGroups(new Map());
       setBookingComments(new Map());
       setWalkInGuests([]);
       setSessionDate(new Date().toDateString());
@@ -168,6 +170,7 @@ const CheckInSystem = ({
       // Reset other data
       setSeatedSections(new Set());
       setPartyGroups(new Map());
+      setFriendshipGroups(new Map());
       setWalkInGuests([]);
       setSessionDate(new Date().toISOString().split('T')[0]);
       console.log(`Migrated data for ${migratedCheckedIn.size} checked-in guests, ${migratedSeated.size} seated guests`);
@@ -211,6 +214,7 @@ const CheckInSystem = ({
           setAllocatedGuests(new Set(currentSession.allocated_guests || []));
           setGuestTableAllocations(new Map(Object.entries(currentSession.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])));
           setPartyGroups(new Map(Object.entries(currentSession.party_groups || {}) as [string, PartyGroup][]));
+          setFriendshipGroups(new Map(Object.entries(currentSession.friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
           setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
           setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
           setSessionDate(today);
@@ -275,6 +279,7 @@ const CheckInSystem = ({
           guest_table_allocations: Object.fromEntries(guestTableAllocations) as any,
           pager_assignments: Object.fromEntries(pagerAssignments) as any,
           party_groups: Object.fromEntries(partyGroups) as any,
+          friendship_groups: Object.fromEntries(friendshipGroups) as any,
           booking_comments: Object.fromEntries(bookingComments) as any,
           walk_in_guests: walkInGuests as any
         };
@@ -295,7 +300,7 @@ const CheckInSystem = ({
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, bookingComments, walkInGuests]);
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, walkInGuests]);
 
   // Extract guest name utility
   const extractGuestName = (bookerName: string) => {
@@ -862,8 +867,8 @@ const CheckInSystem = ({
     // Fallback: parse all ticket_data fields with fuzzy matching
     if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
       Object.entries(guest.ticket_data).forEach(([key, value]) => {
-        // Skip non-ticket fields
-        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'DIET', 'Friends', 'Guests', 'Magic', 'TERMS'].includes(key)) {
+        // Skip non-ticket fields (removed 'Friends' from skip list)
+        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'DIET', 'Guests', 'Magic', 'TERMS'].includes(key)) {
           return;
         }
 
