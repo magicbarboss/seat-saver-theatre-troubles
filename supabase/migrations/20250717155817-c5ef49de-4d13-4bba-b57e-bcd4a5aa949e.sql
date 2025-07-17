@@ -5,9 +5,10 @@ AND booking_code = 'VMLK-010725';
 
 -- Insert the single correct record back
 INSERT INTO guests (
-  id, booking_code, booker_name, total_quantity, ticket_data, show_time, diet_info
+  id, guest_list_id, booking_code, booker_name, total_quantity, ticket_data, show_time, diet_info
 ) VALUES (
   '2b75cab9-5407-45d1-8d92-a6783a8daaa8',
+  '013ae903-b3e7-4447-bc02-ff1d58f8e83b',
   'VMLK-010725',
   'Denise O''Keeffe',
   4,
