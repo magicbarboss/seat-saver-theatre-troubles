@@ -557,23 +557,23 @@ const CheckInSystem = ({
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Safe String Extractors for Object-Based Fields
-    const noteRaw = guest.ticket_data?.Note;
+    // Safe String Extractors - Check direct Status field first, then ticket_data
+    const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
+    const statusStr = typeof statusField === 'object' && statusField?.value
+      ? String(statusField.value).toLowerCase()
+      : String(statusField || '').toLowerCase();
+
+    const noteRaw = guest.Note || guest.note || guest.ticket_data?.Note;
     const noteStr = typeof noteRaw === 'object' && noteRaw?.value
       ? String(noteRaw.value).toLowerCase()
       : String(noteRaw || '').toLowerCase();
-
-    const statusRaw = guest.ticket_data?.Status;
-    const statusStr = typeof statusRaw === 'object' && statusRaw?.value
-      ? String(statusRaw.value).toLowerCase()
-      : String(statusRaw || '').toLowerCase();
     
     // Enhanced Detection Logic with Full Ticket Search
     const ticketDataStr = JSON.stringify(guest.ticket_data || {}).toLowerCase();
     const bookerName = guest.booker_name || '';
     const itemDetails = guest.item_details || '';
     
-    // Step 1: Robust Detection with Full Ticket Search
+    // Step 1: Robust Detection with Status column and Full Ticket Search
     const isGYGBooking =
       statusStr.includes("paid in gyg") ||
       noteStr.includes("gyg booking reference") ||
