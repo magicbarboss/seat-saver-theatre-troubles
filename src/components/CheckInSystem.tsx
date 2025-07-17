@@ -1133,16 +1133,18 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
-  // Group bookings by booking code
+  // Group bookings by booking code - preserve original order
   const groupedBookings = useMemo(() => {
     if (!guests || guests.length === 0) return [];
     const bookingGroups: BookingGroup[] = [];
     const processedIndices = new Set<number>();
+    
     guests.forEach((guest, index) => {
       if (processedIndices.has(index) || !guest) return;
       const bookingCode = guest.booking_code;
       const bookerName = guest.booker_name;
       if (!bookingCode || !bookerName) return;
+      
       const relatedBookings = guests.map((g, i) => ({
         guest: g,
         index: i
@@ -1150,6 +1152,7 @@ const CheckInSystem = ({
         guest: g,
         index: i
       }) => !processedIndices.has(i) && g && g.booking_code === bookingCode && g.booker_name === bookerName);
+      
       if (relatedBookings.length > 0) {
         const mainBooking = relatedBookings[0];
         const addOns = relatedBookings.slice(1);
@@ -1164,7 +1167,9 @@ const CheckInSystem = ({
         }) => processedIndices.add(index));
       }
     });
-    return bookingGroups;
+    
+    // Sort by original index to maintain the order from the CSV file
+    return bookingGroups.sort((a, b) => a.originalIndex - b.originalIndex);
   }, [guests]);
 
   // Filter bookings based on search and show time
