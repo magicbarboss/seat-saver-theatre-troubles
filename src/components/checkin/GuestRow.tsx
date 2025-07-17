@@ -77,7 +77,15 @@ export const GuestRow = ({
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {isWalkIn && <Badge variant="secondary">Walk-in</Badge>}
-          {guestName}
+          <span className={`text-lg font-semibold transition-colors duration-200 ${
+            isCheckedIn 
+              ? 'text-success' 
+              : isWalkIn 
+                ? 'text-info' 
+                : 'text-foreground hover:text-primary'
+          }`}>
+            {guestName}
+          </span>
           {partyInfo?.isInParty && (
             <Badge variant="outline" className="text-xs">
               Party of {partyInfo.partySize}
