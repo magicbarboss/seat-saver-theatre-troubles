@@ -15,7 +15,7 @@ import { CheckInStats } from './checkin/CheckInStats';
 import { CheckInActions } from './checkin/CheckInActions';
 import { WalkInGuestForm } from './checkin/WalkInGuestForm';
 import { GuestTable } from './checkin/GuestTable';
-import { KitchenPrepSummary } from './checkin/KitchenPrepSummary';
+
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
 const CheckInSystem = ({
   guests,
@@ -1126,11 +1126,6 @@ const CheckInSystem = ({
             </div>
           </div>
 
-          <KitchenPrepSummary 
-            filteredBookings={filteredBookings}
-            walkInGuests={walkInGuests}
-            getOrderSummary={getOrderSummary}
-          />
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
             <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getOrderSummary={getOrderSummary} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} />
