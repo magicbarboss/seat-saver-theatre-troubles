@@ -20,6 +20,7 @@ export type Database = {
           booking_comments: Json | null
           checked_in_guests: number[] | null
           created_at: string
+          friendship_groups: Json | null
           guest_list_id: string
           guest_table_allocations: Json | null
           id: string
@@ -37,6 +38,7 @@ export type Database = {
           booking_comments?: Json | null
           checked_in_guests?: number[] | null
           created_at?: string
+          friendship_groups?: Json | null
           guest_list_id: string
           guest_table_allocations?: Json | null
           id?: string
@@ -54,6 +56,7 @@ export type Database = {
           booking_comments?: Json | null
           checked_in_guests?: number[] | null
           created_at?: string
+          friendship_groups?: Json | null
           guest_list_id?: string
           guest_table_allocations?: Json | null
           id?: string

@@ -214,7 +214,7 @@ const CheckInSystem = ({
           setAllocatedGuests(new Set(currentSession.allocated_guests || []));
           setGuestTableAllocations(new Map(Object.entries(currentSession.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])));
           setPartyGroups(new Map(Object.entries(currentSession.party_groups || {}) as [string, PartyGroup][]));
-          setFriendshipGroups(new Map(Object.entries(currentSession.friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
+          setFriendshipGroups(new Map(Object.entries((currentSession as any).friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
           setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
           setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
           setSessionDate(today);
@@ -934,6 +934,55 @@ const CheckInSystem = ({
     }
     return `${totalDrinks} Drinks`;
   };
+
+  // Extract and process friendship groups from guest data
+  const processFriendshipGroups = useMemo(() => {
+    if (!guests || guests.length === 0) return new Map<string, number[]>();
+    
+    const groups = new Map<string, number[]>();
+    
+    guests.forEach((guest, index) => {
+      if (!guest || !guest.ticket_data) return;
+      
+      // Extract friends data from ticket_data
+      const friendsData = guest.ticket_data.Friends || guest.ticket_data.friends;
+      
+      if (friendsData && typeof friendsData === 'string' && friendsData.trim() !== '') {
+        const friendsValue = friendsData.trim();
+        
+        // If this friendship group already exists, add this guest to it
+        if (groups.has(friendsValue)) {
+          const existingGroup = groups.get(friendsValue)!;
+          if (!existingGroup.includes(index)) {
+            existingGroup.push(index);
+          }
+        } else {
+          // Create new friendship group
+          groups.set(friendsValue, [index]);
+        }
+        
+        console.log(`Found friendship group "${friendsValue}" for guest ${guest.booker_name} (index ${index})`);
+      }
+    });
+    
+    // Only keep groups with more than one member
+    const filteredGroups = new Map<string, number[]>();
+    groups.forEach((indices, groupName) => {
+      if (indices.length > 1) {
+        filteredGroups.set(groupName, indices);
+        console.log(`Friendship group "${groupName}" has ${indices.length} members:`, indices);
+      }
+    });
+    
+    return filteredGroups;
+  }, [guests]);
+
+  // Update friendship groups state when processed groups change
+  useEffect(() => {
+    if (processFriendshipGroups.size > 0) {
+      setFriendshipGroups(processFriendshipGroups);
+    }
+  }, [processFriendshipGroups]);
 
   // Group bookings by booking code
   const groupedBookings = useMemo(() => {
