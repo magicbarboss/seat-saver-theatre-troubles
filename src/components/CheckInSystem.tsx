@@ -573,22 +573,15 @@ const CheckInSystem = ({
     const bookerName = guest.booker_name || '';
     const itemDetails = guest.item_details || '';
     
-    // Step 1: Detect booking type with safe string extraction
+    // Step 1: Simplified Detection using only extracted strings
     const isGYGBooking =
       statusStr.includes("paid in gyg") ||
-      noteStr.includes("gyg booking reference") ||
-      noteStr.includes("gyg") ||
-      (ticketDataStr.toLowerCase().includes("gyg")) ||
-      (bookerName.toLowerCase().includes("gyg")) ||
-      (itemDetails.toLowerCase().includes("gyg"));
+      noteStr.includes("gyg booking reference");
 
     const isViatorBooking =
       statusStr.includes("viator") ||
       noteStr.includes("viator") ||
-      (ticketDataStr.toLowerCase().includes("viator")) ||
-      (guest?.booking_source?.toLowerCase?.() === "viator") ||
-      (bookerName.toLowerCase().includes("viator")) ||
-      (itemDetails.toLowerCase().includes("viator"));
+      (guest?.booking_source?.toLowerCase?.() === "viator");
     
     // Enhanced debug logging with extracted values
     console.log("🔍 Guest Detection Debug:", {
