@@ -949,19 +949,42 @@ const CheckInSystem = ({
 
   // Extract and process diet and magic information from guest data and save to database
   useEffect(() => {
-    if (!guests || guests.length === 0) return;
+    console.log('🚀 DIET/MAGIC EXTRACTION useEffect TRIGGERED');
+    
+    if (!guests || guests.length === 0) {
+      console.log('❌ No guests found, exiting extraction');
+      return;
+    }
+    
+    console.log(`🔍 Starting diet/magic extraction for ${guests.length} guests`);
     
     const updateGuestsWithDietMagic = async () => {
       const guestsToUpdate: { id: string; diet_info?: string; magic_info?: string }[] = [];
       
-      guests.forEach((guest) => {
-        if (!guest || !guest.ticket_data) return;
+      guests.forEach((guest, index) => {
+        console.log(`🔍 Checking guest ${index}: ${guest.booker_name}`, {
+          hasTicketData: !!guest.ticket_data,
+          ticketData: guest.ticket_data,
+          hasGuestData: !!guest,
+          guestKeys: Object.keys(guest || {}),
+          existingDiet: guest.diet_info,
+          existingMagic: guest.magic_info
+        });
+        
+        // Check if guest has any data fields to extract from
+        if (!guest) {
+          console.log(`❌ Skipping - no guest data`);
+          return;
+        }
+        
+        // Handle both ticket_data format and direct field format
+        const ticketData = guest.ticket_data || guest;
         
         let hasUpdates = false;
         const updates: { id: string; diet_info?: string; magic_info?: string } = { id: guest.id };
         
-        // Extract diet information from ticket_data with validation
-        const dietData = guest.ticket_data.DIET || guest.ticket_data.Diet || guest.ticket_data.diet;
+        // Extract diet information with validation
+        const dietData = ticketData.DIET || ticketData.Diet || ticketData.diet;
         if (dietData && typeof dietData === 'string' && dietData.trim() !== '' && !guest.diet_info) {
           const trimmedDiet = dietData.trim();
           // Only extract if it's actually dietary information
@@ -975,8 +998,8 @@ const CheckInSystem = ({
           }
         }
         
-        // Extract magic information from ticket_data
-        const magicData = guest.ticket_data.Magic || guest.ticket_data.MAGIC || guest.ticket_data.magic;
+        // Extract magic information
+        const magicData = ticketData.Magic || ticketData.MAGIC || ticketData.magic;
         if (magicData && typeof magicData === 'string' && magicData.trim() !== '' && !guest.magic_info) {
           const trimmedMagic = magicData.trim();
           updates.magic_info = trimmedMagic;
@@ -1016,7 +1039,7 @@ const CheckInSystem = ({
     };
     
     updateGuestsWithDietMagic();
-  }, [guests]);
+  }, [guests, guestListId]); // Also trigger when guest list changes
 
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
