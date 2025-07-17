@@ -559,9 +559,7 @@ const CheckInSystem = ({
       if (packageInfo) {
         // Calculate drinks
         if (packageInfo.drinks) {
-          const totalDrinks = packageInfo.drinks.perPerson 
-            ? packageInfo.drinks.quantity * guestCount * ticket.quantity
-            : packageInfo.drinks.quantity * ticket.quantity;
+          const totalDrinks = packageInfo.drinks.quantity * ticket.quantity;
           
           if (totalDrinks > 0) {
             const drinkName = packageInfo.drinks.type;
@@ -571,14 +569,7 @@ const CheckInSystem = ({
         
         // Calculate pizzas
         if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
-          let totalPizzas = 0;
-          if (packageInfo.pizza.shared) {
-            // For shared pizzas, use Math.ceil(guestCount / 2) * ticket.quantity
-            totalPizzas = Math.ceil(guestCount / 2) * ticket.quantity;
-          } else {
-            // For fixed quantity pizzas, just use ticket.quantity
-            totalPizzas = packageInfo.pizza.quantity * ticket.quantity;
-          }
+          const totalPizzas = packageInfo.pizza.quantity * ticket.quantity;
           
           if (totalPizzas > 0) {
             orderItems.push(`${totalPizzas} Pizza${totalPizzas > 1 ? 's' : ''}`);
@@ -588,15 +579,8 @@ const CheckInSystem = ({
         // Calculate extras (like fries)
         if (packageInfo.extras && packageInfo.extras.length > 0) {
           packageInfo.extras.forEach(extra => {
-            if (extra.includes('per couple') || extra.includes('(shared)')) {
-              const couples = Math.ceil(guestCount / 2);
-              const extraName = extra.replace(/\s*per couple|\s*\(shared\)/g, '').trim();
-              orderItems.push(`${couples} ${extraName}${couples > 1 && !extraName.endsWith('s') ? 's' : ''}`);
-            } else {
-              // Per person extras
-              const extraName = extra.replace(/\s*per person/g, '').trim();
-              orderItems.push(`${guestCount} ${extraName}${guestCount > 1 && !extraName.endsWith('s') ? 's' : ''}`);
-            }
+            // Just use the extra name as-is, no guest count multiplication
+            orderItems.push(extra);
           });
         }
       }
