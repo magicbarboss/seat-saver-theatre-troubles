@@ -15,6 +15,7 @@ import { CheckInStats } from './checkin/CheckInStats';
 import { CheckInActions } from './checkin/CheckInActions';
 import { WalkInGuestForm } from './checkin/WalkInGuestForm';
 import { GuestTable } from './checkin/GuestTable';
+import { SeatingManagement } from './seating/SeatingManagement';
 
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
 const CheckInSystem = ({
@@ -1478,6 +1479,22 @@ const CheckInSystem = ({
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
             <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getOrderSummary={getOrderSummary} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="seating">
+          <SeatingManagement
+            checkedInGuests={checkedInGuestsArray.map(guest => ({
+              ...guest,
+              guest: guests.find(g => g.id === guest.originalIndex.toString()) || {} as any
+            }))}
+            onGuestTableAssign={(guestIndex: number, tableId: string) => 
+              handleTableAssign(guestIndex, `Table ${tableId}`, 1, showFilter)
+            }
+            onGuestTableRemove={(guestIndex: number) => 
+              handlePagerRelease(guestIndex)
+            }
+            showTime={showFilter}
+          />
         </TabsContent>
 
         <TabsContent value="tables">
