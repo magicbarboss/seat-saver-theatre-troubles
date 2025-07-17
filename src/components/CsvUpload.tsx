@@ -301,25 +301,30 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
             if (TICKET_TYPE_MAPPING.includes(header)) {
               // If the cell has any non-empty value (text or number), this ticket type is present
               if (cellValue && cellValue.toString().trim() !== '') {
+                const cellText = cellValue.toString().trim();
                 const numericValue = parseInt(cellValue);
+                
+                // List of status words and invalid values to skip
+                const statusWords = ['paid', 'paid in gyg', 'viator', 'dan', 'pending', 'cancelled', 'confirmed'];
+                const isStatusWord = statusWords.includes(cellText.toLowerCase());
+                
+                // Check if it's friend names (contains & or multiple names but not actual ticket selection)
+                const containsFriendNames = cellText.includes('&') || 
+                                            (cellText.split(' ').length > 2 && 
+                                             !cellText.toLowerCase().includes('ticket') &&
+                                             !cellText.toLowerCase().includes('package') &&
+                                             !cellText.toLowerCase().includes('offer'));
+                
                 if (!isNaN(numericValue) && numericValue > 0) {
                   // If it's a valid number, use that as quantity
                   extractedTickets[header] = numericValue;
                   console.log(`Found ticket type "${header}" with numeric quantity ${numericValue} for row ${index}`);
+                } else if (!isStatusWord && !containsFriendNames && cellText !== '') {
+                  // This appears to be a valid ticket type selection (not status, not friend names)
+                  extractedTickets[header] = totalQuantity;
+                  console.log(`Found ticket type "${header}" with valid selection "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
                 } else {
-                  // If it's text, only assign quantity if it's NOT friend names (doesn't contain &)
-                  // and the text is not just a list of names
-                  const cellText = cellValue.toString().trim();
-                  const containsFriendNames = cellText.includes('&') || 
-                                              (cellText.split(' ').length > 3 && !cellText.toLowerCase().includes('ticket'));
-                  
-                  if (!containsFriendNames) {
-                    // This appears to be a valid ticket type selection, assign total quantity
-                    extractedTickets[header] = totalQuantity;
-                    console.log(`Found ticket type "${header}" with valid text value "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
-                  } else {
-                    console.log(`Skipping ticket type "${header}" with friend names "${cellValue}" for row ${index}`);
-                  }
+                  console.log(`Skipping ticket type "${header}" - invalid value: "${cellValue}" (status: ${isStatusWord}, friends: ${containsFriendNames}) for row ${index}`);
                 }
               }
             }
