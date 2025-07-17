@@ -594,102 +594,73 @@ const CheckInSystem = ({
     const isGrouponCocktail = allTextContent.includes('groupon cocktail');
     const isWowcherCocktail = allTextContent.includes('wowcher cocktail');
 
-    // Step 2: Apply override logic ONLY for special packages or GYG/Viator
-    if (isGYGBooking || isViatorBooking || isGrouponProsecco || isWowcherProsecco || isGrouponPints || isGrouponCocktail || isWowcherCocktail) {
+    // Log the detection path for debugging
+    console.log("🚀 Processing Path:", {
+      name: guest.booker_name,
+      bookingCode: guest.booking_code,
+      isGYGBooking,
+      isViatorBooking,
+      isGrouponProsecco,
+      isWowcherProsecco,
+      isGrouponPints,
+      isGrouponCocktail,
+      isWowcherCocktail
+    });
+
+    // Step 2: GYG Logic (Highest Priority)
+    if (isGYGBooking) {
+      const orderSummary = {
+        prosecco: guestCount,
+        pizza: 1, // always 1 pizza for GYG
+        fries: guestCount > 1 ? Math.floor(guestCount / 2) : 0
+      };
       
-      // Enhanced Package Overrides (fuzzy detection)
-      if (isGrouponProsecco || isWowcherProsecco) {
-        const proseccoQuantity = guestCount; // 1 per person
-        const pizzaQuantity = Math.floor(guestCount / 2); // per couple
-        const friesQuantity = Math.floor(guestCount / 2); // per couple
-        
-        orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
-        if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
-        if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
-        
-        return orderItems.join(', ');
+      orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
+      orderItems.push('1 Pizza');
+      if (orderSummary.fries > 0) {
+        orderItems.push(`${orderSummary.fries} Fries`);
       }
-
-      if (isGrouponPints) {
-        const pintsQuantity = guestCount; // 1 per person
-        const pizzaQuantity = Math.floor(guestCount / 2); // per couple
-        const friesQuantity = Math.floor(guestCount / 2); // per couple
-        
-        orderItems.push(`${pintsQuantity} House Pint${pintsQuantity > 1 ? 's' : ''}`);
-        if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
-        if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
-        
-        return orderItems.join(', ');
-      }
-
-      if (isGrouponCocktail || isWowcherCocktail) {
-        const cocktailQuantity = guestCount; // 1 per person
-        const pizzaQuantity = Math.floor(guestCount / 2); // per couple
-        const loadedFriesQuantity = Math.floor(guestCount / 2); // per couple
-        
-        orderItems.push(`${cocktailQuantity} House Cocktail${cocktailQuantity > 1 ? 's' : ''}`);
-        if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
-        if (loadedFriesQuantity > 0) orderItems.push(`${loadedFriesQuantity} Loaded Fries`);
-        
-        return orderItems.join(', ');
-      }
-
-      // GYG Logic
-      if (isGYGBooking) {
-        const orderSummary = {
-          prosecco: guestCount,
-          pizza: 1, // always 1 pizza for GYG
-          fries: guestCount > 1 ? Math.floor(guestCount / 2) : 0
-        };
-        
-        orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
-        orderItems.push('1 Pizza');
-        if (orderSummary.fries > 0) {
-          orderItems.push(`${orderSummary.fries} Fries`);
-        }
-        
-        console.log("Booking Type Detected:", {
-          name: guest.booker_name,
-          bookingCode: guest.booking_code,
-          status: guest.ticket_data?.Status,
-          note: guest.ticket_data?.Note,
-          isGYGBooking,
-          isViatorBooking,
-          orderSummary
-        });
-        
-        return orderItems.join(', ');
-      }
-
-      // Viator Logic
-      if (isViatorBooking) {
-        const orderSummary = {
-          prosecco: guestCount,
-          pizza: Math.floor(guestCount / 2),
-          fries: Math.floor(guestCount / 2)
-        };
-        
-        orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
-        if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
-        if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
-        
-        console.log("Booking Type Detected:", {
-          name: guest.booker_name,
-          bookingCode: guest.booking_code,
-          status: guest.ticket_data?.Status,
-          note: guest.ticket_data?.Note,
-          isGYGBooking,
-          isViatorBooking,
-          orderSummary
-        });
-        
-        return orderItems.join(', ');
-      }
-
-    } else {
-      // Process tickets using structured TICKET_TYPE_MAPPING with new calculation logic
-      const tickets = getAllTicketTypes(guest);
       
+      console.log("✅ GYG Path:", {
+        name: guest.booker_name,
+        bookingCode: guest.booking_code,
+        orderSummary,
+        result: orderItems.join(', ')
+      });
+      
+      return orderItems.join(', ');
+    }
+
+    // Step 3: Viator Logic (Second Priority)
+    if (isViatorBooking) {
+      const orderSummary = {
+        prosecco: guestCount,
+        pizza: Math.floor(guestCount / 2),
+        fries: Math.floor(guestCount / 2)
+      };
+      
+      orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
+      if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
+      if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
+      
+      console.log("✅ Viator Path:", {
+        name: guest.booker_name,
+        bookingCode: guest.booking_code,
+        orderSummary,
+        result: orderItems.join(', ')
+      });
+      
+      return orderItems.join(', ');
+    }
+
+    // Step 4: Check if guest has explicit ticket mappings FIRST
+    const tickets = getAllTicketTypes(guest);
+    const hasExplicitMapping = tickets.some(ticket => TICKET_TYPE_MAPPING[ticket.type]);
+    
+    if (hasExplicitMapping) {
+      console.log("✅ Using Explicit Ticket Mapping Path for", guest.booker_name);
+      
+      // Process tickets using structured TICKET_TYPE_MAPPING with exact matching
       tickets.forEach(ticket => {
         const packageInfo = TICKET_TYPE_MAPPING[ticket.type];
         
@@ -698,10 +669,8 @@ const CheckInSystem = ({
           if (packageInfo.drinks) {
             let quantity;
             if (packageInfo.drinks.perPerson) {
-              // perPerson: true - use guest count only
               quantity = packageInfo.drinks.quantity * guestCount;
             } else {
-              // Default: quantity = packageInfo[item].quantity only (NO multiplication)
               quantity = packageInfo.drinks.quantity;
             }
             
@@ -715,10 +684,8 @@ const CheckInSystem = ({
           if (packageInfo.prosecco) {
             let quantity;
             if (packageInfo.prosecco.perPerson) {
-              // perPerson: true - use guest count only
               quantity = packageInfo.prosecco.quantity * guestCount;
             } else {
-              // Default calculation - no multiplication
               quantity = packageInfo.prosecco.quantity;
             }
             
@@ -731,10 +698,8 @@ const CheckInSystem = ({
           if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
             let quantity;
             if (packageInfo.pizza.perCouple) {
-              // perCouple: true - use Math.floor(guestCount / 2) only
               quantity = Math.floor(guestCount / 2);
             } else {
-              // Default: quantity = packageInfo[item].quantity only (NO multiplication)
               quantity = packageInfo.pizza.quantity;
             }
             
@@ -747,10 +712,8 @@ const CheckInSystem = ({
           if (packageInfo.fries && packageInfo.fries.quantity > 0) {
             let quantity;
             if (packageInfo.fries.perCouple) {
-              // perCouple: true - use Math.floor(guestCount / 2) only
               quantity = Math.floor(guestCount / 2);
             } else {
-              // Default calculation - no multiplication
               quantity = packageInfo.fries.quantity;
             }
             
@@ -759,30 +722,63 @@ const CheckInSystem = ({
             }
           }
           
-          // Calculate extras (deprecated - replaced with specific fries calculations)
+          // Calculate extras
           if (packageInfo.extras && packageInfo.extras.length > 0) {
             packageInfo.extras.forEach(extra => {
               orderItems.push(extra);
             });
           }
-        } else {
-          // Log unmatched packages for system improvement
-          console.log(`🔍 Unmatched ticket type: "${ticket.type}" for guest "${guest.booker_name}" (${guest.total_quantity} people) - Consider adding to TICKET_TYPE_MAPPING`);
         }
       });
-
-      // Log if no order items found despite having ticket data (for troubleshooting)
-      if (orderItems.length === 0 && tickets.length > 0) {
-        console.log(`⚠️ No order summary generated for guest "${guest.booker_name}" despite having ${tickets.length} ticket types:`, tickets.map(t => t.type));
-        console.log("📊 Ticket mapping check:", tickets.map(t => ({ 
-          type: t.type, 
-          hasMapping: !!TICKET_TYPE_MAPPING[t.type],
-          mapping: TICKET_TYPE_MAPPING[t.type] 
-        })));
-      } else if (orderItems.length > 0) {
-        console.log(`✅ Regular ticket order for ${guest.booker_name}: ${orderItems.join(', ')}`);
+      
+      if (orderItems.length > 0) {
+        console.log(`✅ Explicit mapping result for ${guest.booker_name}: ${orderItems.join(', ')}`);
+        return orderItems.join(', ');
       }
     }
+
+    // Step 5: Fuzzy Package Detection ONLY if no explicit mapping found
+    if (isGrouponProsecco || isWowcherProsecco) {
+      const proseccoQuantity = guestCount;
+      const pizzaQuantity = Math.floor(guestCount / 2);
+      const friesQuantity = Math.floor(guestCount / 2);
+      
+      orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
+      
+      console.log("✅ Fuzzy Prosecco Path:", guest.booker_name, orderItems.join(', '));
+      return orderItems.join(', ');
+    }
+
+    if (isGrouponPints) {
+      const pintsQuantity = guestCount;
+      const pizzaQuantity = Math.floor(guestCount / 2);
+      const friesQuantity = Math.floor(guestCount / 2);
+      
+      orderItems.push(`${pintsQuantity} House Pint${pintsQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
+      
+      console.log("✅ Fuzzy Pints Path:", guest.booker_name, orderItems.join(', '));
+      return orderItems.join(', ');
+    }
+
+    if (isGrouponCocktail || isWowcherCocktail) {
+      const cocktailQuantity = guestCount;
+      const pizzaQuantity = Math.floor(guestCount / 2);
+      const loadedFriesQuantity = Math.floor(guestCount / 2);
+      
+      orderItems.push(`${cocktailQuantity} House Cocktail${cocktailQuantity > 1 ? 's' : ''}`);
+      if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (loadedFriesQuantity > 0) orderItems.push(`${loadedFriesQuantity} Loaded Fries`);
+      
+      console.log("✅ Fuzzy Cocktail Path:", guest.booker_name, orderItems.join(', '));
+      return orderItems.join(', ');
+    }
+
+    // Step 6: Default fallback
+    console.log("⚠️ No valid path found for", guest.booker_name, "- using fallback");
     
     return orderItems.length > 0 ? orderItems.join(', ') : 'Show ticket only';
   };
