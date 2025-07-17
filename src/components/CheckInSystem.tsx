@@ -935,27 +935,66 @@ const CheckInSystem = ({
     return `${totalDrinks} Drinks`;
   };
 
-  // Extract and process diet and magic information from guest data
-  const processDietAndMagicData = useMemo(() => {
+  // Extract and process diet and magic information from guest data and save to database
+  useEffect(() => {
     if (!guests || guests.length === 0) return;
     
-    guests.forEach((guest, index) => {
-      if (!guest || !guest.ticket_data) return;
+    const updateGuestsWithDietMagic = async () => {
+      const guestsToUpdate: { id: string; diet_info?: string; magic_info?: string }[] = [];
       
-      // Extract diet information from ticket_data
-      const dietData = guest.ticket_data.DIET || guest.ticket_data.Diet || guest.ticket_data.diet;
-      if (dietData && typeof dietData === 'string' && dietData.trim() !== '') {
-        guest.diet_info = dietData.trim();
-        console.log(`Found diet info for ${guest.booker_name}: ${guest.diet_info}`);
-      }
+      guests.forEach((guest) => {
+        if (!guest || !guest.ticket_data) return;
+        
+        let hasUpdates = false;
+        const updates: { id: string; diet_info?: string; magic_info?: string } = { id: guest.id };
+        
+        // Extract diet information from ticket_data
+        const dietData = guest.ticket_data.DIET || guest.ticket_data.Diet || guest.ticket_data.diet;
+        if (dietData && typeof dietData === 'string' && dietData.trim() !== '' && !guest.diet_info) {
+          updates.diet_info = dietData.trim();
+          guest.diet_info = dietData.trim(); // Update local state
+          hasUpdates = true;
+          console.log(`Found diet info for ${guest.booker_name}: ${guest.diet_info}`);
+        }
+        
+        // Extract magic information from ticket_data
+        const magicData = guest.ticket_data.Magic || guest.ticket_data.MAGIC || guest.ticket_data.magic;
+        if (magicData && typeof magicData === 'string' && magicData.trim() !== '' && !guest.magic_info) {
+          updates.magic_info = magicData.trim();
+          guest.magic_info = magicData.trim(); // Update local state
+          hasUpdates = true;
+          console.log(`Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
+        }
+        
+        if (hasUpdates) {
+          guestsToUpdate.push(updates);
+        }
+      });
       
-      // Extract magic information from ticket_data
-      const magicData = guest.ticket_data.Magic || guest.ticket_data.MAGIC || guest.ticket_data.magic;
-      if (magicData && typeof magicData === 'string' && magicData.trim() !== '') {
-        guest.magic_info = magicData.trim();
-        console.log(`Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
+      // Update database with extracted diet and magic info
+      if (guestsToUpdate.length > 0) {
+        try {
+          for (const guestUpdate of guestsToUpdate) {
+            const { error } = await supabase
+              .from('guests')
+              .update({
+                diet_info: guestUpdate.diet_info,
+                magic_info: guestUpdate.magic_info
+              })
+              .eq('id', guestUpdate.id);
+            
+            if (error) {
+              console.error('Error updating guest with diet/magic info:', error);
+            }
+          }
+          console.log(`Updated ${guestsToUpdate.length} guests with diet/magic information`);
+        } catch (error) {
+          console.error('Failed to update guests with diet/magic info:', error);
+        }
       }
-    });
+    };
+    
+    updateGuestsWithDietMagic();
   }, [guests]);
 
   // Extract and process friendship groups from guest data
