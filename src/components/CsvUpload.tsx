@@ -307,9 +307,19 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
                   extractedTickets[header] = numericValue;
                   console.log(`Found ticket type "${header}" with numeric quantity ${numericValue} for row ${index}`);
                 } else {
-                  // If it's text (like guest names), assign the total booking quantity
-                  extractedTickets[header] = totalQuantity;
-                  console.log(`Found ticket type "${header}" with text value "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
+                  // If it's text, only assign quantity if it's NOT friend names (doesn't contain &)
+                  // and the text is not just a list of names
+                  const cellText = cellValue.toString().trim();
+                  const containsFriendNames = cellText.includes('&') || 
+                                              (cellText.split(' ').length > 3 && !cellText.toLowerCase().includes('ticket'));
+                  
+                  if (!containsFriendNames) {
+                    // This appears to be a valid ticket type selection, assign total quantity
+                    extractedTickets[header] = totalQuantity;
+                    console.log(`Found ticket type "${header}" with valid text value "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
+                  } else {
+                    console.log(`Skipping ticket type "${header}" with friend names "${cellValue}" for row ${index}`);
+                  }
                 }
               }
             }
