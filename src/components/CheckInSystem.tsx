@@ -867,8 +867,8 @@ const CheckInSystem = ({
     // Fallback: parse all ticket_data fields with fuzzy matching
     if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
       Object.entries(guest.ticket_data).forEach(([key, value]) => {
-        // Skip non-ticket fields (removed 'Friends', 'DIET', 'Magic' from skip list)
-        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'Guests', 'TERMS'].includes(key)) {
+        // Skip non-ticket fields - including Friends, DIET, Magic that contain names/text
+        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'Guests', 'TERMS', 'Friends', 'DIET', 'Magic'].includes(key)) {
           return;
         }
 
@@ -877,14 +877,21 @@ const CheckInSystem = ({
         if (typeof value === 'number' && value > 0) {
           quantity = value;
         } else if (typeof value === 'string' && value.trim() !== '') {
+          // Check if the string contains friend names (multiple words with &)
+          if (value.includes('&') || value.split(' ').length > 3) {
+            console.log(`🚫 Skipping '${key}' with value '${value}' - appears to contain names`);
+            return;
+          }
+          
           const parsed = parseInt(value);
           if (!isNaN(parsed) && parsed > 0) {
             quantity = parsed;
           }
         }
 
-        // If we found a quantity or this looks like a ticket type, add it
+        // Only add if we found a valid numeric quantity OR it's a known ticket type
         if (quantity > 0 || Object.keys(TICKET_TYPE_MAPPING).includes(key)) {
+          console.log(`✅ Adding ticket type '${key}' with quantity ${quantity || 1} for ${guest.booker_name}`);
           tickets.push({
             type: key,
             quantity: quantity || 1
