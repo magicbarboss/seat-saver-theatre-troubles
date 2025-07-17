@@ -538,27 +538,44 @@ const CheckInSystem = ({
     }
   };
 
-  // Generate comprehensive order summary with enhanced Viator/GYG detection and new calculation logic
+  // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest): string => {
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Enhanced Viator & GYG Detection
+    // Separate GYG and Groupon/Viator Detection
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
-    const isViatorBooking = 
-      (guest.ticket_data && (guest.ticket_data as any).Viator) ||
-      (guest.ticket_data && (guest.ticket_data as any).Status === "VIATOR") ||
+    const isGYGBooking = 
       (guest.ticket_data && (guest.ticket_data as any).Status === "Paid in GYG") ||
       (guest.ticket_data && (guest.ticket_data as any).Note && 
        (guest.ticket_data as any).Note.includes("GYG Booking Reference")) ||
-      ticketDataStr.toLowerCase().includes('paid in gyg') ||
+      ticketDataStr.toLowerCase().includes('paid in gyg');
+    
+    const isViatorGrouponBooking = 
+      (guest.ticket_data && (guest.ticket_data as any).Viator) ||
+      (guest.ticket_data && (guest.ticket_data as any).Status === "VIATOR") ||
       ((guest as any).booking_source === "Viator");
     
-    // If Viator/GYG detected, force treatment as "Groupon Offer Prosecco Package (per person)"
-    if (isViatorBooking) {
+    // GYG Special Logic (can have solo guests)
+    if (isGYGBooking) {
       const proseccoQuantity = guestCount; // 1 per person
-      const pizzaQuantity = Math.ceil(guestCount / 2); // per couple
-      const friesQuantity = Math.ceil(guestCount / 2); // per couple
+      const pizzaQuantity = guestCount === 1 ? 1 : Math.floor(guestCount / 2); // Special solo logic
+      const friesQuantity = guestCount > 1 ? Math.floor(guestCount / 2) : 0; // 0 for solo guests
+      
+      orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
+      orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
+      if (friesQuantity > 0) {
+        orderItems.push(`${friesQuantity} Fries`);
+      }
+      
+      return orderItems.join(', ');
+    }
+    
+    // Groupon/Viator Logic (couples only, guestCount >= 2)
+    if (isViatorGrouponBooking) {
+      const proseccoQuantity = guestCount; // 1 per person
+      const pizzaQuantity = Math.floor(guestCount / 2); // per couple
+      const friesQuantity = Math.floor(guestCount / 2); // per couple
       
       orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
       orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
@@ -578,8 +595,8 @@ const CheckInSystem = ({
         if (packageInfo.drinks) {
           let quantity;
           if (packageInfo.drinks.perPerson) {
-            // perPerson: true - multiply by guest count
-            quantity = packageInfo.drinks.quantity * ticket.quantity * guestCount;
+            // perPerson: true - only use guest count
+            quantity = packageInfo.drinks.quantity * guestCount;
           } else {
             // Default: quantity = packageInfo[item].quantity * ticket.quantity (NO guest count)
             quantity = packageInfo.drinks.quantity * ticket.quantity;
@@ -595,8 +612,8 @@ const CheckInSystem = ({
         if (packageInfo.prosecco) {
           let quantity;
           if (packageInfo.prosecco.perPerson) {
-            // perPerson: true - multiply by guest count
-            quantity = packageInfo.prosecco.quantity * ticket.quantity * guestCount;
+            // perPerson: true - only use guest count
+            quantity = packageInfo.prosecco.quantity * guestCount;
           } else {
             // Default calculation
             quantity = packageInfo.prosecco.quantity * ticket.quantity;
@@ -611,8 +628,8 @@ const CheckInSystem = ({
         if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
           let quantity;
           if (packageInfo.pizza.perCouple) {
-            // perCouple: true - use Math.ceil(guestCount / 2) * ticket.quantity
-            quantity = Math.ceil(guestCount / 2) * ticket.quantity;
+            // perCouple: true - use Math.floor(guestCount / 2) (NO ticket.quantity)
+            quantity = Math.floor(guestCount / 2);
           } else {
             // Default: quantity = packageInfo[item].quantity * ticket.quantity (NO guest count)
             quantity = packageInfo.pizza.quantity * ticket.quantity;
@@ -627,8 +644,8 @@ const CheckInSystem = ({
         if (packageInfo.fries && packageInfo.fries.quantity > 0) {
           let quantity;
           if (packageInfo.fries.perCouple) {
-            // perCouple: true - use Math.ceil(guestCount / 2) * ticket.quantity
-            quantity = Math.ceil(guestCount / 2) * ticket.quantity;
+            // perCouple: true - use Math.floor(guestCount / 2) (NO ticket.quantity)
+            quantity = Math.floor(guestCount / 2);
           } else {
             // Default calculation
             quantity = packageInfo.fries.quantity * ticket.quantity;
