@@ -543,7 +543,7 @@ const CheckInSystem = ({
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Separate GYG and Groupon/Viator Detection
+    // Separate GYG and Viator Detection
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
     const isGYGBooking = 
       (guest.ticket_data && (guest.ticket_data as any).Status === "Paid in GYG") ||
@@ -551,15 +551,15 @@ const CheckInSystem = ({
        (guest.ticket_data as any).Note.includes("GYG Booking Reference")) ||
       ticketDataStr.toLowerCase().includes('paid in gyg');
     
-    const isViatorGrouponBooking = 
-      (guest.ticket_data && (guest.ticket_data as any).Viator) ||
+    const isViatorBooking = 
       (guest.ticket_data && (guest.ticket_data as any).Status === "VIATOR") ||
-      ((guest as any).booking_source === "Viator");
+      ((guest as any).booking_source === "Viator") ||
+      ticketDataStr.toLowerCase().includes('viator');
     
     // GYG Special Logic (can have solo guests)
     if (isGYGBooking) {
       const proseccoQuantity = guestCount; // 1 per person
-      const pizzaQuantity = guestCount === 1 ? 1 : Math.floor(guestCount / 2); // Special solo logic
+      const pizzaQuantity = 1; // Always 1 pizza, even for 1 guest
       const friesQuantity = guestCount > 1 ? Math.floor(guestCount / 2) : 0; // 0 for solo guests
       
       orderItems.push(`${proseccoQuantity} Prosecco${proseccoQuantity > 1 ? 's' : ''}`);
@@ -571,8 +571,8 @@ const CheckInSystem = ({
       return orderItems.join(', ');
     }
     
-    // Groupon/Viator Logic (couples only, guestCount >= 2)
-    if (isViatorGrouponBooking) {
+    // Viator Logic (couples only, guestCount >= 2)
+    if (isViatorBooking) {
       const proseccoQuantity = guestCount; // 1 per person
       const pizzaQuantity = Math.floor(guestCount / 2); // per couple
       const friesQuantity = Math.floor(guestCount / 2); // per couple
