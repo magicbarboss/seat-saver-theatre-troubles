@@ -308,115 +308,110 @@ const CheckInSystem = ({
     return bookerName.trim();
   };
 
-  // Enhanced ticket type mapping with perCouple support
+  // Enhanced ticket type mapping with calculation method support
   const TICKET_TYPE_MAPPING: Record<string, {
+    calculationMethod: 'per-ticket' | 'per-person';
     drinks?: {
       type: string;
       quantity: number;
-      perPerson?: boolean;
     };
     pizza?: {
       quantity: number;
-      perCouple?: boolean;
-      perPerson?: boolean;
     };
     fries?: {
       quantity: number;
-      perCouple?: boolean;
     };
     prosecco?: {
       quantity: number;
-      perPerson?: boolean;
     };
     extras?: string[];
     minimum_people?: number;
   }> = {
     // Standard House Magicians tickets
     'House Magicians Show Ticket': {
+      calculationMethod: 'per-ticket'
       // Basic show ticket - show only unless GYG/Viator detected
     },
     'House Magicians Show Ticket & 2 Drinks': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       }
     },
     'House Magicians Show Ticket includes 2 Drinks +  1 Pizza': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       },
       pizza: {
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       }
     },
     'House Magicians Show Ticket & 1 Pizza': {
+      calculationMethod: 'per-ticket',
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 1
       }
     },
     'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       },
       pizza: {
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       }
     },
     'House Magicians Show Ticket & 2 soft drinks': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'soft drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       }
     },
     // Adult Show tickets
     'Adult Show Ticket includes 2 Drinks': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'Drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       }
     },
     'Adult Show Ticket includes 2 Drinks + 9" Pizza': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'Drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       },
       pizza: {
         quantity: 1
       }
     },
     'Adult Show Ticket induces 2 soft drinks': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'Soft Drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       }
     },
     'Adult Show Ticket induces 2 soft drinks + 9" PIzza': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'Soft Drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       },
       pizza: {
-        quantity: 1,
+        quantity: 1
       }
     },
     'Adult Show Ticket induces 2 soft drinks + 9 PIzza': {
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'Soft Drinks',
-        quantity: 2,
-        perPerson: true
+        quantity: 2
       },
       pizza: {
         quantity: 1
@@ -424,134 +419,129 @@ const CheckInSystem = ({
     },
     // Comedy tickets
     'Comedy ticket plus 9" Pizza': {
+      calculationMethod: 'per-ticket',
       pizza: {
         quantity: 1
       }
     },
     'Comedy ticket plus 9 Pizza': {
+      calculationMethod: 'per-ticket',
       pizza: {
         quantity: 1
       }
     },
     'Adult Comedy & Magic Show Ticket + 9" Pizza': {
+      calculationMethod: 'per-ticket',
       pizza: {
         quantity: 1
       }
     },
     'Adult Comedy & Magic Show Ticket + 9 Pizza': {
+      calculationMethod: 'per-ticket',
       pizza: {
         quantity: 1
       }
     },
-    'Adult Comedy Magic Show ticket': {},
+    'Adult Comedy Magic Show ticket': {
+      calculationMethod: 'per-ticket'
+    },
     // Groupon packages
     'Groupon Offer Prosecco Package (per person)': {
+      calculationMethod: 'per-person',
       prosecco: {
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       },
       fries: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     'Groupon Magic & Pints Package (per person)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'house pint',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       },
       fries: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     'Groupon Magic & Cocktails Package (per person)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'house cocktail',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       },
       fries: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'Drink',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       },
       fries: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     'OLD Groupon Offer (per person - extras are already included)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'Drink',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     // Wowcher packages
     'Wowcher Magic & Cocktails Package (per person)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'Cocktail',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       pizza: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       },
       fries: {
-        quantity: 1,
-        perCouple: true
+        quantity: 0.5
       }
     },
     // Smoke offers
     'Smoke Offer Ticket & 1x Drink': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'drink',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       }
     },
     'Smoke Offer Ticket & 1x Drink (minimum x2 people)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'drink',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       minimum_people: 2
     },
     'Smoke Offer Ticket includes Drink (minimum x2)': {
+      calculationMethod: 'per-person',
       drinks: {
         type: 'drink',
-        quantity: 1,
-        perPerson: true
+        quantity: 1
       },
       minimum_people: 2
     }
@@ -682,15 +672,16 @@ const CheckInSystem = ({
       // Process tickets using structured TICKET_TYPE_MAPPING with exact matching
       tickets.forEach(ticket => {
         const packageInfo = TICKET_TYPE_MAPPING[ticket.type];
+        const ticketCount = ticket.quantity;
         
         if (packageInfo) {
           // Calculate drinks
           if (packageInfo.drinks) {
             let quantity;
-            if (packageInfo.drinks.perPerson) {
+            if (packageInfo.calculationMethod === 'per-person') {
               quantity = packageInfo.drinks.quantity * guestCount;
             } else {
-              quantity = packageInfo.drinks.quantity;
+              quantity = packageInfo.drinks.quantity * ticketCount;
             }
             
             if (quantity > 0) {
@@ -702,10 +693,10 @@ const CheckInSystem = ({
           // Calculate prosecco
           if (packageInfo.prosecco) {
             let quantity;
-            if (packageInfo.prosecco.perPerson) {
+            if (packageInfo.calculationMethod === 'per-person') {
               quantity = packageInfo.prosecco.quantity * guestCount;
             } else {
-              quantity = packageInfo.prosecco.quantity;
+              quantity = packageInfo.prosecco.quantity * ticketCount;
             }
             
             if (quantity > 0) {
@@ -716,12 +707,10 @@ const CheckInSystem = ({
           // Calculate pizzas
           if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
             let quantity;
-            if (packageInfo.pizza.perPerson) {
-              quantity = packageInfo.pizza.quantity * guestCount;
-            } else if (packageInfo.pizza.perCouple) {
-              quantity = Math.floor(guestCount / 2);
+            if (packageInfo.calculationMethod === 'per-person') {
+              quantity = Math.ceil(packageInfo.pizza.quantity * guestCount);
             } else {
-              quantity = packageInfo.pizza.quantity;
+              quantity = packageInfo.pizza.quantity * ticketCount;
             }
             
             if (quantity > 0) {
@@ -732,10 +721,10 @@ const CheckInSystem = ({
           // Calculate fries
           if (packageInfo.fries && packageInfo.fries.quantity > 0) {
             let quantity;
-            if (packageInfo.fries.perCouple) {
-              quantity = Math.floor(guestCount / 2);
+            if (packageInfo.calculationMethod === 'per-person') {
+              quantity = Math.ceil(packageInfo.fries.quantity * guestCount);
             } else {
-              quantity = packageInfo.fries.quantity;
+              quantity = packageInfo.fries.quantity * ticketCount;
             }
             
             if (quantity > 0) {
