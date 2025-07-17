@@ -31,6 +31,8 @@ interface Guest {
   table_assignments: number[];
   interval_pizza_order?: boolean;
   interval_drinks_order?: boolean;
+  diet_info?: string;
+  magic_info?: string;
 }
 
 const GuestManager = () => {
@@ -100,40 +102,48 @@ const GuestManager = () => {
   };
 
   const fetchGuests = async (guestListId: string) => {
-    console.log(`Fetching guests for guest list ID: ${guestListId}`);
-    const { data, error } = await supabase
-      .from('guests')
-      .select('*')
-      .eq('guest_list_id', guestListId)
-      .order('original_row_index');
+    try {
+      console.log('🔄 Fetching guests for list:', guestListId);
+      
+      const { data, error } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('guest_list_id', guestListId);
 
-    if (error) {
-      console.error('Error fetching guests:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load guests",
-        variant: "destructive",
-      });
-    } else {
-      console.log(`Found ${data?.length || 0} guests for guest list ${guestListId}:`, data?.slice(0, 3));
-      // Add more detailed logging for the guest data structure
+      if (error) {
+        console.error('❌ Supabase error fetching guests:', error);
+        toast({
+          title: "Error",
+          description: `Failed to load guests: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('✅ Raw guests data from database:', data?.slice(0, 2));
+      console.log(`📊 Loaded ${data?.length || 0} guests successfully`);
+      
+      // Log ticket_data structure for debugging
       if (data && data.length > 0) {
-        const ticketData = data[0].ticket_data;
-        const isValidObject = ticketData && typeof ticketData === 'object' && !Array.isArray(ticketData);
-        
-        console.log('Available headers:', Object.keys(isValidObject ? ticketData : {}));
-        console.log('Sample guest data:', {
-          ...(isValidObject ? ticketData : {}),
-          id: data[0].id,
-          booking_code: data[0].booking_code,
-          booker_name: data[0].booker_name,
-          total_quantity: data[0].total_quantity,
-          is_checked_in: data[0].is_checked_in,
-          pager_number: data[0].pager_number,
-          table_assignments: data[0].table_assignments
+        const sampleGuest = data[0];
+        console.log('📋 Sample guest ticket_data structure:', {
+          guestName: sampleGuest.booker_name,
+          ticketDataType: typeof sampleGuest.ticket_data,
+          ticketDataKeys: sampleGuest.ticket_data ? Object.keys(sampleGuest.ticket_data) : 'null',
+          hasValidTicketData: sampleGuest.ticket_data && typeof sampleGuest.ticket_data === 'object' && !Array.isArray(sampleGuest.ticket_data),
+          dietInfo: sampleGuest.diet_info,
+          magicInfo: sampleGuest.magic_info
         });
       }
+
       setGuests(data || []);
+    } catch (error) {
+      console.error('❌ Unexpected error fetching guests:', error);
+      toast({
+        title: "Error",
+        description: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -197,9 +207,21 @@ const GuestManager = () => {
 
   if (showCheckIn && activeGuestList && guests.length > 0) {
     // Transform guests data for CheckInSystem
-    const transformedGuests = guests.map(guest => {
+    const transformedGuests = guests.map((guest, index) => {
       const ticketData = guest.ticket_data;
       const isValidObject = ticketData && typeof ticketData === 'object' && !Array.isArray(ticketData);
+      
+      // Debug logging for first few guests
+      if (index < 3) {
+        console.log(`🔄 Transforming guest ${index}: ${guest.booker_name}`, {
+          hasTicketData: !!ticketData,
+          ticketDataType: typeof ticketData,
+          isValidObject,
+          ticketDataSample: isValidObject ? Object.keys(ticketData).slice(0, 5) : 'invalid',
+          dietInfo: guest.diet_info,
+          magicInfo: guest.magic_info
+        });
+      }
       
       return {
         ...(isValidObject ? ticketData : {}),
@@ -212,7 +234,12 @@ const GuestManager = () => {
         table_assignments: guest.table_assignments,
         show_time: guest.show_time,
         interval_pizza_order: guest.interval_pizza_order,
-        interval_drinks_order: guest.interval_drinks_order
+        interval_drinks_order: guest.interval_drinks_order,
+        // Preserve diet and magic info that's already extracted
+        diet_info: guest.diet_info,
+        magic_info: guest.magic_info,
+        // Pass through ticket_data for the CheckInSystem to process
+        ticket_data: ticketData
       };
     });
 
