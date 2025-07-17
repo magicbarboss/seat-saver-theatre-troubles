@@ -98,6 +98,7 @@ export const GuestTable = ({
           <TableHead>Check-in</TableHead>
           <TableHead>Pager</TableHead>
           <TableHead>Table/Seating</TableHead>
+          <TableHead>Booking</TableHead>
           <TableHead>Notes</TableHead>
         </TableRow>
       </TableHeader>

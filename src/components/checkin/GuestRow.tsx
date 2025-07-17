@@ -18,6 +18,7 @@ interface Guest {
   interval_drinks_order?: boolean;
   diet_info?: string;
   magic_info?: string;
+  ticket_data?: any;
 }
 
 interface GuestRowProps {
@@ -245,6 +246,14 @@ export const GuestRow = ({
               </Button>
             )}
           </div>
+        )}
+      </TableCell>
+
+      <TableCell>
+        {guest.ticket_data?.Booking && (
+          <Badge variant="outline" className="text-xs">
+            {guest.ticket_data.Booking}
+          </Badge>
         )}
       </TableCell>
 
