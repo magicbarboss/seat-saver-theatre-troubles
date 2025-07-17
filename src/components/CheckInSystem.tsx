@@ -318,6 +318,7 @@ const CheckInSystem = ({
     pizza?: {
       quantity: number;
       perCouple?: boolean;
+      perPerson?: boolean;
     };
     fries?: {
       quantity: number;
@@ -345,11 +346,11 @@ const CheckInSystem = ({
       drinks: {
         type: 'drinks',
         quantity: 2,
-        perPerson: false
+        perPerson: true
       },
       pizza: {
         quantity: 1,
-        perCouple: false
+        perPerson: true
       }
     },
     'House Magicians Show Ticket & 1 Pizza': {
@@ -362,11 +363,11 @@ const CheckInSystem = ({
       drinks: {
         type: 'drinks',
         quantity: 2,
-        perPerson: false
+        perPerson: true
       },
       pizza: {
         quantity: 1,
-        perCouple: true
+        perPerson: true
       }
     },
     'House Magicians Show Ticket & 2 soft drinks': {
@@ -715,7 +716,9 @@ const CheckInSystem = ({
           // Calculate pizzas
           if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
             let quantity;
-            if (packageInfo.pizza.perCouple) {
+            if (packageInfo.pizza.perPerson) {
+              quantity = packageInfo.pizza.quantity * guestCount;
+            } else if (packageInfo.pizza.perCouple) {
               quantity = Math.floor(guestCount / 2);
             } else {
               quantity = packageInfo.pizza.quantity;
