@@ -329,7 +329,7 @@ const CheckInSystem = ({
     'House Magicians Show Ticket & 1 Pizza': {
       pizza: {
         quantity: 1,
-        shared: false
+        shared: true
       }
     },
     'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
@@ -340,7 +340,7 @@ const CheckInSystem = ({
       },
       pizza: {
         quantity: 1,
-        shared: false
+        shared: true
       }
     },
     'House Magicians Show Ticket & 2 soft drinks': {
@@ -573,12 +573,11 @@ const CheckInSystem = ({
         if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
           let totalPizzas = 0;
           if (packageInfo.pizza.shared) {
-            // For shared pizzas, calculate based on couples
-            const couples = Math.ceil(guestCount / 2);
-            totalPizzas = Math.ceil(packageInfo.pizza.quantity * couples * ticket.quantity);
+            // For shared pizzas, use Math.ceil(guestCount / 2) * ticket.quantity
+            totalPizzas = Math.ceil(guestCount / 2) * ticket.quantity;
           } else {
-            // Per person or per ticket pizzas
-            totalPizzas = Math.ceil(packageInfo.pizza.quantity * guestCount * ticket.quantity);
+            // For fixed quantity pizzas, just use ticket.quantity
+            totalPizzas = packageInfo.pizza.quantity * ticket.quantity;
           }
           
           if (totalPizzas > 0) {
