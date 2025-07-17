@@ -31,7 +31,7 @@ export const CheckInStats = ({
         </CardContent>
       </Card>
 
-      <Card className="card-stat card-stat-success">
+      <Card className="border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-900/20">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Checked In</CardTitle>
           <CheckCircle className="h-4 w-4 text-success" />
