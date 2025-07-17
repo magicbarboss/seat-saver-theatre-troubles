@@ -585,40 +585,28 @@ const CheckInSystem = ({
       ticketDataStr.includes("viator") ||
       (guest?.booking_source?.toLowerCase?.() === "viator");
     
-    // Enhanced debug logging with extracted values
-    console.log("🔍 Guest Detection Debug:", {
-      name: guest.booker_name,
-      bookingCode: guest.booking_code,
-      guestCount,
-      status: {
-        _type: typeof guest.ticket_data?.Status,
-        raw: guest.ticket_data?.Status,
-        extracted: statusStr
-      },
-      note: {
-        _type: typeof guest.ticket_data?.Note,
-        raw: guest.ticket_data?.Note,
-        extracted: noteStr
-      },
-      booking_source: {
-        _type: typeof guest?.booking_source,
-        value: guest?.booking_source
-      },
+    // DEBUG: Show actual guest data structure to find where GYG/Viator info is stored
+    console.log("🔍 COMPLETE GUEST DEBUG for", guest.booker_name, {
+      id: guest.id,
+      booking_code: guest.booking_code,
+      booker_name: guest.booker_name,
+      total_quantity: guest.total_quantity,
+      show_time: guest.show_time,
+      item_details: guest.item_details,
+      notes: guest.notes,
+      booking_comments: guest.booking_comments,
+      ticket_data: guest.ticket_data,
+      // Check all possible fields for GYG/Viator keywords
+      hasGYGInItemDetails: (guest.item_details || '').toLowerCase().includes('gyg'),
+      hasGYGInNotes: (guest.notes || '').toLowerCase().includes('gyg'),
+      hasGYGInComments: (guest.booking_comments || '').toLowerCase().includes('gyg'),
+      hasViatorInItemDetails: (guest.item_details || '').toLowerCase().includes('viator'),
+      hasViatorInNotes: (guest.notes || '').toLowerCase().includes('viator'),
+      hasViatorInComments: (guest.booking_comments || '').toLowerCase().includes('viator'),
       detectionResults: {
         isGYGBooking,
-        isViatorBooking,
-        statusIncludes: {
-          paidInGYG: statusStr.includes("paid in gyg"),
-          viator: statusStr.includes("viator")
-        },
-        noteIncludes: {
-          gygBookingRef: noteStr.includes("gyg booking reference"),
-          gyg: noteStr.includes("gyg"),
-          viator: noteStr.includes("viator")
-        }
-      },
-      fullTicketData: guest.ticket_data,
-      itemDetails: guest.item_details
+        isViatorBooking
+      }
     });
 
     // Fuzzy Package Detection for enhanced robustness
