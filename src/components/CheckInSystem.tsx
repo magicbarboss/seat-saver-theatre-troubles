@@ -334,6 +334,17 @@ const CheckInSystem = ({
         perPerson: false
       }
     },
+    'House Magicians Show Ticket includes 2 Drinks +  1 Pizza': {
+      drinks: {
+        type: 'drinks',
+        quantity: 2,
+        perPerson: false
+      },
+      pizza: {
+        quantity: 1,
+        perCouple: false
+      }
+    },
     'House Magicians Show Ticket & 1 Pizza': {
       pizza: {
         quantity: 1,
@@ -609,19 +620,24 @@ const CheckInSystem = ({
 
       // GYG Logic
       if (isGYGBooking) {
+        console.log(`🟦 GYG booking detected for ${guest.booker_name}: ${guestCount} guests`);
         orderItems.push(`${guestCount} Prosecco${guestCount > 1 ? 's' : ''}`); // 1 per guest
         orderItems.push('1 Pizza');             // ALWAYS 1 pizza
         if (guestCount > 1) {
           orderItems.push(`${Math.floor(guestCount / 2)} Fries`);
         }
+        console.log(`🟦 GYG order: ${orderItems.join(', ')}`);
         return orderItems.join(', '); // ⛔ Skip further ticket mapping
       }
 
       // Viator Logic
       if (isViatorBooking) {
+        console.log(`🟩 Viator booking detected for ${guest.booker_name}: ${guestCount} guests`);
+        const pizzaCount = Math.floor(guestCount / 2);
         orderItems.push(`${guestCount} Prosecco${guestCount > 1 ? 's' : ''}`);                   // 1 per guest
-        orderItems.push(`${Math.floor(guestCount / 2)} Pizza${Math.floor(guestCount / 2) > 1 ? 's' : ''}`);      // per couple
-        orderItems.push(`${Math.floor(guestCount / 2)} Fries`);      // per couple
+        if (pizzaCount > 0) orderItems.push(`${pizzaCount} Pizza${pizzaCount > 1 ? 's' : ''}`);      // per couple
+        if (pizzaCount > 0) orderItems.push(`${pizzaCount} Fries`);      // per couple
+        console.log(`🟩 Viator order: ${orderItems.join(', ')}`);
         return orderItems.join(', '); // ⛔ Skip further ticket mapping
       }
 
@@ -713,6 +729,8 @@ const CheckInSystem = ({
       // Log if no order items found despite having ticket data (for troubleshooting)
       if (orderItems.length === 0 && tickets.length > 0) {
         console.log(`⚠️ No order summary generated for guest "${guest.booker_name}" despite having ${tickets.length} ticket types:`, tickets.map(t => t.type));
+      } else if (orderItems.length > 0) {
+        console.log(`✅ Regular ticket order for ${guest.booker_name}: ${orderItems.join(', ')}`);
       }
     }
     
