@@ -991,20 +991,30 @@ const CheckInSystem = ({
             updates.diet_info = trimmedDiet;
             guest.diet_info = trimmedDiet; // Update local state
             hasUpdates = true;
-            console.log(`✅ Found valid diet info for ${guest.booker_name}: ${guest.diet_info}`);
+            console.log(`🥗 Found valid diet info for ${guest.booker_name}: ${guest.diet_info}`);
           } else {
-            console.log(`❌ Ignoring non-dietary text for ${guest.booker_name}: "${trimmedDiet}"`);
+            // If DIET column doesn't contain dietary keywords, move to magic_info
+            console.log(`🔄 DIET column contains non-dietary content for ${guest.booker_name}, moving to magic_info: "${trimmedDiet}"`);
+            if (!guest.magic_info) {
+              updates.magic_info = trimmedDiet;
+              guest.magic_info = trimmedDiet; // Update local state
+              hasUpdates = true;
+            }
           }
         }
         
-        // Extract magic information
+        // Extract magic information (messages for magicians)
         const magicData = ticketData.Magic || ticketData.MAGIC || ticketData.magic;
-        if (magicData && typeof magicData === 'string' && magicData.trim() !== '' && !guest.magic_info) {
+        if (magicData && typeof magicData === 'string' && magicData.trim() !== '') {
           const trimmedMagic = magicData.trim();
-          updates.magic_info = trimmedMagic;
-          guest.magic_info = trimmedMagic; // Update local state
+          // Append to existing magic_info if any, or create new
+          const existingMagic = guest.magic_info || updates.magic_info || '';
+          const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedMagic}` : trimmedMagic;
+          
+          updates.magic_info = newMagicInfo;
+          guest.magic_info = newMagicInfo; // Update local state
           hasUpdates = true;
-          console.log(`✨ Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
+          console.log(`✨ Found magic info for ${guest.booker_name}: ${newMagicInfo}`);
         }
         
         if (hasUpdates) {
