@@ -287,6 +287,11 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           const ticketData: any = {};
           const extractedTickets: any = {};
 
+          // Extract key fields from the correct columns first
+          const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
+          const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
+          const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
+
           // Process each header and extract ticket quantities
           csvData.headers.forEach((header, headerIndex) => {
             const cellValue = row[headerIndex] || '';
@@ -309,11 +314,6 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
               }
             }
           });
-
-          // Extract key fields from the correct columns
-          const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
-          const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
-          const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
           const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
           const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
           
