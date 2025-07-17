@@ -31,13 +31,13 @@ export const CheckInStats = ({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="card-stat card-stat-success">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Checked In</CardTitle>
-          <CheckCircle className="h-4 w-4 text-muted-foreground" />
+          <CheckCircle className="h-4 w-4 text-success" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">{checkedInCount}</div>
+          <div className="text-2xl font-bold text-success">{checkedInCount}</div>
           <p className="text-xs text-muted-foreground">
             {((checkedInCount / totalGuests) * 100).toFixed(0)}% complete
           </p>

@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 245 55% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 262 83% 58%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -24,15 +24,33 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 262 83% 58%;
+
+    /* New gradient and status colors */
+    --gradient-primary: 262 83% 58%;
+    --gradient-secondary: 221 83% 53%;
+    --gradient-success: 142 76% 36%;
+    --gradient-info: 221 83% 53%;
+    --gradient-warning: 32 95% 44%;
+    --gradient-accent: 328 86% 70%;
+
+    /* Status colors */
+    --success: 142 76% 36%;
+    --success-foreground: 355 100% 97%;
+    --info: 221 83% 53%;
+    --info-foreground: 210 40% 98%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 98%;
+    --magical: 328 86% 70%;
+    --magical-foreground: 0 0% 98%;
 
     --radius: 0.5rem;
 
@@ -63,8 +81,8 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 262 83% 48%;
+    --primary-foreground: 210 40% 98%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -72,7 +90,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 262 83% 48%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -80,7 +98,25 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 262 83% 48%;
+    
+    /* Dark mode gradients and status colors */
+    --gradient-primary: 262 83% 48%;
+    --gradient-secondary: 221 83% 43%;
+    --gradient-success: 142 76% 26%;
+    --gradient-info: 221 83% 43%;
+    --gradient-warning: 32 95% 34%;
+    --gradient-accent: 328 86% 60%;
+
+    /* Dark mode status colors */
+    --success: 142 76% 26%;
+    --success-foreground: 0 0% 98%;
+    --info: 221 83% 43%;
+    --info-foreground: 0 0% 98%;
+    --warning: 32 95% 34%;
+    --warning-foreground: 0 0% 98%;
+    --magical: 328 86% 60%;
+    --magical-foreground: 0 0% 98%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -99,5 +135,55 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Gradient backgrounds */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-[hsl(var(--gradient-primary))] to-[hsl(var(--gradient-secondary))];
+  }
+  
+  .bg-gradient-success {
+    @apply bg-gradient-to-r from-[hsl(var(--gradient-success))] to-[hsl(var(--gradient-info))];
+  }
+  
+  .bg-gradient-warning {
+    @apply bg-gradient-to-r from-[hsl(var(--gradient-warning))] to-[hsl(var(--gradient-accent))];
+  }
+  
+  .bg-gradient-magical {
+    @apply bg-gradient-to-r from-[hsl(var(--gradient-accent))] to-[hsl(var(--gradient-primary))];
+  }
+
+  /* Card styling variants */
+  .card-stat {
+    @apply rounded-lg shadow-md border border-border bg-card transition-all duration-200 hover:shadow-lg;
+  }
+  
+  .card-stat-success {
+    @apply border-l-4 border-l-[hsl(var(--success))];
+  }
+  
+  .card-stat-info {
+    @apply border-l-4 border-l-[hsl(var(--info))];
+  }
+  
+  .card-stat-warning {
+    @apply border-l-4 border-l-[hsl(var(--warning))];
+  }
+  
+  .card-stat-magical {
+    @apply border-l-4 border-l-[hsl(var(--magical))];
+  }
+
+  /* Header styling */
+  .header-gradient {
+    @apply bg-gradient-primary text-white py-4 px-6 shadow-md rounded-lg;
+  }
+  
+  /* Table header styling */
+  .table-header-row {
+    @apply bg-gradient-to-r from-secondary to-muted border-b;
   }
 }
