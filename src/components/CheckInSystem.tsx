@@ -557,50 +557,73 @@ const CheckInSystem = ({
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
+    // Safe String Extractors for Object-Based Fields
+    const noteRaw = guest.ticket_data?.Note;
+    const noteStr = typeof noteRaw === 'object' && noteRaw?.value
+      ? String(noteRaw.value).toLowerCase()
+      : String(noteRaw || '').toLowerCase();
+
+    const statusRaw = guest.ticket_data?.Status;
+    const statusStr = typeof statusRaw === 'object' && statusRaw?.value
+      ? String(statusRaw.value).toLowerCase()
+      : String(statusRaw || '').toLowerCase();
+    
     // Enhanced Detection Logic
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
     const bookerName = guest.booker_name || '';
     const itemDetails = guest.item_details || '';
     
-    // Step 1: Detect booking type with enhanced detection
+    // Step 1: Detect booking type with safe string extraction
     const isGYGBooking =
-      (guest?.ticket_data?.Status === "Paid in GYG") ||
-      (guest?.ticket_data?.Note?.includes?.("GYG")) ||
-      (ticketDataStr.toLowerCase().includes("paid in gyg")) ||
+      statusStr.includes("paid in gyg") ||
+      noteStr.includes("gyg booking reference") ||
+      noteStr.includes("gyg") ||
       (ticketDataStr.toLowerCase().includes("gyg")) ||
       (bookerName.toLowerCase().includes("gyg")) ||
       (itemDetails.toLowerCase().includes("gyg"));
 
     const isViatorBooking =
-      (guest?.ticket_data?.Status === "VIATOR") ||
+      statusStr.includes("viator") ||
+      noteStr.includes("viator") ||
       (ticketDataStr.toLowerCase().includes("viator")) ||
-      (guest?.booking_source === "Viator") ||
+      (guest?.booking_source?.toLowerCase?.() === "viator") ||
       (bookerName.toLowerCase().includes("viator")) ||
       (itemDetails.toLowerCase().includes("viator"));
     
-    // Add detailed debug logging for detection
+    // Enhanced debug logging with extracted values
     console.log("🔍 Guest Detection Debug:", {
       name: guest.booker_name,
       bookingCode: guest.booking_code,
       guestCount,
       status: {
         _type: typeof guest.ticket_data?.Status,
-        value: guest.ticket_data?.Status
+        raw: guest.ticket_data?.Status,
+        extracted: statusStr
       },
       note: {
         _type: typeof guest.ticket_data?.Note,
-        value: guest.ticket_data?.Note
+        raw: guest.ticket_data?.Note,
+        extracted: noteStr
       },
       booking_source: {
         _type: typeof guest?.booking_source,
         value: guest?.booking_source
       },
-      isGYGBooking,
-      isViatorBooking,
-      ticketDataStr: ticketDataStr.substring(0, 200) + "...",
+      detectionResults: {
+        isGYGBooking,
+        isViatorBooking,
+        statusIncludes: {
+          paidInGYG: statusStr.includes("paid in gyg"),
+          viator: statusStr.includes("viator")
+        },
+        noteIncludes: {
+          gygBookingRef: noteStr.includes("gyg booking reference"),
+          gyg: noteStr.includes("gyg"),
+          viator: noteStr.includes("viator")
+        }
+      },
       fullTicketData: guest.ticket_data,
-      itemDetails: guest.item_details,
-      allTextContent: `${bookerName} ${itemDetails} ${ticketDataStr}`.toLowerCase()
+      itemDetails: guest.item_details
     });
 
     // Fuzzy Package Detection for enhanced robustness
