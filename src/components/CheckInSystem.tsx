@@ -523,17 +523,10 @@ const CheckInSystem = ({
     }
   };
 
-  // Generate comprehensive order summary for direct display
+  // Generate comprehensive order summary for direct display using only structured data
   const getOrderSummary = (guest: Guest): string => {
     const guestCount = guest.total_quantity || 1;
     const orderItems: string[] = [];
-    
-    // Debug logging for MVDT-110525
-    if (guest.booking_code === 'MVDT-110525') {
-      console.log('🔍 Debugging MVDT-110525:');
-      console.log('Guest data:', guest);
-      console.log('Ticket data raw:', guest.ticket_data);
-    }
     
     // Check if this is a GYG (GetYourGuide) payment - treat as Groupon Offer Prosecco Package
     const ticketDataStr = JSON.stringify(guest.ticket_data || {});
@@ -541,26 +534,23 @@ const CheckInSystem = ({
     const isGYGPayment = ticketDataStr.toLowerCase().includes('paid in gyg') || 
                         statusStr.toLowerCase().includes('paid in gyg');
     
-    // Debug logging for GYG detection
-    if (guest.booking_code === 'MVDT-110525') {
-      console.log('Ticket data string:', ticketDataStr);
-      console.log('Contains "paid in gyg"?', isGYGPayment);
-      console.log('Guest count:', guestCount);
-    }
-    
     if (isGYGPayment) {
-      // Apply GYG rules: 1 prosecco per person, 1 pizza per couple, 1 fries per couple
+      // Apply GYG rules: 1 prosecco per person, pizza shared per couple, fries shared per couple
       const totalProseccos = guestCount;
-      const couples = Math.floor(guestCount / 2); // Only whole pairs get shared items
+      const couples = Math.ceil(guestCount / 2);
       
-      orderItems.push(`${totalProseccos} Prosecco${totalProseccos > 1 ? 's' : ''}`);
-      orderItems.push(`${couples} Pizza${couples > 1 ? 's' : ''}`);
-      orderItems.push(`${couples} Fries`);
+      if (totalProseccos > 0) {
+        orderItems.push(`${totalProseccos} Prosecco${totalProseccos > 1 ? 's' : ''}`);
+      }
+      if (couples > 0) {
+        orderItems.push(`${couples} Pizza${couples > 1 ? 's' : ''}`);
+        orderItems.push(`${couples} Fries`);
+      }
       
       return orderItems.join(', ');
     }
     
-    // Normal processing for non-GYG bookings
+    // Process tickets using only structured TICKET_TYPE_MAPPING
     const tickets = getAllTicketTypes(guest);
     
     tickets.forEach(ticket => {
@@ -570,12 +560,12 @@ const CheckInSystem = ({
         // Calculate drinks
         if (packageInfo.drinks) {
           const totalDrinks = packageInfo.drinks.perPerson 
-            ? packageInfo.drinks.quantity * guestCount
+            ? packageInfo.drinks.quantity * guestCount * ticket.quantity
             : packageInfo.drinks.quantity * ticket.quantity;
           
           if (totalDrinks > 0) {
             const drinkName = packageInfo.drinks.type;
-            orderItems.push(`${totalDrinks} ${drinkName}${totalDrinks > 1 ? 's' : ''}`);
+            orderItems.push(`${totalDrinks} ${drinkName}${totalDrinks > 1 && !drinkName.toLowerCase().endsWith('s') ? 's' : ''}`);
           }
         }
         
@@ -583,12 +573,12 @@ const CheckInSystem = ({
         if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
           let totalPizzas = 0;
           if (packageInfo.pizza.shared) {
-            // For shared pizzas (per couple), calculate based on couples
+            // For shared pizzas, calculate based on couples
             const couples = Math.ceil(guestCount / 2);
-            totalPizzas = packageInfo.pizza.quantity * couples * ticket.quantity;
+            totalPizzas = Math.ceil(packageInfo.pizza.quantity * couples * ticket.quantity);
           } else {
-            // Per person pizzas
-            totalPizzas = packageInfo.pizza.quantity * guestCount * ticket.quantity;
+            // Per person or per ticket pizzas
+            totalPizzas = Math.ceil(packageInfo.pizza.quantity * guestCount * ticket.quantity);
           }
           
           if (totalPizzas > 0) {
@@ -601,56 +591,17 @@ const CheckInSystem = ({
           packageInfo.extras.forEach(extra => {
             if (extra.includes('per couple') || extra.includes('(shared)')) {
               const couples = Math.ceil(guestCount / 2);
-              const extraName = extra.replace(/\s*per couple|\s*\(shared\)/g, '');
-              const pluralSuffix = couples > 1 && !extraName.endsWith('s') ? 's' : '';
-              orderItems.push(`${couples} ${extraName}${pluralSuffix}`);
+              const extraName = extra.replace(/\s*per couple|\s*\(shared\)/g, '').trim();
+              orderItems.push(`${couples} ${extraName}${couples > 1 && !extraName.endsWith('s') ? 's' : ''}`);
             } else {
               // Per person extras
-              const extraName = extra.replace(/\s*per person/g, '');
-              const pluralSuffix = guestCount > 1 && !extraName.endsWith('s') ? 's' : '';
-              orderItems.push(`${guestCount} ${extraName}${pluralSuffix}`);
+              const extraName = extra.replace(/\s*per person/g, '').trim();
+              orderItems.push(`${guestCount} ${extraName}${guestCount > 1 && !extraName.endsWith('s') ? 's' : ''}`);
             }
           });
         }
-      } else {
-        // Enhanced fallback parsing for unmapped tickets
-        const ticketType = ticket.type.toLowerCase();
-        
-        // Parse drinks patterns
-        const drinkPatterns = [
-          /(\d+)\s*(glass(?:es)?\s+of\s+prosecco|prosecco|drinks?|soft\s*drinks?|pints?|cocktails?)/i,
-          /&\s*(\d+)\s*(drinks?|soft\s*drinks?)/i,
-          /includes?\s*(\d+)\s*(drinks?|soft\s*drinks?)/i
-        ];
-        
-        for (const pattern of drinkPatterns) {
-          const match = ticketType.match(pattern);
-          if (match) {
-            const quantity = parseInt(match[1]);
-            const drinkType = match[2];
-            const totalDrinks = quantity * guestCount;
-            orderItems.push(`${totalDrinks} ${drinkType}`);
-            break;
-          }
-        }
-        
-        // Parse pizza patterns
-        const pizzaPatterns = [
-          /(\d+).*?pizza/i,
-          /&\s*(\d+).*?pizza/i,
-          /includes?\s*(\d+).*?pizza/i
-        ];
-        
-        for (const pattern of pizzaPatterns) {
-          const match = ticketType.match(pattern);
-          if (match) {
-            const quantity = parseInt(match[1]);
-            const totalPizzas = quantity * guestCount;
-            orderItems.push(`${totalPizzas} Pizza${totalPizzas > 1 ? 's' : ''}`);
-            break;
-          }
-        }
       }
+      // If ticket type not mapped, no fallback parsing - just skip it
     });
     
     return orderItems.length > 0 ? orderItems.join(', ') : 'Show ticket only';
