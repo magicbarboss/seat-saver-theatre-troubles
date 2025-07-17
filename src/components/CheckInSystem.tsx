@@ -326,7 +326,9 @@ const CheckInSystem = ({
     minimum_people?: number;
   }> = {
     // Standard House Magicians tickets
-    'House Magicians Show Ticket': {},
+    'House Magicians Show Ticket': {
+      // Basic show ticket - show only unless GYG/Viator detected
+    },
     'House Magicians Show Ticket & 2 Drinks': {
       drinks: {
         type: 'drinks',
@@ -550,8 +552,9 @@ const CheckInSystem = ({
   };
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
-  const getOrderSummary = (guest: Guest): string => {
-    const guestCount = guest.total_quantity || 1;
+  const getOrderSummary = (guest: Guest, totalGuestCount?: number): string => {
+    // Use the provided total guest count for booking groups, or fallback to individual guest count
+    const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
     // Enhanced Detection Logic
@@ -569,6 +572,19 @@ const CheckInSystem = ({
       (guest?.ticket_data?.Status === "VIATOR") ||
       (ticketDataStr.toLowerCase().includes("viator")) ||
       (guest?.booking_source === "Viator");
+    
+    // Add detailed debug logging for detection
+    console.log("🔍 Guest Detection Debug:", {
+      name: guest.booker_name,
+      bookingCode: guest.booking_code,
+      guestCount,
+      status: guest.ticket_data?.Status,
+      note: guest.ticket_data?.Note,
+      booking_source: guest?.booking_source,
+      isGYGBooking,
+      isViatorBooking,
+      ticketDataStr: ticketDataStr.substring(0, 200) + "..."
+    });
 
     // Fuzzy Package Detection for enhanced robustness
     const allTextContent = `${bookerName} ${itemDetails} ${ticketDataStr}`.toLowerCase();
@@ -758,6 +774,11 @@ const CheckInSystem = ({
       // Log if no order items found despite having ticket data (for troubleshooting)
       if (orderItems.length === 0 && tickets.length > 0) {
         console.log(`⚠️ No order summary generated for guest "${guest.booker_name}" despite having ${tickets.length} ticket types:`, tickets.map(t => t.type));
+        console.log("📊 Ticket mapping check:", tickets.map(t => ({ 
+          type: t.type, 
+          hasMapping: !!TICKET_TYPE_MAPPING[t.type],
+          mapping: TICKET_TYPE_MAPPING[t.type] 
+        })));
       } else if (orderItems.length > 0) {
         console.log(`✅ Regular ticket order for ${guest.booker_name}: ${orderItems.join(', ')}`);
       }
