@@ -9,6 +9,8 @@ export interface Guest {
   table_assignments: number[] | null;
   interval_pizza_order?: boolean;
   interval_drinks_order?: boolean;
+  diet_info?: string;
+  magic_info?: string;
 }
 
 export interface CheckInSystemProps {

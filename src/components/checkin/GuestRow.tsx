@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CheckCircle, User, Radio, MessageSquare, Info } from 'lucide-react';
+import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface Guest {
   [key: string]: any;
@@ -16,6 +16,8 @@ interface Guest {
   table_assignments: number[] | null;
   interval_pizza_order?: boolean;
   interval_drinks_order?: boolean;
+  diet_info?: string;
+  magic_info?: string;
 }
 
 interface GuestRowProps {
@@ -94,37 +96,80 @@ export const GuestRow = ({
           <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
             {orderSummary}
           </div>
-          {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
+          
+          {/* Diet Info Badge */}
+          {guest.diet_info && (
+            <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Diet
+            </Badge>
+          )}
+          
+          {/* Magic Info Badge */}
+          {guest.magic_info && (
+            <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Magic
+            </Badge>
+          )}
+          
+          {(packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0)) || guest.diet_info || guest.magic_info ? (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                   <Info className="h-3 w-3" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80">
+              <PopoverContent className="w-96 max-h-80 overflow-y-auto">
                 <div className="space-y-3">
-                  <h4 className="font-medium">Additional Info:</h4>
-                  {packageDetails.map((pkg, idx) => (
-                    pkg.details.length > 0 && (
-                      <div key={idx} className="space-y-1">
-                        <div className="text-sm font-medium text-muted-foreground">
-                          {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
-                        </div>
-                        <ul className="space-y-1">
-                          {pkg.details.map((detail, detailIdx) => (
-                            <li key={detailIdx} className="text-sm flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
-                              {detail}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )
-                  ))}
+                  {guest.diet_info && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-orange-500" />
+                        Dietary Requirements
+                      </h4>
+                      <p className="text-sm text-orange-700 bg-orange-50 p-2 rounded border border-orange-200">
+                        {guest.diet_info}
+                      </p>
+                    </div>
+                  )}
+                  {guest.magic_info && (
+                    <div>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-purple-500" />
+                        Magic Show Message
+                      </h4>
+                      <p className="text-sm text-purple-700 bg-purple-50 p-2 rounded border border-purple-200">
+                        {guest.magic_info}
+                      </p>
+                    </div>
+                  )}
+                  {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
+                    <div>
+                      <h4 className="font-medium">Additional Info:</h4>
+                      {packageDetails.map((pkg, idx) => (
+                        pkg.details.length > 0 && (
+                          <div key={idx} className="space-y-1">
+                            <div className="text-sm font-medium text-muted-foreground">
+                              {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
+                            </div>
+                            <ul className="space-y-1">
+                              {pkg.details.map((detail, detailIdx) => (
+                                <li key={detailIdx} className="text-sm flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
+                                  {detail}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
-          )}
+          ) : null}
         </div>
       </TableCell>
 

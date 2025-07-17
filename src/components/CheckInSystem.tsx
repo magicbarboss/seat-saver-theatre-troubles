@@ -867,8 +867,8 @@ const CheckInSystem = ({
     // Fallback: parse all ticket_data fields with fuzzy matching
     if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
       Object.entries(guest.ticket_data).forEach(([key, value]) => {
-        // Skip non-ticket fields (removed 'Friends' from skip list)
-        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'DIET', 'Guests', 'Magic', 'TERMS'].includes(key)) {
+        // Skip non-ticket fields (removed 'Friends', 'DIET', 'Magic' from skip list)
+        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'Guests', 'TERMS'].includes(key)) {
           return;
         }
 
@@ -934,6 +934,29 @@ const CheckInSystem = ({
     }
     return `${totalDrinks} Drinks`;
   };
+
+  // Extract and process diet and magic information from guest data
+  const processDietAndMagicData = useMemo(() => {
+    if (!guests || guests.length === 0) return;
+    
+    guests.forEach((guest, index) => {
+      if (!guest || !guest.ticket_data) return;
+      
+      // Extract diet information from ticket_data
+      const dietData = guest.ticket_data.DIET || guest.ticket_data.Diet || guest.ticket_data.diet;
+      if (dietData && typeof dietData === 'string' && dietData.trim() !== '') {
+        guest.diet_info = dietData.trim();
+        console.log(`Found diet info for ${guest.booker_name}: ${guest.diet_info}`);
+      }
+      
+      // Extract magic information from ticket_data
+      const magicData = guest.ticket_data.Magic || guest.ticket_data.MAGIC || guest.ticket_data.magic;
+      if (magicData && typeof magicData === 'string' && magicData.trim() !== '') {
+        guest.magic_info = magicData.trim();
+        console.log(`Found magic info for ${guest.booker_name}: ${guest.magic_info}`);
+      }
+    });
+  }, [guests]);
 
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {

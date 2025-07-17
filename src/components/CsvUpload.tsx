@@ -336,6 +336,14 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           ticketType.toLowerCase().includes('drink')
         );
 
+        // Extract diet information
+        const dietInfo = ticketData.DIET || ticketData.Diet || ticketData.diet;
+        const cleanDietInfo = dietInfo && typeof dietInfo === 'string' && dietInfo.trim() !== '' ? dietInfo.trim() : null;
+        
+        // Extract magic information  
+        const magicInfo = ticketData.Magic || ticketData.MAGIC || ticketData.magic;
+        const cleanMagicInfo = magicInfo && typeof magicInfo === 'string' && magicInfo.trim() !== '' ? magicInfo.trim() : null;
+
         const guestRecord = {
           guest_list_id: guestList.id,
           booking_code: bookingCode,
@@ -346,6 +354,8 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           notes: notes,
           interval_pizza_order: hasPizzaTickets,
           interval_drinks_order: hasDrinkTickets,
+          diet_info: cleanDietInfo,
+          magic_info: cleanMagicInfo,
           ticket_data: { 
             ...ticketData, // Keep all original CSV data
             extracted_tickets: extractedTickets // Add structured ticket quantities

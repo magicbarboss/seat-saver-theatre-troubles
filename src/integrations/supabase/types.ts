@@ -101,6 +101,7 @@ export type Database = {
           booking_code: string | null
           booking_comments: string | null
           checked_in_at: string | null
+          diet_info: string | null
           guest_list_id: string
           id: string
           interval_drinks_order: boolean | null
@@ -109,6 +110,7 @@ export type Database = {
           is_checked_in: boolean | null
           is_seated: boolean | null
           item_details: string | null
+          magic_info: string | null
           notes: string | null
           original_row_index: number | null
           pager_number: number | null
@@ -123,6 +125,7 @@ export type Database = {
           booking_code?: string | null
           booking_comments?: string | null
           checked_in_at?: string | null
+          diet_info?: string | null
           guest_list_id: string
           id?: string
           interval_drinks_order?: boolean | null
@@ -131,6 +134,7 @@ export type Database = {
           is_checked_in?: boolean | null
           is_seated?: boolean | null
           item_details?: string | null
+          magic_info?: string | null
           notes?: string | null
           original_row_index?: number | null
           pager_number?: number | null
@@ -145,6 +149,7 @@ export type Database = {
           booking_code?: string | null
           booking_comments?: string | null
           checked_in_at?: string | null
+          diet_info?: string | null
           guest_list_id?: string
           id?: string
           interval_drinks_order?: boolean | null
@@ -153,6 +158,7 @@ export type Database = {
           is_checked_in?: boolean | null
           is_seated?: boolean | null
           item_details?: string | null
+          magic_info?: string | null
           notes?: string | null
           original_row_index?: number | null
           pager_number?: number | null
