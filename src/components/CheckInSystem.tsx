@@ -982,10 +982,18 @@ const CheckInSystem = ({
         let hasUpdates = false;
         const updates: { id: string; diet_info?: string; magic_info?: string } = { id: guest.id };
         
-        // Helper function to check if message already exists
+        // Helper function to check if message already exists in semicolon-separated list
         const messageAlreadyExists = (existingMagic: string, newMessage: string): boolean => {
           if (!existingMagic) return false;
-          return existingMagic.includes(newMessage);
+          const existingMessages = existingMagic.split(';').map(msg => msg.trim());
+          return existingMessages.some(msg => msg === newMessage.trim());
+        };
+
+        // Helper function to truncate message to character limit
+        const truncateMessage = (message: string, limit: number = 150): string => {
+          if (message.length <= limit) return message;
+          console.log(`⚠️ Truncating message from ${message.length} to ${limit} characters: "${message}"`);
+          return message.substring(0, limit).trim();
         };
 
         // Extract diet information with validation
@@ -1003,12 +1011,19 @@ const CheckInSystem = ({
             console.log(`🔄 DIET column contains non-dietary content for ${guest.booker_name}, moving to magic_info: "${trimmedDiet}"`);
             const existingMagic = guest.magic_info || updates.magic_info || '';
             
+            // Apply character limit
+            const truncatedMessage = truncateMessage(trimmedDiet);
+            console.log(`📝 Processing diet message for ${guest.booker_name} (${trimmedDiet.length} chars): "${trimmedDiet}"`);
+            
             // Only add if the message doesn't already exist
-            if (!messageAlreadyExists(existingMagic, trimmedDiet)) {
-              const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedDiet}` : trimmedDiet;
+            if (!messageAlreadyExists(existingMagic, truncatedMessage)) {
+              const newMagicInfo = existingMagic ? `${existingMagic}; ${truncatedMessage}` : truncatedMessage;
               updates.magic_info = newMagicInfo;
               guest.magic_info = newMagicInfo; // Update local state
               hasUpdates = true;
+              console.log(`✅ Added magic info from DIET for ${guest.booker_name}: "${truncatedMessage}"`);
+            } else {
+              console.log(`🔄 Magic message from DIET already exists for ${guest.booker_name}, skipping: "${truncatedMessage}"`);
             }
           }
         }
@@ -1019,16 +1034,20 @@ const CheckInSystem = ({
           const trimmedMagic = magicData.trim();
           const existingMagic = guest.magic_info || updates.magic_info || '';
           
+          // Apply character limit
+          const truncatedMessage = truncateMessage(trimmedMagic);
+          console.log(`📝 Processing Magic column for ${guest.booker_name} (${trimmedMagic.length} chars): "${trimmedMagic}"`);
+          
           // Only append if the message doesn't already exist
-          if (!messageAlreadyExists(existingMagic, trimmedMagic)) {
-            const newMagicInfo = existingMagic ? `${existingMagic}; ${trimmedMagic}` : trimmedMagic;
+          if (!messageAlreadyExists(existingMagic, truncatedMessage)) {
+            const newMagicInfo = existingMagic ? `${existingMagic}; ${truncatedMessage}` : truncatedMessage;
             
             updates.magic_info = newMagicInfo;
             guest.magic_info = newMagicInfo; // Update local state
             hasUpdates = true;
-            console.log(`✨ Found new magic info for ${guest.booker_name}: ${trimmedMagic}`);
+            console.log(`✨ Added magic info from Magic column for ${guest.booker_name}: "${truncatedMessage}"`);
           } else {
-            console.log(`🔄 Magic message already exists for ${guest.booker_name}, skipping: "${trimmedMagic}"`);
+            console.log(`🔄 Magic message from Magic column already exists for ${guest.booker_name}, skipping: "${truncatedMessage}"`);
           }
         }
         
