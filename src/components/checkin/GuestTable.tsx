@@ -40,7 +40,7 @@ interface GuestTableProps {
   partyGroups: Map<string, PartyGroup>;
   bookingComments: Map<number, string>;
   walkInGuests: Guest[];
-  getOrderSummary: (guest: Guest, totalGuestCount?: number) => string;
+  getOrderSummary: (guest: Guest, totalGuestCount?: number, addOnGuests?: Guest[]) => string;
   getPackageDetails: (guest: Guest) => Array<{
     type: string;
     quantity: number;
@@ -113,7 +113,7 @@ export const GuestTable = ({
             isAllocated={allocatedGuests.has(group.originalIndex)}
             pagerNumber={pagerAssignments.get(group.originalIndex)}
             tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
-            orderSummary={getOrderSummary(group.mainBooking, group.mainBooking.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0))}
+            orderSummary={getOrderSummary(group.mainBooking, group.mainBooking.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0), group.addOns)}
             packageDetails={getPackageDetails(group.mainBooking)}
             comment={bookingComments.get(group.originalIndex)}
             partyInfo={getPartyInfo(group.originalIndex)}

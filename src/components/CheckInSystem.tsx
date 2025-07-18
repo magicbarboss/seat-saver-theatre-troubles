@@ -548,13 +548,19 @@ const CheckInSystem = ({
     }
   };
 
-  // Extract addon orders from booking codes (like "3 glasses of prosecco", "Garlic Pizza", etc.)
-  const extractAddonOrders = (bookingCode: string, itemDetails?: string): string[] => {
+  // Extract addon orders from booking codes and item_details across all entries in a booking group
+  const extractAddonOrders = (mainGuest: Guest, addOnGuests: Guest[] = []): string[] => {
     const addons: string[] = [];
     
+    // Combine all booking codes and item details from the booking group
+    const allGuests = [mainGuest, ...addOnGuests];
+    const combinedBookingCodes = allGuests.map(g => g.booking_code || '').join(' ');
+    const combinedItemDetails = allGuests.map(g => g.item_details || '').join(' ');
+    const combinedText = combinedBookingCodes + ' ' + combinedItemDetails;
+    
     // Match patterns like "• 3 glasses of prosecco (2 included in the deal, 1 purchased)"
-    if (bookingCode.includes('prosecco')) {
-      const match = bookingCode.match(/(\d+)\s*glasses?\s*of\s*prosecco/i);
+    if (combinedText.includes('prosecco')) {
+      const match = combinedText.match(/(\d+)\s*glasses?\s*of\s*prosecco/i);
       if (match) {
         const quantity = parseInt(match[1]);
         addons.push(`${quantity} Prosecco${quantity > 1 ? 's' : ''}`);
@@ -562,8 +568,8 @@ const CheckInSystem = ({
     }
     
     // Match patterns like "• 3 portions of chips (1 included in the deal, 2 purchased)"
-    if (bookingCode.includes('chips') || bookingCode.includes('fries')) {
-      const match = bookingCode.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
+    if (combinedText.includes('chips') || combinedText.includes('fries')) {
+      const match = combinedText.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
       if (match) {
         const quantity = parseInt(match[1]);
         addons.push(`${quantity} ${match[2].charAt(0).toUpperCase() + match[2].slice(1)}`);
@@ -571,7 +577,6 @@ const CheckInSystem = ({
     }
     
     // Match pizza orders including "Stone Baked Garlic Pizza" from item_details
-    const combinedText = bookingCode + ' ' + (itemDetails || '');
     if (combinedText.toLowerCase().includes('pizza')) {
       if (combinedText.toLowerCase().includes('stone baked garlic')) {
         addons.push('1x Stone Baked Garlic Pizza');
@@ -592,15 +597,13 @@ const CheckInSystem = ({
   };
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
-  const getOrderSummary = (guest: Guest, totalGuestCount?: number): string => {
+  const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
     // Use the provided total guest count for booking groups, or fallback to individual guest count
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Check for addon orders from booking code - we'll add these at the end
-    const bookingCode = guest.booking_code || '';
-    const guestItemDetails = guest.item_details || '';
-    const addonItems = extractAddonOrders(bookingCode, guestItemDetails);
+    // Check for addon orders from booking group - we'll add these at the end
+    const addonItems = extractAddonOrders(guest, addOnGuests);
     
     // Safe String Extractors - Check direct Status field first, then ticket_data
     const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
