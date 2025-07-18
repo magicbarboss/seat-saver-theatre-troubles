@@ -552,6 +552,15 @@ const CheckInSystem = ({
   const extractAddonOrders = (mainGuest: Guest, addOnGuests: Guest[] = []): string[] => {
     const addons: string[] = [];
     
+    // Debug logging for Jill
+    if (mainGuest.booker_name?.includes('Jill')) {
+      console.log('🔍 Jill Addon Debug:', {
+        mainGuest: mainGuest.item_details,
+        addOnGuests: addOnGuests.map(g => g.item_details),
+        addOnCount: addOnGuests.length
+      });
+    }
+    
     // Combine all booking codes and item details from the booking group
     const allGuests = [mainGuest, ...addOnGuests];
     const combinedBookingCodes = allGuests.map(g => g.booking_code || '').join(' ');
