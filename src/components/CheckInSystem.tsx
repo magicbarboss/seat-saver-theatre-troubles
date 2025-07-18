@@ -1231,6 +1231,14 @@ const CheckInSystem = ({
   // Group bookings by booking code - preserve original order
   const groupedBookings = useMemo(() => {
     if (!guests || guests.length === 0) return [];
+    
+    console.log('👥 Total guests loaded:', guests.length);
+    console.log('🔍 Looking for Jill:', guests.filter(g => g?.booker_name?.toLowerCase().includes('jill')).map(g => ({
+      name: g.booker_name,
+      item_details: g.item_details,
+      booking_code: g.booking_code
+    })));
+    
     const bookingGroups: BookingGroup[] = [];
     const processedIndices = new Set<number>();
     
