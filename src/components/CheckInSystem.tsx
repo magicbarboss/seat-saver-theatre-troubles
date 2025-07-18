@@ -576,10 +576,12 @@ const CheckInSystem = ({
       noteStr.includes("gyg booking reference") ||
       ticketDataStr.includes("paid in gyg");
 
+    // More precise Viator detection - must have actual Viator content, not just empty fields
+    const viatorField = guest.ticket_data?.Viator || '';
     const isViatorBooking =
-      statusStr.includes("viator") ||
-      noteStr.includes("viator") ||
-      ticketDataStr.includes("viator") ||
+      statusStr === "viator" ||
+      (viatorField && viatorField.toLowerCase().includes("viator booking reference")) ||
+      statusStr.includes("viator booking") ||
       (guest?.booking_source?.toLowerCase?.() === "viator");
     
     // DEBUG: Show actual guest data structure to find where GYG/Viator info is stored
