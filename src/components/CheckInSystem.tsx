@@ -1587,10 +1587,25 @@ const CheckInSystem = ({
       <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalPizzasNeeded()} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
 
       <Tabs defaultValue="checkin" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-white shadow-sm">
-          <TabsTrigger value="checkin">Check-In System</TabsTrigger>
-          <TabsTrigger value="tables">Table Management</TabsTrigger>
-          <TabsTrigger value="stats">Show Statistics</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
+          <TabsTrigger 
+            value="checkin" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-lg py-3 px-6 font-semibold transition-all duration-300 hover:bg-white/50"
+          >
+            🎭 Check-In System
+          </TabsTrigger>
+          <TabsTrigger 
+            value="tables" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-lg py-3 px-6 font-semibold transition-all duration-300 hover:bg-white/50"
+          >
+            🍽️ Table Management
+          </TabsTrigger>
+          <TabsTrigger 
+            value="stats" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-lg py-3 px-6 font-semibold transition-all duration-300 hover:bg-white/50"
+          >
+            📊 Show Statistics
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="checkin" className="space-y-6">
