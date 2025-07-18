@@ -7,6 +7,11 @@ interface CheckInStatsProps {
   checkedInCount: number;
   allocatedCount: number;
   totalPizzasNeeded: number;
+  foodBreakdown?: {
+    pizzas: number;
+    chips: number;
+    stoneBakedPizza: number;
+  };
   showTimeStats: { [key: string]: number };
   lastSaved: Date;
 }
@@ -16,6 +21,7 @@ export const CheckInStats = ({
   checkedInCount,
   allocatedCount,
   totalPizzasNeeded,
+  foodBreakdown,
   showTimeStats,
   lastSaved
 }: CheckInStatsProps) => {
@@ -64,7 +70,28 @@ export const CheckInStats = ({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">{totalPizzasNeeded}</div>
-          <p className="text-xs text-muted-foreground">Pizzas, chips & food</p>
+          {foodBreakdown && (
+            <div className="mt-1 space-y-1">
+              {foodBreakdown.pizzas > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span>Pizzas:</span>
+                  <span className="font-semibold">{foodBreakdown.pizzas}</span>
+                </div>
+              )}
+              {foodBreakdown.chips > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span>Chips:</span>
+                  <span className="font-semibold">{foodBreakdown.chips}</span>
+                </div>
+              )}
+              {foodBreakdown.stoneBakedPizza > 0 && (
+                <div className="flex justify-between text-xs">
+                  <span>Stone Baked:</span>
+                  <span className="font-semibold">{foodBreakdown.stoneBakedPizza}</span>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

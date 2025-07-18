@@ -1353,7 +1353,11 @@ const CheckInSystem = ({
     return count;
   };
   const getTotalFoodNeeded = () => {
-    let totalFood = 0;
+    const foodBreakdown = {
+      pizzas: 0,
+      chips: 0,
+      stoneBakedPizza: 0
+    };
     
     console.log('🍕 DEBUG: Calculating total food needed...');
     
@@ -1371,7 +1375,7 @@ const CheckInSystem = ({
         const mapping = TICKET_TYPE_MAPPING[type];
         if (mapping?.pizza?.quantity && typeof mapping.pizza.quantity === 'number') {
           console.log(`🍕 Found pizza ticket: ${type} x${quantity} = ${mapping.pizza.quantity * quantity} pizzas`);
-          totalFood += mapping.pizza.quantity * quantity;
+          foodBreakdown.pizzas += mapping.pizza.quantity * quantity;
         }
       });
       
@@ -1388,7 +1392,7 @@ const CheckInSystem = ({
       if (chipsMatch) {
         const chipsCount = parseInt(chipsMatch[1]);
         console.log(`🍟 Found chips for ${guest.booker_name}: ${chipsCount}`);
-        totalFood += chipsCount;
+        foodBreakdown.chips += chipsCount;
       }
       
       // Look for other food items that might be mentioned
@@ -1397,13 +1401,19 @@ const CheckInSystem = ({
         if (pizzaMatch) {
           const stonePizzaCount = parseInt(pizzaMatch[1]);
           console.log(`🍕 Found stone baked garlic pizza for ${guest.booker_name}: ${stonePizzaCount}`);
-          totalFood += stonePizzaCount;
+          foodBreakdown.stoneBakedPizza += stonePizzaCount;
         }
       }
     });
     
+    const totalFood = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
+    console.log(`🍕 FOOD BREAKDOWN:`, foodBreakdown);
     console.log(`🍕 TOTAL FOOD CALCULATED: ${totalFood}`);
-    return totalFood;
+    
+    return {
+      total: totalFood,
+      breakdown: foodBreakdown
+    };
   };
   const getShowTimeStats = () => {
     const stats = {
@@ -1626,7 +1636,7 @@ const CheckInSystem = ({
 
       <CheckInActions onRefreshStatus={refreshStatus} onClearData={clearAllData} showClearDialog={showClearDialog} setShowClearDialog={setShowClearDialog} />
 
-      <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalFoodNeeded()} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
+      <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalFoodNeeded().total} foodBreakdown={getTotalFoodNeeded().breakdown} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
 
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
