@@ -1248,6 +1248,20 @@ const CheckInSystem = ({
         index: i
       }) => !processedIndices.has(i) && g && g.booking_code === bookingCode && g.booker_name === bookerName);
       
+      // Debug logging for Jill's booking group
+      if (bookerName?.toLowerCase().includes('jill')) {
+        console.log('🔍 Jill Booking Group Debug:', {
+          bookingCode,
+          bookerName,
+          relatedBookingsCount: relatedBookings.length,
+          relatedBookings: relatedBookings.map(rb => ({
+            index: rb.index,
+            item_details: rb.guest.item_details,
+            total_quantity: rb.guest.total_quantity
+          }))
+        });
+      }
+      
       if (relatedBookings.length > 0) {
         const mainBooking = relatedBookings[0];
         const addOns = relatedBookings.slice(1);
