@@ -1359,94 +1359,59 @@ const CheckInSystem = ({
       stoneBakedPizza: 0
     };
     
-    console.log('🍕 DEBUG: Calculating total food needed...');
-    console.log(`🍕 Processing ${groupedBookings.length} grouped bookings...`);
+    console.log('\n🍕 === STARTING FOOD CALCULATION ===');
+    console.log(`Processing ${groupedBookings.length} bookings for show filter: ${showFilter}`);
     
-    // Count food for ALL guests (not just checked-in)
-    groupedBookings.forEach((booking, bookingIndex) => {
-      if (!booking.mainBooking) {
-        console.log(`🚫 Skipping booking ${bookingIndex} - no mainBooking`);
-        return;
-      }
+    groupedBookings.forEach((booking, index) => {
+      if (!booking.mainBooking) return;
       
       const guest = booking.mainBooking;
-      console.log(`\n🍕 === PROCESSING GUEST ${guest.booker_name} ===`);
+      console.log(`\n${index + 1}. GUEST: ${guest.booker_name}`);
       
-      // METHOD 1: Check ticket mappings
-      const allTickets = getAllTicketTypes(guest);
-      console.log(`🎫 Found ${allTickets.length} tickets:`, allTickets);
+      // Check if guest has pizza tickets in their ticket data
+      const ticketData = guest.ticket_data || {};
+      console.log('   Ticket data keys:', Object.keys(ticketData));
       
-      allTickets.forEach(({ type, quantity }) => {
-        const mapping = TICKET_TYPE_MAPPING[type];
-        if (mapping?.pizza?.quantity && typeof mapping.pizza.quantity === 'number') {
-          const pizzaCount = mapping.pizza.quantity * quantity;
-          console.log(`🍕 TICKET PIZZA: ${type} x${quantity} = ${pizzaCount} pizzas`);
-          foodBreakdown.pizzas += pizzaCount;
+      // Look for pizza-related ticket fields
+      Object.entries(ticketData).forEach(([key, value]) => {
+        if (key.toLowerCase().includes('pizza') && value && value !== '') {
+          const numValue = parseInt(String(value)) || 1;
+          console.log(`   🍕 FOUND PIZZA TICKET: ${key} = ${value} (parsed as ${numValue})`);
+          
+          if (key.toLowerCase().includes('stone baked') || key.toLowerCase().includes('garlic')) {
+            foodBreakdown.stoneBakedPizza += numValue;
+          } else {
+            foodBreakdown.pizzas += numValue;
+          }
+        }
+        
+        if (key.toLowerCase().includes('chips') && value && value !== '') {
+          const numValue = parseInt(String(value)) || 1;
+          console.log(`   🍟 FOUND CHIPS: ${key} = ${value} (parsed as ${numValue})`);
+          foodBreakdown.chips += numValue;
         }
       });
       
-      // METHOD 2: Check interval_pizza_order flag
+      // Also check interval_pizza_order flag
       if (guest.interval_pizza_order) {
-        console.log(`🍕 Guest has interval_pizza_order flag set`);
-        const pizzaInfo = getPizzaInfo(guest);
-        console.log(`🍕 Pizza info result: "${pizzaInfo}"`);
-        const match = pizzaInfo.match(/(\d+)/);
-        if (match) {
-          const flagPizzaCount = parseInt(match[1]);
-          console.log(`🍕 FLAG PIZZA: Found ${flagPizzaCount} pizzas from interval flag`);
-          foodBreakdown.pizzas += flagPizzaCount;
-        }
+        console.log(`   🚩 Has interval_pizza_order flag - adding 1 pizza`);
+        foodBreakdown.pizzas += 1;
       }
       
-      // METHOD 3: Text analysis for additional food
-      const combinedText = [
-        guest.item_details,
-        guest.notes, 
-        guest.booking_comments,
-        guest.ticket_data ? JSON.stringify(guest.ticket_data) : ''
-      ].filter(Boolean).join(' ');
-      
-      console.log(`📝 Combined text for analysis: "${combinedText}"`);
-      
-      // Look for chips/fries mentions
-      const chipsMatch = combinedText.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
-      if (chipsMatch) {
-        const chipsCount = parseInt(chipsMatch[1]);
-        console.log(`🍟 TEXT CHIPS: Found ${chipsCount} portions`);
-        foodBreakdown.chips += chipsCount;
-      }
-      
-      // Look for stone baked garlic pizza mentions
-      const lowerText = combinedText.toLowerCase();
-      if (lowerText.includes('stone baked garlic')) {
-        const pizzaMatch = lowerText.match(/(\d+)\s*stone\s*baked\s*garlic\s*pizza/i);
-        if (pizzaMatch) {
-          const stonePizzaCount = parseInt(pizzaMatch[1]);
-          console.log(`🍕 TEXT STONE PIZZA: Found ${stonePizzaCount} stone baked pizzas`);
-          foodBreakdown.stoneBakedPizza += stonePizzaCount;
-        } else {
-          // If mentioned but no number, assume 1
-          console.log(`🍕 TEXT STONE PIZZA: Found stone baked mention (assuming 1)`);
-          foodBreakdown.stoneBakedPizza += 1;
-        }
-      }
-      
-      console.log(`🍕 Guest ${guest.booker_name} totals so far:`, {
-        pizzas: foodBreakdown.pizzas,
-        chips: foodBreakdown.chips, 
-        stoneBaked: foodBreakdown.stoneBakedPizza
-      });
+      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}`);
     });
     
-    const totalFood = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
-    console.log(`\n🍕 === FINAL FOOD BREAKDOWN ===`);
-    console.log(`🍕 Regular Pizzas: ${foodBreakdown.pizzas}`);
-    console.log(`🍟 Chips: ${foodBreakdown.chips}`);
-    console.log(`🍕 Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
-    console.log(`🍕 TOTAL FOOD ITEMS: ${totalFood}`);
+    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
+    
+    console.log('\n🍕 === FINAL FOOD TOTALS ===');
+    console.log(`Regular Pizzas: ${foodBreakdown.pizzas}`);
+    console.log(`Chips: ${foodBreakdown.chips}`);
+    console.log(`Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
+    console.log(`TOTAL: ${total}`);
+    console.log('================================\n');
     
     return {
-      total: totalFood,
+      total,
       breakdown: foodBreakdown
     };
   };
