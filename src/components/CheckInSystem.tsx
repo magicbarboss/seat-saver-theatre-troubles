@@ -1355,6 +1355,8 @@ const CheckInSystem = ({
   const getTotalFoodNeeded = () => {
     let totalFood = 0;
     
+    console.log('🍕 DEBUG: Calculating total food needed...');
+    
     // Count food for ALL guests (not just checked-in)
     groupedBookings.forEach(booking => {
       if (!booking.mainBooking) return;
@@ -1362,11 +1364,14 @@ const CheckInSystem = ({
       const guest = booking.mainBooking;
       const allTickets = getAllTicketTypes(guest);
       
+      console.log(`🍕 Guest ${guest.booker_name}: found ${allTickets.length} tickets:`, allTickets);
+      
       // Count pizzas
       allTickets.forEach(({ type, quantity }) => {
         const mapping = TICKET_TYPE_MAPPING[type];
-        if (mapping?.pizza && typeof mapping.pizza === 'number') {
-          totalFood += mapping.pizza * quantity;
+        if (mapping?.pizza?.quantity && typeof mapping.pizza.quantity === 'number') {
+          console.log(`🍕 Found pizza ticket: ${type} x${quantity} = ${mapping.pizza.quantity * quantity} pizzas`);
+          totalFood += mapping.pizza.quantity * quantity;
         }
       });
       
@@ -1381,18 +1386,23 @@ const CheckInSystem = ({
       // Look for chips/fries mentions
       const chipsMatch = combinedText.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
       if (chipsMatch) {
-        totalFood += parseInt(chipsMatch[1]);
+        const chipsCount = parseInt(chipsMatch[1]);
+        console.log(`🍟 Found chips for ${guest.booker_name}: ${chipsCount}`);
+        totalFood += chipsCount;
       }
       
       // Look for other food items that might be mentioned
       if (combinedText.includes('stone baked garlic')) {
         const pizzaMatch = combinedText.match(/(\d+)\s*stone\s*baked\s*garlic\s*pizza/i);
         if (pizzaMatch) {
-          totalFood += parseInt(pizzaMatch[1]);
+          const stonePizzaCount = parseInt(pizzaMatch[1]);
+          console.log(`🍕 Found stone baked garlic pizza for ${guest.booker_name}: ${stonePizzaCount}`);
+          totalFood += stonePizzaCount;
         }
       }
     });
     
+    console.log(`🍕 TOTAL FOOD CALCULATED: ${totalFood}`);
     return totalFood;
   };
   const getShowTimeStats = () => {
