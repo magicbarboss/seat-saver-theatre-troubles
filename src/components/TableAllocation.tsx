@@ -1495,11 +1495,11 @@ const TableAllocation = ({
               
               return {
                 ...s,
-                status: guestsForThisSection >= s.capacity ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                status: 'ALLOCATED' as const, // FIXED: Always ALLOCATED during allocation, never OCCUPIED
                 allocatedTo: selectedGuest.name,
                 allocatedGuest: selectedGuest,
                 allocatedCount: guestsForThisSection, // Only guests for THIS section
-                seatedCount: 0,
+                seatedCount: 0, // Always 0 during allocation
               };
             })
           };
@@ -1593,11 +1593,11 @@ const TableAllocation = ({
               
               return {
                 ...s,
-                status: guestsForThisSection >= s.capacity ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                status: 'ALLOCATED' as const, // FIXED: Always ALLOCATED during allocation, never OCCUPIED
                 allocatedTo: selectedGuest.name,
                 allocatedGuest: selectedGuest,
                 allocatedCount: guestsForThisSection, // Only guests for THIS section
-                seatedCount: 0,
+                seatedCount: 0, // Always 0 during allocation
               };
             })
           };
