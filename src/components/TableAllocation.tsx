@@ -785,6 +785,14 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
 
+    // DEBUG: Check if guest is being incorrectly marked as seated
+    console.log(`🔍 DEBUG: Section allocation for ${selectedGuest.name}:`, {
+      allocation: 'completed',
+      callingOnTableAllocated: true,
+      NOT_callingOnGuestSeated: true,
+      guestIndex: selectedGuest.originalIndex
+    });
+
     // REMOVED onTableAssign call to prevent auto-seating during allocation
     console.log(`Section allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
@@ -1409,6 +1417,14 @@ const TableAllocation = ({
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
 
+    // DEBUG: Check if guest is being incorrectly marked as seated
+    console.log(`🔍 DEBUG: Whole table allocation for ${selectedGuest.name}:`, {
+      allocation: 'completed',
+      callingOnTableAllocated: true,
+      NOT_callingOnGuestSeated: true,
+      guestIndex: selectedGuest.originalIndex
+    });
+
     // REMOVED onTableAssign call to prevent auto-seating during allocation
     console.log(`Whole table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
 
@@ -1494,6 +1510,14 @@ const TableAllocation = ({
 
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
+
+    // DEBUG: Check if guest is being incorrectly marked as seated
+    console.log(`🔍 DEBUG: Multiple table allocation for ${selectedGuest.name}:`, {
+      allocation: 'completed',
+      callingOnTableAllocated: true,
+      NOT_callingOnGuestSeated: true,
+      guestIndex: selectedGuest.originalIndex
+    });
 
     // REMOVED onTableAssign call to prevent auto-seating during allocation
     console.log(`Table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
@@ -1584,6 +1608,14 @@ const TableAllocation = ({
 
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, tablesToAssign.map(t => t.id));
+
+    // DEBUG: Check if guest is being incorrectly marked as seated
+    console.log(`🔍 DEBUG: Joined table allocation for ${selectedGuest.name}:`, {
+      allocation: 'completed',
+      callingOnTableAllocated: true,
+      NOT_callingOnGuestSeated: true,
+      guestIndex: selectedGuest.originalIndex
+    });
 
     // REMOVED onTableAssign call to prevent auto-seating during allocation
     console.log(`Joined table allocation completed for ${selectedGuest.name} - NOT calling onTableAssign to prevent auto-seating`);
