@@ -70,28 +70,35 @@ export const CheckInStats = ({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">{totalPizzasNeeded}</div>
-          {foodBreakdown && (
-            <div className="mt-1 space-y-1">
-              {foodBreakdown.pizzas > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span>Pizzas:</span>
-                  <span className="font-semibold">{foodBreakdown.pizzas}</span>
-                </div>
-              )}
-              {foodBreakdown.chips > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span>Chips:</span>
-                  <span className="font-semibold">{foodBreakdown.chips}</span>
-                </div>
-              )}
-              {foodBreakdown.stoneBakedPizza > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span>Stone Baked:</span>
-                  <span className="font-semibold">{foodBreakdown.stoneBakedPizza}</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            {foodBreakdown ? (
+              <>
+                {foodBreakdown.pizzas > 0 && (
+                  <div className="flex justify-between">
+                    <span>🍕 Pizzas:</span>
+                    <span className="font-semibold text-foreground">{foodBreakdown.pizzas}</span>
+                  </div>
+                )}
+                {foodBreakdown.chips > 0 && (
+                  <div className="flex justify-between">
+                    <span>🍟 Chips:</span>
+                    <span className="font-semibold text-foreground">{foodBreakdown.chips}</span>
+                  </div>
+                )}
+                {foodBreakdown.stoneBakedPizza > 0 && (
+                  <div className="flex justify-between">
+                    <span>🥖 Stone Baked:</span>
+                    <span className="font-semibold text-foreground">{foodBreakdown.stoneBakedPizza}</span>
+                  </div>
+                )}
+                {!foodBreakdown.pizzas && !foodBreakdown.chips && !foodBreakdown.stoneBakedPizza && (
+                  <div className="text-xs">No food items detected</div>
+                )}
+              </>
+            ) : (
+              <div className="text-xs">Calculating breakdown...</div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
