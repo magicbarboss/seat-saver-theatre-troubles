@@ -1273,6 +1273,16 @@ const CheckInSystem = ({
       if (relatedBookings.length > 0) {
         const mainBooking = relatedBookings[0];
         const addOns = relatedBookings.slice(1);
+        
+        // Debug for Jill specifically
+        if (bookerName?.toLowerCase().includes('jill')) {
+          console.log('🎯 Found Jill booking group:', {
+            mainBooking: mainBooking.guest.item_details,
+            addOns: addOns.map(ao => ao.guest.item_details),
+            totalRelated: relatedBookings.length
+          });
+        }
+        
         bookingGroups.push({
           mainBooking: mainBooking.guest,
           addOns: addOns.map(rb => rb.guest),
