@@ -1315,10 +1315,12 @@ const CheckInSystem = ({
 
   // Statistics calculations - use actual guest data
   const getTotalGuests = () => {
-    if (!guests || guests.length === 0) return 0;
-    const guestTotal = guests.reduce((total, guest) => total + (guest.total_quantity || 1), 0);
+    // Use filtered bookings to match the current view/filter
+    const filteredGuestTotal = filteredBookings.reduce((total, booking) => 
+      total + (booking.mainBooking?.total_quantity || 1), 0
+    );
     const walkInTotal = walkInGuests.reduce((total, guest) => total + (guest.total_quantity || 0), 0);
-    return guestTotal + walkInTotal;
+    return filteredGuestTotal + walkInTotal;
   };
   const getCheckedInGuestsCount = () => {
     let count = 0;
@@ -1350,18 +1352,48 @@ const CheckInSystem = ({
     });
     return count;
   };
-  const getTotalPizzasNeeded = () => {
-    let totalPizzas = 0;
+  const getTotalFoodNeeded = () => {
+    let totalFood = 0;
+    
+    // Count food for ALL guests (not just checked-in)
     groupedBookings.forEach(booking => {
-      if (checkedInGuests.has(booking.originalIndex) && booking.mainBooking?.interval_pizza_order) {
-        const pizzaText = getPizzaInfo(booking.mainBooking);
-        const match = pizzaText.match(/(\d+)/);
-        if (match) {
-          totalPizzas += parseInt(match[1]);
+      if (!booking.mainBooking) return;
+      
+      const guest = booking.mainBooking;
+      const allTickets = getAllTicketTypes(guest);
+      
+      // Count pizzas
+      allTickets.forEach(({ type, quantity }) => {
+        const mapping = TICKET_TYPE_MAPPING[type];
+        if (mapping?.pizza && typeof mapping.pizza === 'number') {
+          totalFood += mapping.pizza * quantity;
+        }
+      });
+      
+      // Count chips/fries from extracted data
+      const combinedText = [
+        guest.item_details,
+        guest.notes, 
+        guest.booking_comments,
+        guest.ticket_data ? JSON.stringify(guest.ticket_data) : ''
+      ].filter(Boolean).join(' ').toLowerCase();
+      
+      // Look for chips/fries mentions
+      const chipsMatch = combinedText.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
+      if (chipsMatch) {
+        totalFood += parseInt(chipsMatch[1]);
+      }
+      
+      // Look for other food items that might be mentioned
+      if (combinedText.includes('stone baked garlic')) {
+        const pizzaMatch = combinedText.match(/(\d+)\s*stone\s*baked\s*garlic\s*pizza/i);
+        if (pizzaMatch) {
+          totalFood += parseInt(pizzaMatch[1]);
         }
       }
     });
-    return totalPizzas;
+    
+    return totalFood;
   };
   const getShowTimeStats = () => {
     const stats = {
@@ -1584,7 +1616,7 @@ const CheckInSystem = ({
 
       <CheckInActions onRefreshStatus={refreshStatus} onClearData={clearAllData} showClearDialog={showClearDialog} setShowClearDialog={setShowClearDialog} />
 
-      <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalPizzasNeeded()} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
+      <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalFoodNeeded()} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
 
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
