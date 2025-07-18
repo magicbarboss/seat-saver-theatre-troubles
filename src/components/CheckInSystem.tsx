@@ -548,11 +548,58 @@ const CheckInSystem = ({
     }
   };
 
+  // Extract addon orders from booking codes (like "3 glasses of prosecco", "Garlic Pizza", etc.)
+  const extractAddonOrders = (bookingCode: string): string[] => {
+    const addons: string[] = [];
+    
+    // Match patterns like "• 3 glasses of prosecco (2 included in the deal, 1 purchased)"
+    if (bookingCode.includes('prosecco')) {
+      const match = bookingCode.match(/(\d+)\s*glasses?\s*of\s*prosecco/i);
+      if (match) {
+        const quantity = parseInt(match[1]);
+        addons.push(`${quantity} Prosecco${quantity > 1 ? 's' : ''}`);
+      }
+    }
+    
+    // Match patterns like "• 3 portions of chips (1 included in the deal, 2 purchased)"
+    if (bookingCode.includes('chips') || bookingCode.includes('fries')) {
+      const match = bookingCode.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
+      if (match) {
+        const quantity = parseInt(match[1]);
+        addons.push(`${quantity} ${match[2].charAt(0).toUpperCase() + match[2].slice(1)}`);
+      }
+    }
+    
+    // Match pizza orders including "Garlic Pizza"
+    if (bookingCode.toLowerCase().includes('pizza')) {
+      if (bookingCode.toLowerCase().includes('garlic')) {
+        addons.push('Garlic Pizza');
+      } else {
+        const match = bookingCode.match(/(\d+)\s*.*?pizza/i);
+        if (match) {
+          const quantity = parseInt(match[1]);
+          addons.push(`${quantity} Pizza${quantity > 1 ? 's' : ''}`);
+        } else {
+          addons.push('Pizza');
+        }
+      }
+    }
+    
+    return addons;
+  };
+
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number): string => {
     // Use the provided total guest count for booking groups, or fallback to individual guest count
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
+    
+    // Check for addon orders from booking code first
+    const bookingCode = guest.booking_code || '';
+    const addonItems = extractAddonOrders(bookingCode);
+    if (addonItems.length > 0) {
+      return addonItems.join(', ');
+    }
     
     // Safe String Extractors - Check direct Status field first, then ticket_data
     const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
