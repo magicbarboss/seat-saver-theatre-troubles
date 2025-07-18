@@ -1360,55 +1360,90 @@ const CheckInSystem = ({
     };
     
     console.log('🍕 DEBUG: Calculating total food needed...');
+    console.log(`🍕 Processing ${groupedBookings.length} grouped bookings...`);
     
     // Count food for ALL guests (not just checked-in)
-    groupedBookings.forEach(booking => {
-      if (!booking.mainBooking) return;
+    groupedBookings.forEach((booking, bookingIndex) => {
+      if (!booking.mainBooking) {
+        console.log(`🚫 Skipping booking ${bookingIndex} - no mainBooking`);
+        return;
+      }
       
       const guest = booking.mainBooking;
+      console.log(`\n🍕 === PROCESSING GUEST ${guest.booker_name} ===`);
+      
+      // METHOD 1: Check ticket mappings
       const allTickets = getAllTicketTypes(guest);
+      console.log(`🎫 Found ${allTickets.length} tickets:`, allTickets);
       
-      console.log(`🍕 Guest ${guest.booker_name}: found ${allTickets.length} tickets:`, allTickets);
-      
-      // Count pizzas
       allTickets.forEach(({ type, quantity }) => {
         const mapping = TICKET_TYPE_MAPPING[type];
         if (mapping?.pizza?.quantity && typeof mapping.pizza.quantity === 'number') {
-          console.log(`🍕 Found pizza ticket: ${type} x${quantity} = ${mapping.pizza.quantity * quantity} pizzas`);
-          foodBreakdown.pizzas += mapping.pizza.quantity * quantity;
+          const pizzaCount = mapping.pizza.quantity * quantity;
+          console.log(`🍕 TICKET PIZZA: ${type} x${quantity} = ${pizzaCount} pizzas`);
+          foodBreakdown.pizzas += pizzaCount;
         }
       });
       
-      // Count chips/fries from extracted data
+      // METHOD 2: Check interval_pizza_order flag
+      if (guest.interval_pizza_order) {
+        console.log(`🍕 Guest has interval_pizza_order flag set`);
+        const pizzaInfo = getPizzaInfo(guest);
+        console.log(`🍕 Pizza info result: "${pizzaInfo}"`);
+        const match = pizzaInfo.match(/(\d+)/);
+        if (match) {
+          const flagPizzaCount = parseInt(match[1]);
+          console.log(`🍕 FLAG PIZZA: Found ${flagPizzaCount} pizzas from interval flag`);
+          foodBreakdown.pizzas += flagPizzaCount;
+        }
+      }
+      
+      // METHOD 3: Text analysis for additional food
       const combinedText = [
         guest.item_details,
         guest.notes, 
         guest.booking_comments,
         guest.ticket_data ? JSON.stringify(guest.ticket_data) : ''
-      ].filter(Boolean).join(' ').toLowerCase();
+      ].filter(Boolean).join(' ');
+      
+      console.log(`📝 Combined text for analysis: "${combinedText}"`);
       
       // Look for chips/fries mentions
       const chipsMatch = combinedText.match(/(\d+)\s*portions?\s*of\s*(chips|fries)/i);
       if (chipsMatch) {
         const chipsCount = parseInt(chipsMatch[1]);
-        console.log(`🍟 Found chips for ${guest.booker_name}: ${chipsCount}`);
+        console.log(`🍟 TEXT CHIPS: Found ${chipsCount} portions`);
         foodBreakdown.chips += chipsCount;
       }
       
-      // Look for other food items that might be mentioned
-      if (combinedText.includes('stone baked garlic')) {
-        const pizzaMatch = combinedText.match(/(\d+)\s*stone\s*baked\s*garlic\s*pizza/i);
+      // Look for stone baked garlic pizza mentions
+      const lowerText = combinedText.toLowerCase();
+      if (lowerText.includes('stone baked garlic')) {
+        const pizzaMatch = lowerText.match(/(\d+)\s*stone\s*baked\s*garlic\s*pizza/i);
         if (pizzaMatch) {
           const stonePizzaCount = parseInt(pizzaMatch[1]);
-          console.log(`🍕 Found stone baked garlic pizza for ${guest.booker_name}: ${stonePizzaCount}`);
+          console.log(`🍕 TEXT STONE PIZZA: Found ${stonePizzaCount} stone baked pizzas`);
           foodBreakdown.stoneBakedPizza += stonePizzaCount;
+        } else {
+          // If mentioned but no number, assume 1
+          console.log(`🍕 TEXT STONE PIZZA: Found stone baked mention (assuming 1)`);
+          foodBreakdown.stoneBakedPizza += 1;
         }
       }
+      
+      console.log(`🍕 Guest ${guest.booker_name} totals so far:`, {
+        pizzas: foodBreakdown.pizzas,
+        chips: foodBreakdown.chips, 
+        stoneBaked: foodBreakdown.stoneBakedPizza
+      });
     });
     
     const totalFood = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
-    console.log(`🍕 FOOD BREAKDOWN:`, foodBreakdown);
-    console.log(`🍕 TOTAL FOOD CALCULATED: ${totalFood}`);
+    console.log(`\n🍕 === FINAL FOOD BREAKDOWN ===`);
+    console.log(`🍕 Regular Pizzas: ${foodBreakdown.pizzas}`);
+    console.log(`🍟 Chips: ${foodBreakdown.chips}`);
+    console.log(`🍕 Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
+    console.log(`🍕 TOTAL FOOD ITEMS: ${totalFood}`);
     
     return {
       total: totalFood,
@@ -1636,7 +1671,18 @@ const CheckInSystem = ({
 
       <CheckInActions onRefreshStatus={refreshStatus} onClearData={clearAllData} showClearDialog={showClearDialog} setShowClearDialog={setShowClearDialog} />
 
-      <CheckInStats totalGuests={getTotalGuests()} checkedInCount={getCheckedInGuestsCount()} allocatedCount={getAllocatedGuestsCount()} totalPizzasNeeded={getTotalFoodNeeded().total} foodBreakdown={getTotalFoodNeeded().breakdown} showTimeStats={getShowTimeStats()} lastSaved={lastSaved} />
+      {(() => {
+        const foodData = getTotalFoodNeeded();
+        return <CheckInStats 
+          totalGuests={getTotalGuests()} 
+          checkedInCount={getCheckedInGuestsCount()} 
+          allocatedCount={getAllocatedGuestsCount()} 
+          totalPizzasNeeded={foodData.total} 
+          foodBreakdown={foodData.breakdown} 
+          showTimeStats={getShowTimeStats()} 
+          lastSaved={lastSaved} 
+        />;
+      })()}
 
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
