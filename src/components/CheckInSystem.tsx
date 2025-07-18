@@ -594,12 +594,9 @@ const CheckInSystem = ({
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Check for addon orders from booking code first
+    // Check for addon orders from booking code - we'll add these at the end
     const bookingCode = guest.booking_code || '';
     const addonItems = extractAddonOrders(bookingCode);
-    if (addonItems.length > 0) {
-      return addonItems.join(', ');
-    }
     
     // Safe String Extractors - Check direct Status field first, then ticket_data
     const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
@@ -692,6 +689,11 @@ const CheckInSystem = ({
       
       console.log(`🟢 GYG Detected for ${guest.booker_name}: ${guestCount} guests`);
       
+      // Add any addon items
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
+      
       return orderItems.join(', ');
     }
 
@@ -708,6 +710,11 @@ const CheckInSystem = ({
       if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
       
       console.log(`🔵 Viator Detected for ${guest.booker_name}: ${guestCount} guests`);
+      
+      // Add any addon items
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
       
       return orderItems.join(', ');
     }
@@ -792,6 +799,10 @@ const CheckInSystem = ({
       });
       
       if (orderItems.length > 0) {
+        // Add any addon items
+        if (addonItems.length > 0) {
+          orderItems.push(...addonItems);
+        }
         console.log(`✅ Explicit mapping result for ${guest.booker_name}: ${orderItems.join(', ')}`);
         return orderItems.join(', ');
       }
@@ -808,6 +819,10 @@ const CheckInSystem = ({
       if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
       
       console.log("✅ Fuzzy Prosecco Path:", guest.booker_name, orderItems.join(', '));
+      // Add any addon items
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
       return orderItems.join(', ');
     }
 
@@ -821,6 +836,10 @@ const CheckInSystem = ({
       if (friesQuantity > 0) orderItems.push(`${friesQuantity} Fries`);
       
       console.log("✅ Fuzzy Pints Path:", guest.booker_name, orderItems.join(', '));
+      // Add any addon items
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
       return orderItems.join(', ');
     }
 
@@ -834,11 +853,20 @@ const CheckInSystem = ({
       if (loadedFriesQuantity > 0) orderItems.push(`${loadedFriesQuantity} Loaded Fries`);
       
       console.log("✅ Fuzzy Cocktail Path:", guest.booker_name, orderItems.join(', '));
+      // Add any addon items
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
       return orderItems.join(', ');
     }
 
     // Step 6: Default fallback
     console.log("⚠️ No valid path found for", guest.booker_name, "- using fallback");
+    
+    // Always add addon items at the end if they exist
+    if (addonItems.length > 0) {
+      orderItems.push(...addonItems);
+    }
     
     return orderItems.length > 0 ? orderItems.join(', ') : 'Show ticket only';
   };
