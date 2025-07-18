@@ -553,11 +553,12 @@ const CheckInSystem = ({
     const addons: string[] = [];
     
     // Debug logging for Jill
-    if (mainGuest.booker_name?.includes('Jill')) {
+    if (mainGuest.booker_name?.toLowerCase().includes('jill')) {
       console.log('🔍 Jill Addon Debug:', {
         mainGuest: mainGuest.item_details,
         addOnGuests: addOnGuests.map(g => g.item_details),
-        addOnCount: addOnGuests.length
+        addOnCount: addOnGuests.length,
+        bookingCode: mainGuest.booking_code
       });
     }
     
