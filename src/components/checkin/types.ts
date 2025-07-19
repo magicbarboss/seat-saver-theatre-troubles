@@ -11,6 +11,7 @@ export interface Guest {
   interval_drinks_order?: boolean;
   diet_info?: string;
   magic_info?: string;
+  manual_override?: boolean;
 }
 
 export interface CheckInSystemProps {
