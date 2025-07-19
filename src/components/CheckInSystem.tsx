@@ -1394,7 +1394,8 @@ const CheckInSystem = ({
         
         if (key.toLowerCase().includes('drinks') && value && value !== '') {
           const numValue = parseInt(String(value)) || 1;
-          console.log(`   🥤 FOUND DRINKS: ${key} = ${value} (parsed as ${numValue})`);
+          console.log(`   🥤 FOUND DRINKS: Guest ${guest.booker_name} - ${key} = ${value} (parsed as ${numValue})`);
+          console.log(`   Full ticket data for ${guest.booker_name}:`, guest.ticket_data);
           foodBreakdown.drinks += numValue;
         }
       });
