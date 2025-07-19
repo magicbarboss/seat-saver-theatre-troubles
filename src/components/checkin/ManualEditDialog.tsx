@@ -77,6 +77,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         show_time: formData.show_time,
         diet_info: formData.diet_info || null,
         magic_info: formData.magic_info || null,
+        manual_override: true, // Flag to prevent automatic processing override
       };
 
       // If a ticket type was selected, update the ticket_data

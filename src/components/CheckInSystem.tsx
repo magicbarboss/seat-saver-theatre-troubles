@@ -611,6 +611,22 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
+    // If guest has manual override, use a simpler display based on extracted tickets
+    if (guest.manual_override) {
+      console.log(`🔧 Manual override detected for ${guest.booker_name}, using extracted tickets display`);
+      const extractedTickets = guest.ticket_data?.extracted_tickets || {};
+      const ticketEntries = Object.entries(extractedTickets);
+      
+      if (ticketEntries.length > 0) {
+        return ticketEntries
+          .map(([ticketType, quantity]) => `${ticketType} (×${quantity})`)
+          .join(', ');
+      }
+      
+      // Fallback to item_details if no extracted tickets
+      return guest.item_details || 'No ticket information';
+    }
+
     // Use the provided total guest count for booking groups, or fallback to individual guest count
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];

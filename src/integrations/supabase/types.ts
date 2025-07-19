@@ -111,6 +111,7 @@ export type Database = {
           is_seated: boolean | null
           item_details: string | null
           magic_info: string | null
+          manual_override: boolean | null
           notes: string | null
           original_row_index: number | null
           pager_number: number | null
@@ -135,6 +136,7 @@ export type Database = {
           is_seated?: boolean | null
           item_details?: string | null
           magic_info?: string | null
+          manual_override?: boolean | null
           notes?: string | null
           original_row_index?: number | null
           pager_number?: number | null
@@ -159,6 +161,7 @@ export type Database = {
           is_seated?: boolean | null
           item_details?: string | null
           magic_info?: string | null
+          manual_override?: boolean | null
           notes?: string | null
           original_row_index?: number | null
           pager_number?: number | null
