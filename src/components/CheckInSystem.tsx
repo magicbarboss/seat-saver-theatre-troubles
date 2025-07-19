@@ -1356,7 +1356,8 @@ const CheckInSystem = ({
     const foodBreakdown = {
       pizzas: 0,
       chips: 0,
-      stoneBakedPizza: 0
+      stoneBakedPizza: 0,
+      drinks: 0
     };
     
     console.log('\n🍕 === STARTING FOOD CALCULATION ===');
@@ -1390,6 +1391,12 @@ const CheckInSystem = ({
           console.log(`   🍟 FOUND CHIPS: ${key} = ${value} (parsed as ${numValue})`);
           foodBreakdown.chips += numValue;
         }
+        
+        if (key.toLowerCase().includes('drinks') && value && value !== '') {
+          const numValue = parseInt(String(value)) || 1;
+          console.log(`   🥤 FOUND DRINKS: ${key} = ${value} (parsed as ${numValue})`);
+          foodBreakdown.drinks += numValue;
+        }
       });
       
       // Also check interval_pizza_order flag
@@ -1398,15 +1405,16 @@ const CheckInSystem = ({
         foodBreakdown.pizzas += 1;
       }
       
-      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}`);
+      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}, Drinks=${foodBreakdown.drinks}`);
     });
     
-    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
+    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza + foodBreakdown.drinks;
     
     console.log('\n🍕 === FINAL FOOD TOTALS ===');
     console.log(`Regular Pizzas: ${foodBreakdown.pizzas}`);
     console.log(`Chips: ${foodBreakdown.chips}`);
     console.log(`Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
+    console.log(`Drinks: ${foodBreakdown.drinks}`);
     console.log(`TOTAL: ${total}`);
     console.log('================================\n');
     
