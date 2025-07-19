@@ -11,7 +11,6 @@ interface CheckInStatsProps {
     pizzas: number;
     chips: number;
     stoneBakedPizza: number;
-    drinks: number;
   };
   showTimeStats: { [key: string]: number };
   lastSaved: Date;
@@ -96,13 +95,7 @@ export const CheckInStats = ({
                     <span className="font-semibold text-foreground">{foodBreakdown.stoneBakedPizza}</span>
                   </div>
                 )}
-                {foodBreakdown.drinks > 0 && (
-                  <div className="flex justify-between">
-                    <span>🥤 Drinks:</span>
-                    <span className="font-semibold text-foreground">{foodBreakdown.drinks}</span>
-                  </div>
-                )}
-                {!foodBreakdown.pizzas && !foodBreakdown.chips && !foodBreakdown.stoneBakedPizza && !foodBreakdown.drinks && (
+                {!foodBreakdown.pizzas && !foodBreakdown.chips && !foodBreakdown.stoneBakedPizza && (
                   <div className="text-xs">No food items detected</div>
                 )}
               </>

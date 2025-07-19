@@ -1356,8 +1356,8 @@ const CheckInSystem = ({
     const foodBreakdown = {
       pizzas: 0,
       chips: 0,
-      stoneBakedPizza: 0,
-      drinks: 0
+      stoneBakedPizza: 0
+      // Removed drinks - causing confusion with ticket names
     };
     
     console.log('\n🍕 === STARTING FOOD CALCULATION ===');
@@ -1399,13 +1399,7 @@ const CheckInSystem = ({
           foodBreakdown.chips += numValue;
         }
         
-        // Only count actual drink line items, not ticket names containing "drink"
-        const keyLower = key.toLowerCase();
-        if ((keyLower.match(/^\d+\s*drinks?$/) || keyLower.match(/^drinks?\s*\d+$/) || keyLower === 'drinks' || keyLower === 'drink') && value && value !== '') {
-          const numValue = parseInt(String(value)) || 1;
-          console.log(`   🥤 FOUND DRINKS: Guest ${guest.booker_name} - ${key} = ${value} (parsed as ${numValue})`);
-          foodBreakdown.drinks += numValue;
-        }
+        // Removed drinks detection - was causing confusion with ticket names containing "drink"
       });
       
       // Also check interval_pizza_order flag
@@ -1414,16 +1408,15 @@ const CheckInSystem = ({
         foodBreakdown.pizzas += 1;
       }
       
-      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}, Drinks=${foodBreakdown.drinks}`);
+      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}`);
     });
     
-    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza + foodBreakdown.drinks;
+    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
     
     console.log('\n🍕 === FINAL FOOD TOTALS ===');
     console.log(`Regular Pizzas: ${foodBreakdown.pizzas}`);
     console.log(`Chips: ${foodBreakdown.chips}`);
     console.log(`Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
-    console.log(`Drinks: ${foodBreakdown.drinks}`);
     console.log(`TOTAL: ${total}`);
     console.log('================================\n');
     

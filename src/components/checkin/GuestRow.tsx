@@ -153,28 +153,7 @@ export const GuestRow = ({
                       </p>
                     </div>
                   )}
-                  {packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0) && (
-                    <div>
-                      <h4 className="font-medium">Additional Info:</h4>
-                      {packageDetails.map((pkg, idx) => (
-                        pkg.details.length > 0 && (
-                          <div key={idx} className="space-y-1">
-                            <div className="text-sm font-medium text-muted-foreground">
-                              {pkg.type} {pkg.quantity > 1 && `(×${pkg.quantity})`}
-                            </div>
-                            <ul className="space-y-1">
-                              {pkg.details.map((detail, detailIdx) => (
-                                <li key={detailIdx} className="text-sm flex items-center gap-1">
-                                  <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
-                                  {detail}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  )}
+                  {/* Remove package details display - it's showing irrelevant info */}
                 </div>
               </PopoverContent>
             </Popover>
