@@ -611,6 +611,12 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
+    // Debug: Check if manual override exists and is working
+    console.log(`🔧 DEBUG: Guest ${guest.booker_name} manual_override status:`, {
+      hasManualOverride: guest.manual_override,
+      guestObject: guest
+    });
+    
     // If guest has manual override, use a simpler display based on extracted tickets
     if (guest.manual_override) {
       console.log(`🔧 Manual override detected for ${guest.booker_name}, using extracted tickets display`);
