@@ -1369,6 +1369,13 @@ const CheckInSystem = ({
       const guest = booking.mainBooking;
       console.log(`\n${index + 1}. GUEST: ${guest.booker_name}`);
       
+      // Debug Alex specifically
+      if (guest.booker_name?.toLowerCase().includes('alex')) {
+        console.log(`🔍 ALEX DEBUG - magic_info:`, guest.magic_info);
+        console.log(`🔍 ALEX DEBUG - diet_info:`, guest.diet_info);
+        console.log(`🔍 ALEX DEBUG - full guest data:`, guest);
+      }
+      
       // Check if guest has pizza tickets in their ticket data
       const ticketData = guest.ticket_data || {};
       console.log('   Ticket data keys:', Object.keys(ticketData));
