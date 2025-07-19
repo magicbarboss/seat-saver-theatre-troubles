@@ -1392,10 +1392,11 @@ const CheckInSystem = ({
           foodBreakdown.chips += numValue;
         }
         
-        if (key.toLowerCase().includes('drinks') && value && value !== '') {
+        // Only count actual drink line items, not ticket names containing "drink"
+        const keyLower = key.toLowerCase();
+        if ((keyLower.match(/^\d+\s*drinks?$/) || keyLower.match(/^drinks?\s*\d+$/) || keyLower === 'drinks' || keyLower === 'drink') && value && value !== '') {
           const numValue = parseInt(String(value)) || 1;
           console.log(`   🥤 FOUND DRINKS: Guest ${guest.booker_name} - ${key} = ${value} (parsed as ${numValue})`);
-          console.log(`   Full ticket data for ${guest.booker_name}:`, guest.ticket_data);
           foodBreakdown.drinks += numValue;
         }
       });
