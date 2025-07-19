@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles } from 'lucide-react';
+import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit } from 'lucide-react';
 
 interface Guest {
   [key: string]: any;
@@ -47,6 +47,7 @@ interface GuestRowProps {
   onTableAllocate: (index: number) => void;
   onSeat: (index: number) => void;
   onComment: (index: number) => void;
+  onManualEdit?: (index: number) => void;
 }
 
 export const GuestRow = ({
@@ -66,7 +67,8 @@ export const GuestRow = ({
   onPagerAction,
   onTableAllocate,
   onSeat,
-  onComment
+  onComment,
+  onManualEdit
 }: GuestRowProps) => {
   const guestName = guest.booker_name || 'Unknown Guest';
   const guestCount = guest.total_quantity || 1;
@@ -105,6 +107,17 @@ export const GuestRow = ({
           <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
             {orderSummary}
           </div>
+          {onManualEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onManualEdit(index)}
+              className="h-6 w-6 p-0"
+              title="Edit guest details"
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
+          )}
           
           {/* Diet Info Badge */}
           {guest.diet_info && (

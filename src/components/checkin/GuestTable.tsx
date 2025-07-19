@@ -52,6 +52,7 @@ interface GuestTableProps {
   onTableAllocate: (index: number) => void;
   onSeat: (index: number) => void;
   onComment: (index: number) => void;
+  onManualEdit?: (index: number) => void;
 }
 
 export const GuestTable = ({
@@ -71,7 +72,8 @@ export const GuestTable = ({
   onPagerAction,
   onTableAllocate,
   onSeat,
-  onComment
+  onComment,
+  onManualEdit
 }: GuestTableProps) => {
   // Helper function to get party info for a guest
   const getPartyInfo = (guestIndex: number) => {
@@ -122,6 +124,7 @@ export const GuestTable = ({
             onTableAllocate={onTableAllocate}
             onSeat={onSeat}
             onComment={onComment}
+            onManualEdit={onManualEdit}
           />
         ))}
         
@@ -146,6 +149,7 @@ export const GuestTable = ({
               onTableAllocate={onTableAllocate}
               onSeat={onSeat}
               onComment={onComment}
+              onManualEdit={onManualEdit}
             />
           );
         })}

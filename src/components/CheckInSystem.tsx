@@ -16,6 +16,7 @@ import { CheckInActions } from './checkin/CheckInActions';
 import { WalkInGuestForm } from './checkin/WalkInGuestForm';
 import { GuestTable } from './checkin/GuestTable';
 import { SeatingManagement } from './seating/SeatingManagement';
+import { ManualEditDialog } from './checkin/ManualEditDialog';
 
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
 const CheckInSystem = ({
@@ -48,6 +49,8 @@ const CheckInSystem = ({
   const [walkInGuests, setWalkInGuests] = useState<Guest[]>([]);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [selectedGuestForComment, setSelectedGuestForComment] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedGuestForEdit, setSelectedGuestForEdit] = useState<Guest | null>(null);
   const [commentText, setCommentText] = useState('');
 
   // Initialize show filter
@@ -1491,6 +1494,43 @@ const CheckInSystem = ({
     setCommentText(bookingComments.get(guestIndex) || '');
     setCommentDialogOpen(true);
   };
+
+  const handleManualEdit = (guestIndex: number) => {
+    const guest = guests[guestIndex];
+    if (guest) {
+      setSelectedGuestForEdit(guest);
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveManualEdit = async (guestId: string, updates: Partial<Guest>) => {
+    try {
+      const { error } = await supabase
+        .from('guests')
+        .update(updates)
+        .eq('id', guestId);
+
+      if (error) throw error;
+
+      // Update local state
+      const guestIndex = guests.findIndex(g => g.id === guestId);
+      if (guestIndex !== -1) {
+        guests[guestIndex] = { ...guests[guestIndex], ...updates };
+      }
+
+      toast({
+        title: "Guest Updated",
+        description: "Guest information has been corrected successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating guest:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update guest information.",
+        variant: "destructive",
+      });
+    }
+  };
   const handleAddWalkIn = (walkInData: {
     name: string;
     count: number;
@@ -1691,7 +1731,7 @@ const CheckInSystem = ({
 
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getOrderSummary={getOrderSummary} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} />
+            <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getOrderSummary={getOrderSummary} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} onManualEdit={handleManualEdit} />
           </div>
         </TabsContent>
 
@@ -1789,6 +1829,14 @@ const CheckInSystem = ({
             </div>}
         </DialogContent>
       </Dialog>
+
+      {/* Manual Edit Dialog */}
+      <ManualEditDialog
+        isOpen={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        guest={selectedGuestForEdit}
+        onSave={handleSaveManualEdit}
+      />
     </div>;
 };
 export default CheckInSystem;
