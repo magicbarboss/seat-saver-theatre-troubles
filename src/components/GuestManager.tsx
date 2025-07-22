@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +14,6 @@ interface GuestList {
   uploaded_at: string;
   uploaded_by: string;
   is_active: boolean;
-  event_date?: string;
 }
 
 interface Guest {
@@ -278,7 +278,6 @@ const GuestManager = () => {
           headers={headers}
           showTimes={showTimes}
           guestListId={activeGuestList.id}
-          eventDate={activeGuestList.event_date}
         />
       </div>
     );
