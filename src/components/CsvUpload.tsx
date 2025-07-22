@@ -573,6 +573,20 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     const eventDate = file ? extractDateFromFilename(file.name) : null;
     const defaultName = file ? file.name.replace(/\.(csv|xlsx)$/i, '') : `Guest List ${new Date().toLocaleDateString()}`;
 
+    // FIXED: Format date using timezone-neutral method to prevent day offset
+    const formatDateForStorage = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    console.log(`🔧 FIXED - Date storage formatting:`, {
+      originalDate: eventDate?.toDateString() || 'None',
+      formattedForStorage: eventDate ? formatDateForStorage(eventDate) : 'None',
+      dayOfWeek: eventDate ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][eventDate.getDay()] : 'N/A'
+    });
+
     // Check for existing guest list with the same name to prevent duplicates
     const { data: existingLists } = await supabase
       .from('guest_lists')
@@ -594,7 +608,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       .insert({
         uploaded_by: user.id,
         name: guestListName || defaultName,
-        event_date: eventDate?.toISOString().split('T')[0] || null
+        event_date: eventDate ? formatDateForStorage(eventDate) : null
       })
       .select()
       .single();
