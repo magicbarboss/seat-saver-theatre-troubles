@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { extractShowTimeFromText, normalizeShowTime, isValidShowTime } from '@/utils/showTimeExtractor';
 
 interface ProcessedGuest {
   booking_code?: string;
@@ -80,6 +80,40 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     });
     
     return ticketData;
+  }, []);
+
+  const processGuestShowTime = useCallback((guest: ProcessedGuest): ProcessedGuest => {
+    // If show_time is already populated and valid, keep it
+    if (guest.show_time && isValidShowTime(guest.show_time)) {
+      guest.show_time = normalizeShowTime(guest.show_time);
+      return guest;
+    }
+    
+    // Try to extract show time from item_details
+    if (guest.item_details) {
+      const extractedTime = extractShowTimeFromText(guest.item_details);
+      if (extractedTime) {
+        guest.show_time = extractedTime;
+        console.log(`📅 Extracted show time "${extractedTime}" from item details: "${guest.item_details}"`);
+      }
+    }
+    
+    // Try to extract from any other text fields as fallback
+    if (!guest.show_time) {
+      const fieldsToCheck = [guest.notes, guest.booking_comments];
+      for (const field of fieldsToCheck) {
+        if (field) {
+          const extractedTime = extractShowTimeFromText(field);
+          if (extractedTime) {
+            guest.show_time = extractedTime;
+            console.log(`📅 Extracted show time "${extractedTime}" from field: "${field}"`);
+            break;
+          }
+        }
+      }
+    }
+    
+    return guest;
   }, []);
 
   const processExcelFile = useCallback(async (file: File) => {
@@ -187,13 +221,16 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               }
             });
             
-            return guest;
+            // Process show time extraction after all fields are populated
+            const processedGuest = processGuestShowTime(guest);
+            
+            return processedGuest;
           }).filter(guest => 
             guest.booker_name || guest.booking_code || Object.keys(guest.ticket_data || {}).length > 0
           );
           
           console.log(`✅ Successfully processed ${processedGuests.length} guests from Excel`);
-          console.log('👥 Sample processed guests:', processedGuests.slice(0, 3));
+          console.log('👥 Sample processed guests with show times:', processedGuests.slice(0, 3));
           
           resolve(processedGuests);
         } catch (error) {
@@ -205,7 +242,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       reader.onerror = () => reject(new Error('Failed to read Excel file'));
       reader.readAsArrayBuffer(file);
     });
-  }, [extractTicketData]);
+  }, [extractTicketData, processGuestShowTime]);
 
   const processCsvFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
@@ -261,8 +298,14 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
                 }
               });
               
-              return guest;
+              // Process show time extraction after all fields are populated
+              const processedGuest = processGuestShowTime(guest);
+              
+              return processedGuest;
             }).filter(guest => guest.booker_name || guest.booking_code);
+            
+            console.log(`✅ Successfully processed ${processedGuests.length} guests from CSV`);
+            console.log('👥 Sample processed guests with show times:', processedGuests.slice(0, 3));
             
             resolve(processedGuests);
           } catch (error) {
@@ -272,7 +315,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
         error: (error) => reject(error)
       });
     });
-  }, [extractTicketData]);
+  }, [extractTicketData, processGuestShowTime]);
 
   const uploadGuests = async (guests: ProcessedGuest[]) => {
     if (!user?.id) {
