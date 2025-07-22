@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +23,19 @@ interface ProcessedGuest {
   original_row_index?: number;
 }
 
-const CsvUpload = () => {
+interface GuestList {
+  id: string;
+  name: string;
+  uploaded_at: string;
+  uploaded_by: string;
+  is_active: boolean;
+}
+
+interface CsvUploadProps {
+  onGuestListCreated?: (guestList: GuestList) => void;
+}
+
+const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
@@ -144,12 +157,32 @@ const CsvUpload = () => {
                   // Ensure total_quantity is a number
                   const numValue = typeof value === 'string' ? parseInt(value, 10) : Number(value);
                   if (!isNaN(numValue) && numValue > 0) {
-                    guest[field as keyof ProcessedGuest] = numValue as any;
+                    guest.total_quantity = numValue;
                   } else {
-                    guest[field as keyof ProcessedGuest] = 1 as any; // Default to 1 if invalid
+                    guest.total_quantity = 1; // Default to 1 if invalid
                   }
                 } else {
-                  guest[field as keyof ProcessedGuest] = String(value) as any;
+                  // Type-safe assignment for other fields
+                  switch (field) {
+                    case 'booking_code':
+                      guest.booking_code = String(value);
+                      break;
+                    case 'booker_name':
+                      guest.booker_name = String(value);
+                      break;
+                    case 'show_time':
+                      guest.show_time = String(value);
+                      break;
+                    case 'item_details':
+                      guest.item_details = String(value);
+                      break;
+                    case 'notes':
+                      guest.notes = String(value);
+                      break;
+                    case 'booking_comments':
+                      guest.booking_comments = String(value);
+                      break;
+                  }
                 }
               }
             });
@@ -201,9 +234,29 @@ const CsvUpload = () => {
                 if (value && value.trim() !== '') {
                   if (field === 'total_quantity') {
                     const numValue = parseInt(value.trim(), 10);
-                    guest[field as keyof ProcessedGuest] = isNaN(numValue) ? 1 : numValue as any;
+                    guest.total_quantity = isNaN(numValue) ? 1 : numValue;
                   } else {
-                    guest[field as keyof ProcessedGuest] = value.trim() as any;
+                    // Type-safe assignment for other fields
+                    switch (field) {
+                      case 'booking_code':
+                        guest.booking_code = value.trim();
+                        break;
+                      case 'booker_name':
+                        guest.booker_name = value.trim();
+                        break;
+                      case 'show_time':
+                        guest.show_time = value.trim();
+                        break;
+                      case 'item_details':
+                        guest.item_details = value.trim();
+                        break;
+                      case 'notes':
+                        guest.notes = value.trim();
+                        break;
+                      case 'booking_comments':
+                        guest.booking_comments = value.trim();
+                        break;
+                    }
                   }
                 }
               });
@@ -285,13 +338,18 @@ const CsvUpload = () => {
         throw new Error('No valid guest data found in the file');
       }
 
-      await uploadGuests(guests);
+      const guestList = await uploadGuests(guests);
       
       setUploadComplete(true);
       toast({
         title: "Upload successful",
         description: `Successfully uploaded ${guests.length} guests`
       });
+
+      // Call the callback if provided
+      if (onGuestListCreated) {
+        onGuestListCreated(guestList);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       toast({
