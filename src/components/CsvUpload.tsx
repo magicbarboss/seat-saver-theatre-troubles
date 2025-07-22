@@ -620,9 +620,25 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       guest_list_id: guestList.id
     }));
 
+    // Check for and remove duplicates based on booking_code + booker_name combination
+    const uniqueGuests = [];
+    const seenCombinations = new Set();
+    
+    for (const guest of guestsWithListId) {
+      const key = `${guest.booking_code || 'NO_CODE'}-${guest.booker_name || 'NO_NAME'}`;
+      if (!seenCombinations.has(key)) {
+        seenCombinations.add(key);
+        uniqueGuests.push(guest);
+      } else {
+        console.warn(`🚫 Duplicate detected and skipped: ${guest.booker_name} (${guest.booking_code})`);
+      }
+    }
+
+    console.log(`📝 Uploading ${uniqueGuests.length} unique guests (${guestsWithListId.length - uniqueGuests.length} duplicates filtered)`);
+
     const { error: guestsError } = await supabase
       .from('guests')
-      .insert(guestsWithListId);
+      .insert(uniqueGuests);
 
     if (guestsError) throw guestsError;
 
