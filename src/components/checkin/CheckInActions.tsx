@@ -1,20 +1,35 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { RotateCcw, Trash2, AlertTriangle, Save } from 'lucide-react';
+import { RotateCcw, Trash2, AlertTriangle, Link } from 'lucide-react';
+import { ManualLinkDialog } from './ManualLinkDialog';
+import { BookingGroup } from './types';
 
 interface CheckInActionsProps {
   onRefreshStatus: () => void;
   onClearData: () => void;
   showClearDialog: boolean;
   setShowClearDialog: (show: boolean) => void;
+  bookingGroups: BookingGroup[];
+  checkedInGuests: Set<number>;
+  manualLinks: Map<string, number[]>;
+  onCreateManualLink: (guestIndices: number[]) => void;
+  onRemoveManualLink: (linkId: string) => void;
+  extractGuestName: (name: string) => string;
 }
 
 export const CheckInActions = ({
   onRefreshStatus,
   onClearData,
   showClearDialog,
-  setShowClearDialog
+  setShowClearDialog,
+  bookingGroups,
+  checkedInGuests,
+  manualLinks,
+  onCreateManualLink,
+  onRemoveManualLink,
+  extractGuestName
 }: CheckInActionsProps) => {
   return (
     <div className="flex gap-2 mb-4">
@@ -27,6 +42,15 @@ export const CheckInActions = ({
         <RotateCcw className="h-4 w-4" />
         Refresh Status
       </Button>
+
+      <ManualLinkDialog
+        bookingGroups={bookingGroups}
+        checkedInGuests={checkedInGuests}
+        manualLinks={manualLinks}
+        onCreateLink={onCreateManualLink}
+        onRemoveLink={onRemoveManualLink}
+        extractGuestName={extractGuestName}
+      />
 
       <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <DialogTrigger asChild>
@@ -56,6 +80,7 @@ export const CheckInActions = ({
               <li>Pager assignments</li>
               <li>Seating information</li>
               <li>Party connections</li>
+              <li>Manual guest links</li>
               <li>Walk-in guests</li>
               <li>Comments</li>
             </ul>

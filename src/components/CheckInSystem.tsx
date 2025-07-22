@@ -19,6 +19,7 @@ import { SeatingManagement } from './seating/SeatingManagement';
 import { ManualEditDialog } from './checkin/ManualEditDialog';
 
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
+
 const CheckInSystem = ({
   guests,
   headers,
@@ -52,6 +53,9 @@ const CheckInSystem = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedGuestForEdit, setSelectedGuestForEdit] = useState<Guest | null>(null);
   const [commentText, setCommentText] = useState('');
+  
+  // Add manual links state
+  const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
 
   // Initialize show filter
   useEffect(() => {
@@ -60,7 +64,31 @@ const CheckInSystem = ({
     }
   }, [showTimes, showFilter]);
 
-  // Clear all data function
+  // Manual link handlers
+  const handleCreateManualLink = (guestIndices: number[]) => {
+    const linkId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newLinks = new Map(manualLinks);
+    newLinks.set(linkId, guestIndices);
+    setManualLinks(newLinks);
+
+    toast({
+      title: "✨ Guests Linked",
+      description: `Created manual link for ${guestIndices.length} guests`
+    });
+  };
+
+  const handleRemoveManualLink = (linkId: string) => {
+    const newLinks = new Map(manualLinks);
+    newLinks.delete(linkId);
+    setManualLinks(newLinks);
+
+    toast({
+      title: "🔗 Link Removed",
+      description: "Manual guest link has been removed"
+    });
+  };
+
+  // Clear all data function - updated to include manual links
   const clearAllData = async () => {
     if (!user?.id) return;
     try {
@@ -74,6 +102,7 @@ const CheckInSystem = ({
       setPartyGroups(new Map());
       setFriendshipGroups(new Map());
       setBookingComments(new Map());
+      setManualLinks(new Map()); // Clear manual links
       setWalkInGuests([]);
       setSessionDate(new Date().toDateString());
       setShowClearDialog(false);
@@ -197,7 +226,6 @@ const CheckInSystem = ({
       try {
         const today = new Date().toISOString().split('T')[0];
 
-        // Try to load session for this specific guest list
         const {
           data: currentSession,
           error
@@ -221,6 +249,11 @@ const CheckInSystem = ({
           setFriendshipGroups(new Map(Object.entries((currentSession as any).friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
           setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
           setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
+          
+          // Load manual links
+          const manualLinksData = (currentSession as any).manual_links || {};
+          setManualLinks(new Map(Object.entries(manualLinksData).map(([k, v]) => [k, v as number[]])));
+          
           setSessionDate(today);
           const savedDataCount = (currentSession.checked_in_guests || []).length;
           if (savedDataCount > 0) {
@@ -266,7 +299,7 @@ const CheckInSystem = ({
     };
   }, [user?.id, guestListId, guests?.length]);
 
-  // Auto-save to Supabase
+  // Auto-save to Supabase - updated to include manual links
   useEffect(() => {
     if (!isInitialized || !user?.id) return;
     const saveState = async () => {
@@ -285,7 +318,8 @@ const CheckInSystem = ({
           party_groups: Object.fromEntries(partyGroups) as any,
           friendship_groups: Object.fromEntries(friendshipGroups) as any,
           booking_comments: Object.fromEntries(bookingComments) as any,
-          walk_in_guests: walkInGuests as any
+          walk_in_guests: walkInGuests as any,
+          manual_links: Object.fromEntries(manualLinks) as any // Add manual links to save
         };
         const {
           error
@@ -304,7 +338,7 @@ const CheckInSystem = ({
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, walkInGuests]);
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, walkInGuests, manualLinks]); // Add manualLinks to dependency
 
   // Extract guest name utility
   const extractGuestName = (bookerName: string) => {
@@ -1706,7 +1740,18 @@ const CheckInSystem = ({
         <p className="text-gray-600 mt-1">Simple guest management with pager assignment</p>
       </div>
 
-      <CheckInActions onRefreshStatus={refreshStatus} onClearData={clearAllData} showClearDialog={showClearDialog} setShowClearDialog={setShowClearDialog} />
+      <CheckInActions 
+        onRefreshStatus={refreshStatus} 
+        onClearData={clearAllData} 
+        showClearDialog={showClearDialog} 
+        setShowClearDialog={setShowClearDialog}
+        bookingGroups={groupedBookings}
+        checkedInGuests={checkedInGuests}
+        manualLinks={manualLinks}
+        onCreateManualLink={handleCreateManualLink}
+        onRemoveManualLink={handleRemoveManualLink}
+        extractGuestName={extractGuestName}
+      />
 
       {(() => {
         const foodData = getTotalFoodNeeded();
