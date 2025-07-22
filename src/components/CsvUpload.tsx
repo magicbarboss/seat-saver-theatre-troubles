@@ -90,58 +90,49 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
             return;
           }
           
-          // Find the header row by looking for key header indicators
-          let headerRowIndex = -1;
-          for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
-            const row = jsonData[i] as any[];
-            if (row && row.some(cell => {
-              const cellText = String(cell || '').toLowerCase();
-              return cellText.includes('booker') || 
-                     cellText.includes('booking') ||
-                     cellText.includes('ticket') ||
-                     cellText.includes('item') ||
-                     cellText.includes('guests') ||
-                     cellText.includes('code');
-            })) {
-              headerRowIndex = i;
-              console.log('Found header row at index:', i, 'with data:', row);
-              break;
-            }
-          }
-          
-          // If no header found, try the default row 4 (index 3)
-          if (headerRowIndex === -1) {
-            headerRowIndex = 3;
-            console.log('No header row found, using default index 3');
-          }
+          // Use row 4 (index 3) as header row as specified by user
+          const headerRowIndex = 3;
           
           if (jsonData.length <= headerRowIndex) {
-            setParsingError('Not enough rows in the Excel file after header detection');
+            setParsingError('Excel file does not have enough rows - expected headers in row 4');
             return;
           }
           
-          const headers = (jsonData[headerRowIndex] as string[])
-            .map(header => String(header || '').trim())
-            .filter(header => header !== ''); // Remove empty headers
+          const rawHeaders = (jsonData[headerRowIndex] as any[]) || [];
+          console.log('Raw headers from row 4:', rawHeaders);
           
-          console.log('Processed headers:', headers);
+          // Process headers and filter out "Total" column and empty headers
+          const headers: string[] = [];
+          const validColumnIndices: number[] = [];
           
+          rawHeaders.forEach((header, index) => {
+            const headerStr = String(header || '').trim();
+            if (headerStr !== '' && headerStr.toLowerCase() !== 'total') {
+              headers.push(headerStr);
+              validColumnIndices.push(index);
+            }
+          });
+          
+          console.log('Processed headers (excluding Total):', headers);
+          console.log('Valid column indices:', validColumnIndices);
+          
+          // Extract data rows starting from row 5 (after header row 4)
           const rows = jsonData.slice(headerRowIndex + 1)
             .filter(row => {
-              if (!row || (row as any[]).length === 0) return false;
-              // Check if row has meaningful data (not just empty cells)
-              const meaningfulCells = (row as any[]).filter(cell => 
-                String(cell || '').trim() !== ''
-              );
-              return meaningfulCells.length > 2; // At least 3 non-empty cells
+              if (!row || !Array.isArray(row)) return false;
+              // Check if row has meaningful data in the valid columns
+              const meaningfulCells = validColumnIndices.filter(colIndex => {
+                const cellValue = row[colIndex];
+                return cellValue !== null && cellValue !== undefined && String(cellValue).trim() !== '';
+              });
+              return meaningfulCells.length >= 2; // At least 2 non-empty cells in valid columns
             })
             .map(row => {
-              const processedRow = (row as any[]).map(cell => String(cell || '').trim());
-              // Pad row to match header length
-              while (processedRow.length < headers.length) {
-                processedRow.push('');
-              }
-              return processedRow.slice(0, headers.length); // Trim to header length
+              // Extract only the valid columns (excluding Total column)
+              return validColumnIndices.map(colIndex => {
+                const cellValue = row[colIndex];
+                return String(cellValue || '').trim();
+              });
             });
           
           console.log(`Final Excel data: ${headers.length} headers, ${rows.length} rows`);
@@ -175,7 +166,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
             });
             
             if (testResult.data.length > 0) {
-              const avgColumns = testResult.data.reduce((sum, row: any) => sum + row.length, 0) / testResult.data.length;
+              const avgColumns = testResult.data.reduce((sum, row: any) => sum + (Array.isArray(row) ? row.length : 0), 0) / testResult.data.length;
               if (avgColumns > maxColumns) {
                 maxColumns = avgColumns;
                 bestDelimiter = delimiter;
