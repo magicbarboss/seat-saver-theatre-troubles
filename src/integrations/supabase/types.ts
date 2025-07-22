@@ -73,6 +73,7 @@ export type Database = {
       }
       guest_lists: {
         Row: {
+          event_date: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -80,6 +81,7 @@ export type Database = {
           uploaded_by: string
         }
         Insert: {
+          event_date?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -87,6 +89,7 @@ export type Database = {
           uploaded_by: string
         }
         Update: {
+          event_date?: string | null
           id?: string
           is_active?: boolean | null
           name?: string

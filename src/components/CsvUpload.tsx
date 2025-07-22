@@ -11,6 +11,38 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { extractShowTimeFromText, normalizeShowTime, isValidShowTime } from '@/utils/showTimeExtractor';
 
+// Date extraction utility function
+const extractDateFromFilename = (filename: string): Date | null => {
+  const cleanName = filename.replace(/\.(csv|xlsx)$/i, '');
+  
+  // Pattern 1: "July 26 2025" or "July 26, 2025"
+  const monthNamePattern = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i;
+  const monthNameMatch = cleanName.match(monthNamePattern);
+  if (monthNameMatch) {
+    const [, month, day, year] = monthNameMatch;
+    const monthIndex = new Date(`${month} 1, 2000`).getMonth();
+    return new Date(parseInt(year), monthIndex, parseInt(day));
+  }
+  
+  // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
+  const ddmmyyyyPattern = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/;
+  const ddmmyyyyMatch = cleanName.match(ddmmyyyyPattern);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Pattern 3: YYYY-MM-DD
+  const yyyymmddPattern = /\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/;
+  const yyyymmddMatch = cleanName.match(yyyymmddPattern);
+  if (yyyymmddMatch) {
+    const [, year, month, day] = yyyymmddMatch;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  return null;
+};
+
 interface ProcessedGuest {
   booking_code?: string;
   booker_name?: string;
@@ -170,34 +202,53 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     return 0;
   }, []);
 
-  const processGuestShowTime = useCallback((guest: ProcessedGuest): ProcessedGuest => {
+  const processGuestShowTime = useCallback((guest: ProcessedGuest, eventDate?: Date): ProcessedGuest => {
     // If show_time is already populated and valid, keep it
     if (guest.show_time && isValidShowTime(guest.show_time)) {
       guest.show_time = normalizeShowTime(guest.show_time);
-      return guest;
-    }
-    
-    // Try to extract show time from item_details
-    if (guest.item_details) {
-      const extractedTime = extractShowTimeFromText(guest.item_details);
-      if (extractedTime) {
-        guest.show_time = extractedTime;
-        console.log(`📅 Extracted show time "${extractedTime}" from item details: "${guest.item_details}"`);
+    } else {
+      // Try to extract show time from item_details
+      if (guest.item_details) {
+        const extractedTime = extractShowTimeFromText(guest.item_details);
+        if (extractedTime) {
+          guest.show_time = extractedTime;
+          console.log(`📅 Extracted show time "${extractedTime}" from item details: "${guest.item_details}"`);
+        }
       }
-    }
-    
-    // Try to extract from any other text fields as fallback
-    if (!guest.show_time) {
-      const fieldsToCheck = [guest.notes, guest.booking_comments];
-      for (const field of fieldsToCheck) {
-        if (field) {
-          const extractedTime = extractShowTimeFromText(field);
-          if (extractedTime) {
-            guest.show_time = extractedTime;
-            console.log(`📅 Extracted show time "${extractedTime}" from field: "${field}"`);
-            break;
+      
+      // Try to extract from any other text fields as fallback
+      if (!guest.show_time) {
+        const fieldsToCheck = [guest.notes, guest.booking_comments];
+        for (const field of fieldsToCheck) {
+          if (field) {
+            const extractedTime = extractShowTimeFromText(field);
+            if (extractedTime) {
+              guest.show_time = extractedTime;
+              console.log(`📅 Extracted show time "${extractedTime}" from field: "${field}"`);
+              break;
+            }
           }
         }
+      }
+    }
+
+    // Check if this is a Viator booking and determine package based on event date
+    if (guest.booking_code?.toLowerCase().includes('viator')) {
+      const dateToCheck = eventDate || new Date();
+      const dayOfWeek = dateToCheck.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday, 6 = Saturday
+      
+      // If it's Thursday, it's a prosecco package
+      if (dayOfWeek === 4) {
+        // Prosecco package: 1 prosecco per person, 1 pizza + 1 fries per couple
+        const proseccoCount = guest.total_quantity || 1;
+        const coupleCount = Math.ceil(proseccoCount / 2);
+        
+        guest.item_details = `${proseccoCount} x Prosecco, ${coupleCount} x Pizza, ${coupleCount} x Fries`;
+        guest.notes = guest.notes ? `${guest.notes} | Viator Prosecco Package` : 'Viator Prosecco Package';
+      } else {
+        // Friday or Saturday - show only
+        guest.item_details = 'Show Only';
+        guest.notes = guest.notes ? `${guest.notes} | Viator Show Only` : 'Viator Show Only';
       }
     }
     
@@ -304,6 +355,10 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           
           console.log(`📊 Processing ${dataRows.length} data rows`);
           
+          // Extract event date from filename
+          const eventDate = extractDateFromFilename(file.name);
+          console.log(`📅 Extracted event date from filename "${file.name}":`, eventDate);
+          
           const processedGuests: ProcessedGuest[] = dataRows.map((row, index) => {
             const guest: ProcessedGuest = {
               original_row_index: index,
@@ -348,8 +403,8 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               }
             });
             
-            // Process show time extraction after all fields are populated
-            let processedGuest = processGuestShowTime(guest);
+            // Process show time extraction and Viator logic using event date
+            let processedGuest = processGuestShowTime(guest, eventDate || undefined);
             
             // Process total quantity calculation after all fields are populated
             processedGuest = processGuestTotalQuantity(processedGuest);
@@ -395,6 +450,10 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             const headers = rows[0];
             const columnMapping = detectColumns(headers);
             
+            // Extract event date from filename
+            const eventDate = extractDateFromFilename(file.name);
+            console.log(`📅 Extracted event date from filename "${file.name}":`, eventDate);
+            
             const processedGuests: ProcessedGuest[] = rows.slice(1).map((row, index) => {
               const guest: ProcessedGuest = {
                 original_row_index: index,
@@ -433,8 +492,8 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
                 }
               });
               
-              // Process show time extraction after all fields are populated
-              let processedGuest = processGuestShowTime(guest);
+              // Process show time extraction and Viator logic using event date
+              let processedGuest = processGuestShowTime(guest, eventDate || undefined);
               
               // Process total quantity calculation after all fields are populated
               processedGuest = processGuestTotalQuantity(processedGuest);
@@ -460,11 +519,16 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       throw new Error('User not authenticated');
     }
 
+    // Extract event date from filename if available
+    const eventDate = file ? extractDateFromFilename(file.name) : null;
+    const defaultName = file ? file.name.replace(/\.(csv|xlsx)$/i, '') : `Guest List ${new Date().toLocaleDateString()}`;
+
     const { data: guestList, error: listError } = await supabase
       .from('guest_lists')
       .insert({
         uploaded_by: user.id,
-        name: guestListName || `Guest List ${new Date().toLocaleDateString()}`
+        name: guestListName || defaultName,
+        event_date: eventDate?.toISOString().split('T')[0] || null
       })
       .select()
       .single();
