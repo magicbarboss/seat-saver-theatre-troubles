@@ -1,18 +1,26 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 interface CsvData {
   headers: string[];
   rows: string[][];
+  totalRows: number;
+  detectedColumns: {
+    booker?: string;
+    bookingCode?: string;
+    totalQty?: string;
+    item?: string;
+    note?: string;
+  };
 }
 
 interface CsvUploadProps {
@@ -23,140 +31,229 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
   const [csvData, setCsvData] = useState<CsvData | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [uploading, setUploading] = useState(false);
+  const [parsingError, setParsingError] = useState<string>('');
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const detectColumns = (headers: string[]) => {
+    const detected: CsvData['detectedColumns'] = {};
+    
+    headers.forEach((header, index) => {
+      const lowerHeader = header.toLowerCase();
+      
+      if (lowerHeader.includes('booker') && !detected.booker) {
+        detected.booker = header;
+      } else if (lowerHeader.includes('booking') && lowerHeader.includes('code') && !detected.bookingCode) {
+        detected.bookingCode = header;
+      } else if ((lowerHeader.includes('total') && lowerHeader.includes('quantity')) || 
+                 (lowerHeader.includes('quantity') && !detected.totalQty)) {
+        detected.totalQty = header;
+      } else if ((lowerHeader.includes('item') || lowerHeader.includes('show') || lowerHeader.includes('event')) && !detected.item) {
+        detected.item = header;
+      } else if ((lowerHeader.includes('note') || lowerHeader.includes('notes')) && !detected.note) {
+        detected.note = header;
+      }
+    });
+    
+    console.log('Detected columns:', detected);
+    return detected;
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
+    setParsingError('');
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const data = e.target?.result;
       
-      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        // Handle Excel files
-        const workbook = XLSX.read(data, { type: 'binary' });
-        console.log('Available sheets:', workbook.SheetNames);
-        
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        
-        console.log('Raw Excel data (first 15 rows):', jsonData.slice(0, 15));
-        
-        if (jsonData.length === 0) return;
-        
-        // Find the header row by looking for key header indicators
-        let headerRowIndex = -1;
-        for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
-          const row = jsonData[i] as any[];
-          if (row && row.some(cell => {
-            const cellText = String(cell || '').toLowerCase();
-            return cellText.includes('booker') || 
-                   cellText.includes('booking') ||
-                   cellText.includes('ticket') ||
-                   cellText.includes('item') ||
-                   cellText.includes('guests') ||
-                   cellText.includes('code');
-          })) {
-            headerRowIndex = i;
-            console.log('Found header row at index:', i, 'with data:', row);
-            break;
+      try {
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          console.log('Processing Excel file...');
+          
+          // Handle Excel files
+          const workbook = XLSX.read(data, { type: 'binary' });
+          console.log('Available sheets:', workbook.SheetNames);
+          
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          console.log(`Raw Excel data: ${jsonData.length} rows`);
+          console.log('First 5 rows:', jsonData.slice(0, 5));
+          
+          if (jsonData.length === 0) {
+            setParsingError('Excel file appears to be empty');
+            return;
           }
-        }
-        
-        // If no header found, try the default row 4 (index 3)
-        if (headerRowIndex === -1) {
-          headerRowIndex = 3;
-          console.log('No header row found, using default index 3');
-        }
-        
-        if (jsonData.length <= headerRowIndex) {
-          console.log('Not enough rows in the file');
-          return;
-        }
-        
-        const headers = (jsonData[headerRowIndex] as string[])
-          .map(header => String(header || '').trim())
-          .filter(header => header !== ''); // Remove empty headers
-        
-        console.log('Processed headers:', headers);
-        
-        const rows = jsonData.slice(headerRowIndex + 1)
-          .filter(row => {
-            if (!row || (row as any[]).length === 0) return false;
-            // Check if row has meaningful data (not just empty cells)
-            const meaningfulCells = (row as any[]).filter(cell => 
-              String(cell || '').trim() !== ''
-            );
-            return meaningfulCells.length > 2; // At least 3 non-empty cells
-          })
-          .map(row => {
-            const processedRow = (row as any[]).map(cell => String(cell || '').trim());
-            // Pad row to match header length
-            while (processedRow.length < headers.length) {
-              processedRow.push('');
+          
+          // Find the header row by looking for key header indicators
+          let headerRowIndex = -1;
+          for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+            const row = jsonData[i] as any[];
+            if (row && row.some(cell => {
+              const cellText = String(cell || '').toLowerCase();
+              return cellText.includes('booker') || 
+                     cellText.includes('booking') ||
+                     cellText.includes('ticket') ||
+                     cellText.includes('item') ||
+                     cellText.includes('guests') ||
+                     cellText.includes('code');
+            })) {
+              headerRowIndex = i;
+              console.log('Found header row at index:', i, 'with data:', row);
+              break;
             }
-            return processedRow.slice(0, headers.length); // Trim to header length
-          });
-        
-        console.log('Sample processed rows:', rows.slice(0, 5));
-        console.log(`Final data: ${headers.length} headers, ${rows.length} rows`);
-        
-        setCsvData({ headers, rows });
-      } else {
-        // Handle CSV/TSV files - detect delimiter
-        const text = data as string;
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        
-        if (lines.length === 0) return;
-
-        // Find header row
-        let headerRowIndex = 0;
-        for (let i = 0; i < Math.min(lines.length, 10); i++) {
-          if (lines[i].toLowerCase().includes('booker') || lines[i].toLowerCase().includes('booking')) {
-            headerRowIndex = i;
-            break;
           }
-        }
-
-        // Check if it's comma-separated or tab-separated by looking at the header line
-        const headerLine = lines[headerRowIndex];
-        const commaCount = (headerLine.match(/,/g) || []).length;
-        const tabCount = (headerLine.match(/\t/g) || []).length;
-        
-        console.log('Header line:', headerLine);
-        console.log('Comma count:', commaCount, 'Tab count:', tabCount);
-        
-        // Use the delimiter that appears most frequently
-        const delimiter = commaCount > tabCount ? ',' : '\t';
-        console.log('Using delimiter:', delimiter === ',' ? 'comma' : 'tab');
-
-        const headers = lines[headerRowIndex].split(delimiter)
-          .map(header => header.trim().replace(/"/g, ''))
-          .filter(header => header !== '');
-        
-        const rows = lines.slice(headerRowIndex + 1)
-          .filter(line => {
-            const cells = line.split(delimiter);
-            const meaningfulCells = cells.filter(cell => cell.trim().replace(/"/g, '') !== '');
-            return meaningfulCells.length > 2;
-          })
-          .map(line => {
-            const processedRow = line.split(delimiter).map(cell => cell.trim().replace(/"/g, ''));
-            while (processedRow.length < headers.length) {
-              processedRow.push('');
-            }
-            return processedRow.slice(0, headers.length);
+          
+          // If no header found, try the default row 4 (index 3)
+          if (headerRowIndex === -1) {
+            headerRowIndex = 3;
+            console.log('No header row found, using default index 3');
+          }
+          
+          if (jsonData.length <= headerRowIndex) {
+            setParsingError('Not enough rows in the Excel file after header detection');
+            return;
+          }
+          
+          const headers = (jsonData[headerRowIndex] as string[])
+            .map(header => String(header || '').trim())
+            .filter(header => header !== ''); // Remove empty headers
+          
+          console.log('Processed headers:', headers);
+          
+          const rows = jsonData.slice(headerRowIndex + 1)
+            .filter(row => {
+              if (!row || (row as any[]).length === 0) return false;
+              // Check if row has meaningful data (not just empty cells)
+              const meaningfulCells = (row as any[]).filter(cell => 
+                String(cell || '').trim() !== ''
+              );
+              return meaningfulCells.length > 2; // At least 3 non-empty cells
+            })
+            .map(row => {
+              const processedRow = (row as any[]).map(cell => String(cell || '').trim());
+              // Pad row to match header length
+              while (processedRow.length < headers.length) {
+                processedRow.push('');
+              }
+              return processedRow.slice(0, headers.length); // Trim to header length
+            });
+          
+          console.log(`Final Excel data: ${headers.length} headers, ${rows.length} rows`);
+          console.log('Sample processed rows:', rows.slice(0, 3));
+          
+          const detectedColumns = detectColumns(headers);
+          setCsvData({ 
+            headers, 
+            rows, 
+            totalRows: rows.length,
+            detectedColumns 
           });
+          
+        } else {
+          console.log('Processing CSV/TSV file...');
+          
+          // Handle CSV/TSV files with Papa Parse for robust parsing
+          const text = data as string;
+          
+          // Auto-detect delimiter by testing the first few lines
+          const sampleLines = text.split('\n').slice(0, 5).join('\n');
+          const delimiters = [',', '\t', ';', '|'];
+          let bestDelimiter = ',';
+          let maxColumns = 0;
+          
+          for (const delimiter of delimiters) {
+            const testResult = Papa.parse(sampleLines, { 
+              delimiter,
+              skipEmptyLines: true,
+              header: false
+            });
+            
+            if (testResult.data.length > 0) {
+              const avgColumns = testResult.data.reduce((sum, row: any) => sum + row.length, 0) / testResult.data.length;
+              if (avgColumns > maxColumns) {
+                maxColumns = avgColumns;
+                bestDelimiter = delimiter;
+              }
+            }
+          }
+          
+          console.log(`Auto-detected delimiter: "${bestDelimiter}" (${bestDelimiter === ',' ? 'comma' : bestDelimiter === '\t' ? 'tab' : bestDelimiter === ';' ? 'semicolon' : 'pipe'})`);
+          
+          // Parse with Papa Parse using detected delimiter
+          const parseResult = Papa.parse(text, {
+            delimiter: bestDelimiter,
+            skipEmptyLines: true,
+            header: false,
+            transformHeader: (header: string) => header.trim(),
+            transform: (value: string) => value.trim()
+          });
+          
+          if (parseResult.errors.length > 0) {
+            console.warn('CSV parsing warnings:', parseResult.errors);
+          }
+          
+          const parsedData = parseResult.data as string[][];
+          
+          if (parsedData.length === 0) {
+            setParsingError('CSV file appears to be empty');
+            return;
+          }
+          
+          console.log(`Parsed CSV data: ${parsedData.length} rows`);
+          console.log('First 5 rows:', parsedData.slice(0, 5));
+          
+          // Find header row
+          let headerRowIndex = 0;
+          for (let i = 0; i < Math.min(parsedData.length, 10); i++) {
+            const row = parsedData[i];
+            if (row && row.some(cell => {
+              const cellText = cell.toLowerCase();
+              return cellText.includes('booker') || 
+                     cellText.includes('booking') ||
+                     cellText.includes('ticket') ||
+                     cellText.includes('item');
+            })) {
+              headerRowIndex = i;
+              console.log('Found header row at index:', i);
+              break;
+            }
+          }
+          
+          const headers = parsedData[headerRowIndex].filter(header => header && header.trim() !== '');
+          const rows = parsedData.slice(headerRowIndex + 1)
+            .filter(row => {
+              const meaningfulCells = row.filter(cell => cell && cell.trim() !== '');
+              return meaningfulCells.length > 2;
+            })
+            .map(row => {
+              const processedRow = [...row];
+              while (processedRow.length < headers.length) {
+                processedRow.push('');
+              }
+              return processedRow.slice(0, headers.length);
+            });
 
-        console.log('Parsed headers:', headers);
-        console.log('Sample parsed rows:', rows.slice(0, 3));
+          console.log(`Final CSV data: ${headers.length} headers, ${rows.length} rows`);
+          console.log('Parsed headers:', headers);
+          console.log('Sample parsed rows:', rows.slice(0, 3));
 
-        setCsvData({ headers, rows });
+          const detectedColumns = detectColumns(headers);
+          setCsvData({ 
+            headers, 
+            rows, 
+            totalRows: rows.length,
+            detectedColumns 
+          });
+        }
+      } catch (error) {
+        console.error('File parsing error:', error);
+        setParsingError(`Failed to parse file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     };
 
@@ -223,139 +320,110 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
 
       // TICKET_TYPE_MAPPING - standardized list matching CheckInSystem exactly
       const TICKET_TYPE_MAPPING = [
-        // Standard House Magicians tickets
         'House Magicians Show Ticket',
         'House Magicians Show Ticket & 2 Drinks',
         'House Magicians Show Ticket & 1 Pizza',
         'House Magicians Show Ticket includes 2 Drinks +  1 Pizza',
         'House Magicians Show Ticket includes 2 Drinks + 1 Pizza',
         'House Magicians Show Ticket & 2 soft drinks',
-        
-        // Adult Show tickets
         'Adult Show Ticket includes 2 Drinks',
         'Adult Show Ticket includes 2 Drinks + 9" Pizza',
         'Adult Show Ticket induces 2 soft drinks',
         'Adult Show Ticket induces 2 soft drinks + 9" PIzza',
         'Adult Show Ticket induces 2 soft drinks + 9 PIzza',
-        
-        // Comedy tickets
         'Comedy ticket plus 9" Pizza',
         'Comedy ticket plus 9 Pizza',
         'Adult Comedy & Magic Show Ticket + 9" Pizza',
         'Adult Comedy & Magic Show Ticket + 9 Pizza',
         'Adult Comedy Magic Show ticket',
-        
-        // Groupon packages
         'Groupon Offer Prosecco Package (per person)',
         'Groupon Magic & Pints Package (per person)',
         'Groupon Magic & Cocktails Package (per person)',
         'Groupon Magic Show, Snack and Loaded Fries Package (per person)',
         'OLD Groupon Offer (per person - extras are already included)',
-        
-        // Wowcher packages
         'Wowcher Magic & Cocktails Package (per person)',
-        
-        // Smoke offers
         'Smoke Offer Ticket & 1x Drink',
         'Smoke Offer Ticket & 1x Drink (minimum x2 people)',
         'Smoke Offer Ticket includes Drink (minimum x2)'
       ];
 
-        // Function to extract show time from item details
-        const extractShowTime = (itemDetails: string): string => {
-          if (!itemDetails) return '';
-          
-          // Extract time from formats like [7:00pm], [8:00pm], [9:00pm]
-          const timeMatch = itemDetails.match(/\[(\d+):00pm\]/i);
-          if (timeMatch) {
-            const hour = timeMatch[1];
-            return `${hour}pm`;
-          }
-          
-          // Fallback: look for standalone time patterns like 7:00pm, 8:00pm, 9:00pm
-          const fallbackMatch = itemDetails.match(/(\d+):00pm/i);
-          if (fallbackMatch) {
-            const hour = fallbackMatch[1];
-            return `${hour}pm`;
-          }
-          
-          return '';
-        };
+      const extractShowTime = (itemDetails: string): string => {
+        if (!itemDetails) return '';
+        
+        const timeMatch = itemDetails.match(/\[(\d+):00pm\]/i);
+        if (timeMatch) {
+          const hour = timeMatch[1];
+          return `${hour}pm`;
+        }
+        
+        const fallbackMatch = itemDetails.match(/(\d+):00pm/i);
+        if (fallbackMatch) {
+          const hour = fallbackMatch[1];
+          return `${hour}pm`;
+        }
+        
+        return '';
+      };
 
-        // Prepare guest data with proper field mapping and enhanced validation
-        const guestsData = csvData.rows.map((row, index) => {
-          const ticketData: any = {};
-          const extractedTickets: any = {};
+      const guestsData = csvData.rows.map((row, index) => {
+        const ticketData: any = {};
+        const extractedTickets: any = {};
 
-          // Extract key fields from the correct columns first
-          const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
-          const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
-          const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
+        const bookerName = bookerIndex >= 0 ? row[bookerIndex] || '' : '';
+        const bookingCode = bookingCodeIndex >= 0 ? row[bookingCodeIndex] || '' : '';
+        const totalQuantity = totalQtyIndex >= 0 ? parseInt(row[totalQtyIndex]) || 1 : 1;
 
-          // Process each header and extract ticket quantities
-          csvData.headers.forEach((header, headerIndex) => {
-            const cellValue = row[headerIndex] || '';
-            ticketData[header] = cellValue;
+        csvData.headers.forEach((header, headerIndex) => {
+          const cellValue = row[headerIndex] || '';
+          ticketData[header] = cellValue;
 
-            // Check if this header matches a known ticket type
-            if (TICKET_TYPE_MAPPING.includes(header)) {
-              // If the cell has any non-empty value (text or number), this ticket type is present
-              if (cellValue && cellValue.toString().trim() !== '') {
-                const cellText = cellValue.toString().trim();
-                const numericValue = parseInt(cellValue);
-                
-                // List of status words and invalid values to skip
-                const statusWords = ['paid', 'paid in gyg', 'viator', 'dan', 'pending', 'cancelled', 'confirmed'];
-                const isStatusWord = statusWords.includes(cellText.toLowerCase());
-                
-                // Check if it's friend names (contains & or multiple names but not actual ticket selection)
-                const containsFriendNames = cellText.includes('&') || 
-                                            (cellText.split(' ').length > 2 && 
-                                             !cellText.toLowerCase().includes('ticket') &&
-                                             !cellText.toLowerCase().includes('package') &&
-                                             !cellText.toLowerCase().includes('offer'));
-                
-                if (!isNaN(numericValue) && numericValue > 0) {
-                  // If it's a valid number, use that as quantity
-                  extractedTickets[header] = numericValue;
-                  console.log(`Found ticket type "${header}" with numeric quantity ${numericValue} for row ${index}`);
-                } else if (!isStatusWord && !containsFriendNames && cellText !== '') {
-                  // This appears to be a valid ticket type selection (not status, not friend names)
-                  extractedTickets[header] = totalQuantity;
-                  console.log(`Found ticket type "${header}" with valid selection "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
-                } else {
-                  console.log(`Skipping ticket type "${header}" - invalid value: "${cellValue}" (status: ${isStatusWord}, friends: ${containsFriendNames}) for row ${index}`);
-                }
+          if (TICKET_TYPE_MAPPING.includes(header)) {
+            if (cellValue && cellValue.toString().trim() !== '') {
+              const cellText = cellValue.toString().trim();
+              const numericValue = parseInt(cellValue);
+              
+              const statusWords = ['paid', 'paid in gyg', 'viator', 'dan', 'pending', 'cancelled', 'confirmed'];
+              const isStatusWord = statusWords.includes(cellText.toLowerCase());
+              
+              const containsFriendNames = cellText.includes('&') || 
+                                          (cellText.split(' ').length > 2 && 
+                                           !cellText.toLowerCase().includes('ticket') &&
+                                           !cellText.toLowerCase().includes('package') &&
+                                           !cellText.toLowerCase().includes('offer'));
+              
+              if (!isNaN(numericValue) && numericValue > 0) {
+                extractedTickets[header] = numericValue;
+                console.log(`Found ticket type "${header}" with numeric quantity ${numericValue} for row ${index}`);
+              } else if (!isStatusWord && !containsFriendNames && cellText !== '') {
+                extractedTickets[header] = totalQuantity;
+                console.log(`Found ticket type "${header}" with valid selection "${cellValue}", assigning total quantity ${totalQuantity} for row ${index}`);
+              } else {
+                console.log(`Skipping ticket type "${header}" - invalid value: "${cellValue}" (status: ${isStatusWord}, friends: ${containsFriendNames}) for row ${index}`);
               }
             }
-          });
-          const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
-          const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
-          
-          // Extract show time from item details
-          const showTime = extractShowTime(itemDetails);
+          }
+        });
+        
+        const itemDetails = itemIndex >= 0 ? row[itemIndex] || '' : '';
+        const notes = noteIndex >= 0 ? row[noteIndex] || '' : '';
+        const showTime = extractShowTime(itemDetails);
 
-        // Enhanced validation - skip rows with no meaningful data
         if (!bookerName && !bookingCode && totalQuantity <= 0) {
           console.log(`Skipping row ${index}: no meaningful data`);
           return null;
         }
 
-        // Detect if guest has pizza tickets
         const hasPizzaTickets = Object.keys(extractedTickets).some(ticketType => 
           ticketType.toLowerCase().includes('pizza')
         );
 
-        // Detect if guest has drink tickets
         const hasDrinkTickets = Object.keys(extractedTickets).some(ticketType => 
           ticketType.toLowerCase().includes('drink')
         );
 
-        // Extract diet information
         const dietInfo = ticketData.DIET || ticketData.Diet || ticketData.diet;
         const cleanDietInfo = dietInfo && typeof dietInfo === 'string' && dietInfo.trim() !== '' ? dietInfo.trim() : null;
         
-        // Extract magic information  
         const magicInfo = ticketData.Magic || ticketData.MAGIC || ticketData.magic;
         const cleanMagicInfo = magicInfo && typeof magicInfo === 'string' && magicInfo.trim() !== '' ? magicInfo.trim() : null;
 
@@ -364,7 +432,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           booking_code: bookingCode,
           booker_name: bookerName,
           total_quantity: totalQuantity,
-          show_time: showTime, // Extract show time from item details
+          show_time: showTime,
           item_details: itemDetails,
           notes: notes,
           interval_pizza_order: hasPizzaTickets,
@@ -372,16 +440,14 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           diet_info: cleanDietInfo,
           magic_info: cleanMagicInfo,
           ticket_data: { 
-            ...ticketData, // Keep all original CSV data
-            extracted_tickets: extractedTickets // Add structured ticket quantities
+            ...ticketData,
+            extracted_tickets: extractedTickets
           },
           original_row_index: index
         };
         
-        // Log the first few records to debug
         if (index < 5) {
           console.log(`Guest record ${index}:`, guestRecord);
-          // Special logging for Andrew Williams
           if (bookerName.toLowerCase().includes('andrew')) {
             console.log('=== ANDREW WILLIAMS DEBUG INFO ===');
             console.log('Booker name:', bookerName);
@@ -392,11 +458,10 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
         }
         
         return guestRecord;
-      }).filter(record => record !== null); // Remove null records
+      }).filter(record => record !== null);
 
       console.log(`Attempting to insert ${guestsData.length} guest records...`);
 
-      // Insert guests
       const { data: insertedGuests, error: guestsError } = await supabase
         .from('guests')
         .insert(guestsData)
@@ -431,7 +496,7 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       <div className="space-y-2">
         <Label htmlFor="csv-upload">Upload Your Theatre File (Excel or CSV)</Label>
         <div className="flex items-center space-x-2">
@@ -452,41 +517,88 @@ const CsvUpload = ({ onGuestListCreated }: CsvUploadProps) => {
           </p>
         )}
         <p className="text-xs text-muted-foreground">
-          Supports Excel (.xlsx, .xls) and CSV/TSV files. Excel files provide better data parsing.
+          Supports Excel (.xlsx, .xls) and CSV/TSV files. Advanced parsing handles commas in text properly.
         </p>
       </div>
+
+      {parsingError && (
+        <div className="flex items-center space-x-2 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <p className="text-sm text-destructive">{parsingError}</p>
+        </div>
+      )}
 
       {csvData && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">File Contents</h3>
+            <div>
+              <h3 className="text-lg font-semibold">File Contents</h3>
+              <p className="text-sm text-muted-foreground">
+                {csvData.totalRows} total rows • {csvData.headers.length} columns
+              </p>
+            </div>
             <Button onClick={saveToDatabase} disabled={uploading}>
               {uploading ? 'Saving...' : 'Save Guest List'}
             </Button>
           </div>
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {csvData.headers.slice(0, 8).map((header, index) => (
-                    <TableHead key={index}>{header}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {csvData.rows.slice(0, 10).map((row, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    {row.slice(0, 8).map((cell, cellIndex) => (
-                      <TableCell key={cellIndex}>{cell}</TableCell>
+
+          {/* Column Detection Status */}
+          <div className="bg-muted/50 p-4 rounded-md">
+            <h4 className="font-medium mb-2 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              Column Detection
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+              <div>Booker: {csvData.detectedColumns.booker || 'Not found'}</div>
+              <div>Booking Code: {csvData.detectedColumns.bookingCode || 'Not found'}</div>
+              <div>Quantity: {csvData.detectedColumns.totalQty || 'Not found'}</div>
+              <div>Item/Show: {csvData.detectedColumns.item || 'Not found'}</div>
+              <div>Notes: {csvData.detectedColumns.note || 'Not found'}</div>
+            </div>
+          </div>
+
+          {/* Enhanced Data Preview */}
+          <div className="border rounded-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {csvData.headers.slice(0, 12).map((header, index) => (
+                      <TableHead key={index} className="min-w-[120px]">
+                        {header}
+                      </TableHead>
                     ))}
+                    {csvData.headers.length > 12 && (
+                      <TableHead className="text-muted-foreground">
+                        +{csvData.headers.length - 12} more columns
+                      </TableHead>
+                    )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {csvData.rows.length > 10 && (
-              <p className="text-sm text-muted-foreground p-4 border-t">
-                Showing first 10 rows of {csvData.rows.length} total rows. Click "Save Guest List" to store all data.
-              </p>
+                </TableHeader>
+                <TableBody>
+                  {csvData.rows.slice(0, 15).map((row, rowIndex) => (
+                    <TableRow key={rowIndex}>
+                      {row.slice(0, 12).map((cell, cellIndex) => (
+                        <TableCell key={cellIndex} className="max-w-[200px] truncate">
+                          {cell || <span className="text-muted-foreground italic">empty</span>}
+                        </TableCell>
+                      ))}
+                      {csvData.headers.length > 12 && (
+                        <TableCell className="text-muted-foreground">...</TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {csvData.rows.length > 15 && (
+              <div className="p-4 border-t bg-muted/30">
+                <p className="text-sm text-muted-foreground text-center">
+                  Showing first 15 rows of {csvData.totalRows} total rows. 
+                  {csvData.headers.length > 12 && ` Showing first 12 columns of ${csvData.headers.length} total columns.`}
+                  {' '}Click "Save Guest List" to store all data.
+                </p>
+              </div>
             )}
           </div>
         </div>
