@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -229,56 +228,81 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
   };
 
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests?: Guest[]): string => {
-    const ticketData = guest.ticket_data || {};
-    const extractedTickets = ticketData.extracted_tickets || {};
-    
     let pizzaCount = 0;
     let drinkCount = 0;
     let proseccoCount = 0;
     let chipCount = 0;
     
-    // Count items from extracted tickets
-    Object.entries(extractedTickets).forEach(([ticketType, quantity]) => {
-      const qty = parseInt(quantity as string) || 0;
-      const lowerType = ticketType.toLowerCase();
+    // Function to parse ticket information from guest data
+    const parseGuestTickets = (guestData: Guest) => {
+      // First check if we have the old extracted_tickets format
+      const ticketData = guestData.ticket_data || {};
+      const extractedTickets = ticketData.extracted_tickets || {};
       
-      if (lowerType.includes('pizza')) {
-        pizzaCount += qty;
-      }
-      if (lowerType.includes('drink') || lowerType.includes('pint') || lowerType.includes('cocktail')) {
-        drinkCount += qty;
-      }
-      if (lowerType.includes('prosecco')) {
-        proseccoCount += qty;
-      }
-      if (lowerType.includes('chip')) {
-        chipCount += qty;
-      }
-    });
-
-    // Include add-on items if provided
+      // Parse extracted tickets if they exist (backward compatibility)
+      Object.entries(extractedTickets).forEach(([ticketType, quantity]) => {
+        const qty = parseInt(quantity as string) || 0;
+        const lowerType = ticketType.toLowerCase();
+        
+        if (lowerType.includes('pizza')) pizzaCount += qty;
+        if (lowerType.includes('drink') || lowerType.includes('pint') || lowerType.includes('cocktail')) drinkCount += qty;
+        if (lowerType.includes('prosecco')) proseccoCount += qty;
+        if (lowerType.includes('chip')) chipCount += qty;
+      });
+      
+      // Parse all other fields in the guest data that might contain ticket information
+      Object.entries(guestData).forEach(([key, value]) => {
+        if (typeof value === 'string' && value) {
+          const keyLower = key.toLowerCase();
+          const valueLower = value.toLowerCase();
+          
+          // Skip non-ticket fields
+          if (keyLower.includes('name') || keyLower.includes('code') || keyLower.includes('time') || 
+              keyLower.includes('notes') || keyLower.includes('comment') || keyLower.includes('id')) {
+            return;
+          }
+          
+          // Parse ticket descriptions that include food/drink info
+          // Example: "House Magicians Show Ticket includes 2 Drinks + 1 Pizza": "2"
+          if (keyLower.includes('includes') || keyLower.includes('ticket')) {
+            const quantity = parseInt(value) || 1;
+            
+            // Extract numbers and items from the ticket description
+            const drinkMatch = keyLower.match(/(\d+)\s*drinks?/);
+            const pizzaMatch = keyLower.match(/(\d+)\s*pizzas?/);
+            const proseccoMatch = keyLower.match(/(\d+)\s*proseccos?/);
+            const chipMatch = keyLower.match(/(\d+)\s*chips?/);
+            
+            if (drinkMatch) drinkCount += parseInt(drinkMatch[1]) * quantity;
+            if (pizzaMatch) pizzaCount += parseInt(pizzaMatch[1]) * quantity;
+            if (proseccoMatch) proseccoCount += parseInt(proseccoMatch[1]) * quantity;
+            if (chipMatch) chipCount += parseInt(chipMatch[1]) * quantity;
+          }
+          
+          // Also check for direct ticket type names
+          if (keyLower.includes('pizza') && !keyLower.includes('includes')) {
+            pizzaCount += parseInt(value) || 0;
+          }
+          if ((keyLower.includes('drink') || keyLower.includes('pint') || keyLower.includes('cocktail')) && !keyLower.includes('includes')) {
+            drinkCount += parseInt(value) || 0;
+          }
+          if (keyLower.includes('prosecco') && !keyLower.includes('includes')) {
+            proseccoCount += parseInt(value) || 0;
+          }
+          if (keyLower.includes('chip') && !keyLower.includes('includes')) {
+            chipCount += parseInt(value) || 0;
+          }
+        }
+      });
+    };
+    
+    // Parse main guest tickets
+    parseGuestTickets(guest);
+    
+    // Parse add-on guest tickets if provided
     if (addOnGuests) {
       addOnGuests.forEach(addOn => {
-        const addOnTicketData = addOn.ticket_data || {};
-        const addOnExtracted = addOnTicketData.extracted_tickets || {};
-        
-        Object.entries(addOnExtracted).forEach(([ticketType, quantity]) => {
-          const qty = parseInt(quantity as string) || 0;
-          const lowerType = ticketType.toLowerCase();
-          
-          if (lowerType.includes('pizza')) {
-            pizzaCount += qty;
-          }
-          if (lowerType.includes('drink') || lowerType.includes('pint') || lowerType.includes('cocktail')) {
-            drinkCount += qty;
-          }
-          if (lowerType.includes('prosecco')) {
-            proseccoCount += qty;
-          }
-          if (lowerType.includes('chip')) {
-            chipCount += qty;
-          }
-        });
+        parseGuestTickets(addOn);
       });
     }
 
@@ -561,6 +585,12 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
     let stoneBakedPizza = 0;
 
     [...guests, ...walkInGuests].forEach(guest => {
+      // Parse the same way as getOrderSummary for consistency
+      let guestPizzas = 0;
+      let guestChips = 0;
+      let guestStoneBaked = 0;
+      
+      // Check extracted_tickets format (backward compatibility)
       const ticketData = guest.ticket_data || {};
       const extractedTickets = ticketData.extracted_tickets || {};
       
@@ -570,15 +600,48 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
         
         if (lowerType.includes('pizza')) {
           if (lowerType.includes('stone')) {
-            stoneBakedPizza += qty;
+            guestStoneBaked += qty;
           } else {
-            pizzas += qty;
+            guestPizzas += qty;
           }
         }
         if (lowerType.includes('chip')) {
-          chips += qty;
+          guestChips += qty;
         }
       });
+      
+      // Parse all other fields for ticket information
+      Object.entries(guest).forEach(([key, value]) => {
+        if (typeof value === 'string' && value) {
+          const keyLower = key.toLowerCase();
+          
+          // Skip non-ticket fields
+          if (keyLower.includes('name') || keyLower.includes('code') || keyLower.includes('time') || 
+              keyLower.includes('notes') || keyLower.includes('comment') || keyLower.includes('id')) {
+            return;
+          }
+          
+          if (keyLower.includes('includes') || keyLower.includes('ticket')) {
+            const quantity = parseInt(value) || 1;
+            
+            const pizzaMatch = keyLower.match(/(\d+)\s*pizzas?/);
+            const chipMatch = keyLower.match(/(\d+)\s*chips?/);
+            
+            if (pizzaMatch) {
+              if (keyLower.includes('stone')) {
+                guestStoneBaked += parseInt(pizzaMatch[1]) * quantity;
+              } else {
+                guestPizzas += parseInt(pizzaMatch[1]) * quantity;
+              }
+            }
+            if (chipMatch) guestChips += parseInt(chipMatch[1]) * quantity;
+          }
+        }
+      });
+      
+      pizzas += guestPizzas;
+      chips += guestChips;
+      stoneBakedPizza += guestStoneBaked;
     });
 
     return { pizzas, chips, stoneBakedPizza };
