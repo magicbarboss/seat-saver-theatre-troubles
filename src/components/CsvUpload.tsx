@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,54 +11,60 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { extractShowTimeFromText, normalizeShowTime, isValidShowTime } from '@/utils/showTimeExtractor';
 
-// FIXED: Date extraction utility function with proper debugging and month handling
+// FIXED: Date extraction utility function with timezone-neutral date creation
 const extractDateFromFilename = (filename: string): Date | null => {
   const cleanName = filename.replace(/\.(csv|xlsx)$/i, '');
   console.log(`🔍 Extracting date from filename: "${filename}" -> cleaned: "${cleanName}"`);
   
-  // Pattern 1: "July 26 2025" or "July 26, 2025" - FIXED: Use Date constructor properly
+  // Pattern 1: "July 26 2025" or "July 26, 2025" - FIXED: Use timezone-neutral date creation
   const monthNamePattern = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i;
   const monthNameMatch = cleanName.match(monthNamePattern);
   if (monthNameMatch) {
     const [, monthName, day, year] = monthNameMatch;
     console.log(`🔍 Month name extraction: month="${monthName}", day="${day}", year="${year}"`);
     
-    // FIXED: Create date using the proper Date constructor
-    // Format: "Month DD, YYYY" - this ensures correct parsing
-    const dateString = `${monthName} ${day}, ${year}`;
-    const extractedDate = new Date(dateString);
+    // FIXED: Create date using timezone-neutral constructor to avoid UTC offset issues
+    const monthIndex = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December']
+                       .findIndex(m => m.toLowerCase() === monthName.toLowerCase());
     
-    console.log(`✅ Extracted date using month name pattern: "${dateString}" -> ${extractedDate.toDateString()}`);
-    console.log(`📅 Date components: Year=${extractedDate.getFullYear()}, Month=${extractedDate.getMonth() + 1}, Day=${extractedDate.getDate()}`);
-    
-    // Validate the date is valid
-    if (!isNaN(extractedDate.getTime())) {
-      return extractedDate;
-    } else {
-      console.log(`❌ Invalid date created from: "${dateString}"`);
+    if (monthIndex !== -1) {
+      // Use new Date(year, month, day) which creates date in local timezone without UTC conversion
+      const extractedDate = new Date(parseInt(year), monthIndex, parseInt(day));
+      
+      console.log(`✅ FIXED - Extracted date using timezone-neutral creation: "${monthName} ${day}, ${year}" -> ${extractedDate.toDateString()}`);
+      console.log(`📅 Date components: Year=${extractedDate.getFullYear()}, Month=${extractedDate.getMonth() + 1}, Day=${extractedDate.getDate()}`);
+      console.log(`📅 Day of week: ${extractedDate.getDay()} (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][extractedDate.getDay()]})`);
+      
+      // Validate the date is valid
+      if (!isNaN(extractedDate.getTime())) {
+        return extractedDate;
+      } else {
+        console.log(`❌ Invalid date created from: "${monthName} ${day}, ${year}"`);
+      }
     }
   }
   
-  // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
+  // Pattern 2: DD/MM/YYYY or DD-MM-YYYY - also use timezone-neutral creation
   const ddmmyyyyPattern = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/;
   const ddmmyyyyMatch = cleanName.match(ddmmyyyyPattern);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
     const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    console.log(`✅ Extracted date using DD/MM/YYYY pattern: ${day}/${month}/${year} -> ${extractedDate.toDateString()}`);
+    console.log(`✅ FIXED - Extracted date using DD/MM/YYYY pattern: ${day}/${month}/${year} -> ${extractedDate.toDateString()}`);
     
     if (!isNaN(extractedDate.getTime())) {
       return extractedDate;
     }
   }
   
-  // Pattern 3: YYYY-MM-DD
+  // Pattern 3: YYYY-MM-DD - also use timezone-neutral creation
   const yyyymmddPattern = /\b(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/;
   const yyyymmddMatch = cleanName.match(yyyymmddPattern);
   if (yyyymmddMatch) {
     const [, year, month, day] = yyyymmddMatch;
     const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    console.log(`✅ Extracted date using YYYY-MM-DD pattern: ${year}-${month}-${day} -> ${extractedDate.toDateString()}`);
+    console.log(`✅ FIXED - Extracted date using YYYY-MM-DD pattern: ${year}-${month}-${day} -> ${extractedDate.toDateString()}`);
     
     if (!isNaN(extractedDate.getTime())) {
       return extractedDate;
@@ -393,7 +398,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           
           console.log(`📊 Processing ${dataRows.length} data rows`);
           
-          // FIXED: Extract event date from filename with improved logic
+          // FIXED: Extract event date from filename with improved timezone-neutral logic
           const eventDate = extractDateFromFilename(file.name);
           console.log(`📅 FIXED - Final extracted event date from filename "${file.name}":`, {
             date: eventDate?.toDateString() || 'None',
@@ -492,7 +497,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             const headers = rows[0];
             const columnMapping = detectColumns(headers);
             
-            // FIXED: Extract event date from filename
+            // FIXED: Extract event date from filename with timezone-neutral logic
             const eventDate = extractDateFromFilename(file.name);
             console.log(`📅 FIXED - Extracted event date from CSV filename "${file.name}":`, {
               date: eventDate?.toDateString() || 'None',
