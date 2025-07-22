@@ -116,7 +116,7 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
         setGuestTableAllocations(new Map(Object.entries(data.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])));
         setPartyGroups(new Map(Object.entries(data.party_groups || {})));
         setBookingComments(new Map(Object.entries(data.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
-        setWalkInGuests(Array.isArray(data.walk_in_guests) ? data.walk_in_guests : []);
+        setWalkInGuests(Array.isArray(data.walk_in_guests) ? data.walk_in_guests as Guest[] : []);
       }
     } catch (error) {
       console.error('Error loading check-in data:', error);
@@ -135,9 +135,9 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
         allocated_guests: Array.from(allocatedGuests),
         pager_assignments: Object.fromEntries(pagerAssignments),
         guest_table_allocations: Object.fromEntries(guestTableAllocations),
-        party_groups: Object.fromEntries(partyGroups),
+        party_groups: Object.fromEntries(partyGroups) as any,
         booking_comments: Object.fromEntries(bookingComments),
-        walk_in_guests: walkInGuests,
+        walk_in_guests: walkInGuests as any,
       };
 
       const { error } = await supabase
@@ -308,7 +308,7 @@ const CheckInSystem: React.FC<CheckInSystemProps> = ({
     if (newCheckedIn.has(index)) {
       newCheckedIn.delete(index);
       // Also remove from seated and allocated if unchecking
-      const newSeated = new Set(seatedGuested);
+      const newSeated = new Set(seatedGuests);
       const newAllocated = new Set(allocatedGuests);
       newSeated.delete(index);
       newAllocated.delete(index);
