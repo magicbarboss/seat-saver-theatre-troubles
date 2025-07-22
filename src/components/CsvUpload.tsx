@@ -71,8 +71,9 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     
     headers.forEach((header, index) => {
       if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
-        // Skip the "Total" column as requested
-        if (header.toLowerCase().includes('total') && header.toLowerCase().includes('$')) {
+        // More precise filtering: keep quantity totals but exclude price totals
+        if (header.toLowerCase().includes('total') && 
+            (header.toLowerCase().includes('$') || header.toLowerCase().includes('price') || header.toLowerCase().includes('cost'))) {
           return;
         }
         ticketData[header] = row[index];
@@ -80,6 +81,93 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     });
     
     return ticketData;
+  }, []);
+
+  const calculateTotalQuantityFromTicketData = useCallback((ticketData: Record<string, any>): number => {
+    console.log('🔢 Calculating total quantity from ticket data:', ticketData);
+    
+    // First, look for a "Total Quantity" field in ticket data
+    for (const [key, value] of Object.entries(ticketData)) {
+      const normalizedKey = key.toLowerCase();
+      if ((normalizedKey.includes('total') && normalizedKey.includes('quantity')) ||
+          (normalizedKey.includes('total') && normalizedKey.includes('guests')) ||
+          normalizedKey === 'total quantity' ||
+          normalizedKey === 'total guests') {
+        const numValue = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+        if (!isNaN(numValue) && numValue > 0) {
+          console.log(`✅ Found total quantity field "${key}": ${numValue}`);
+          return numValue;
+        }
+      }
+    }
+    
+    // Second, sum up all numeric values that represent ticket quantities
+    let totalQuantity = 0;
+    const quantityFields: string[] = [];
+    
+    for (const [key, value] of Object.entries(ticketData)) {
+      const normalizedKey = key.toLowerCase();
+      
+      // Skip fields that are likely not quantities
+      if (normalizedKey.includes('$') || 
+          normalizedKey.includes('price') || 
+          normalizedKey.includes('cost') || 
+          normalizedKey.includes('code') ||
+          normalizedKey.includes('name') ||
+          normalizedKey.includes('time') ||
+          normalizedKey.includes('date')) {
+        continue;
+      }
+      
+      // Try to parse as number
+      const numValue = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+      if (!isNaN(numValue) && numValue > 0) {
+        // Check if this looks like a ticket quantity field
+        if (normalizedKey.includes('ticket') || 
+            normalizedKey.includes('seat') || 
+            normalizedKey.includes('admission') ||
+            normalizedKey.includes('quantity') ||
+            normalizedKey.includes('guests') ||
+            /^\d+$/.test(String(value))) { // Just a number
+          totalQuantity += numValue;
+          quantityFields.push(`${key}: ${numValue}`);
+        }
+      }
+    }
+    
+    if (totalQuantity > 0) {
+      console.log(`✅ Calculated total quantity by summing fields [${quantityFields.join(', ')}]: ${totalQuantity}`);
+      return totalQuantity;
+    }
+    
+    console.log('⚠️ No quantity fields found in ticket data, defaulting to 1');
+    return 1;
+  }, []);
+
+  const extractQuantityFromText = useCallback((text: string): number => {
+    if (!text) return 0;
+    
+    // Look for patterns like "x2", "2 tickets", "qty: 3", etc.
+    const patterns = [
+      /x(\d+)/i,
+      /(\d+)\s*tickets?/i,
+      /qty:?\s*(\d+)/i,
+      /quantity:?\s*(\d+)/i,
+      /(\d+)\s*guests?/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > 0) {
+          console.log(`📝 Extracted quantity ${num} from text: "${text}"`);
+          return num;
+        }
+      }
+    }
+    
+    return 0;
   }, []);
 
   const processGuestShowTime = useCallback((guest: ProcessedGuest): ProcessedGuest => {
@@ -116,6 +204,48 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     return guest;
   }, []);
 
+  const processGuestTotalQuantity = useCallback((guest: ProcessedGuest): ProcessedGuest => {
+    // If total_quantity is missing, 1, or seems incorrect, try to calculate it
+    const needsQuantityCalculation = !guest.total_quantity || guest.total_quantity === 1;
+    
+    if (needsQuantityCalculation && guest.ticket_data && Object.keys(guest.ticket_data).length > 0) {
+      console.log(`🔍 Guest "${guest.booker_name || 'Unknown'}" needs quantity calculation. Current: ${guest.total_quantity}`);
+      
+      // Try to calculate from ticket data
+      const calculatedQuantity = calculateTotalQuantityFromTicketData(guest.ticket_data);
+      
+      if (calculatedQuantity > 1) {
+        const oldQuantity = guest.total_quantity;
+        guest.total_quantity = calculatedQuantity;
+        console.log(`✅ Updated total_quantity for "${guest.booker_name || 'Unknown'}" from ${oldQuantity} to ${calculatedQuantity}`);
+      }
+    }
+    
+    // Fallback: try to extract from text fields
+    if ((!guest.total_quantity || guest.total_quantity === 1) && 
+        (guest.item_details || guest.notes || guest.booking_comments)) {
+      const fieldsToCheck = [guest.item_details, guest.notes, guest.booking_comments];
+      for (const field of fieldsToCheck) {
+        if (field) {
+          const extractedQuantity = extractQuantityFromText(field);
+          if (extractedQuantity > 1) {
+            const oldQuantity = guest.total_quantity;
+            guest.total_quantity = extractedQuantity;
+            console.log(`✅ Extracted total_quantity ${extractedQuantity} for "${guest.booker_name || 'Unknown'}" from text field: "${field}"`);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Ensure we always have a valid quantity
+    if (!guest.total_quantity || guest.total_quantity < 1) {
+      guest.total_quantity = 1;
+    }
+    
+    return guest;
+  }, [calculateTotalQuantityFromTicketData, extractQuantityFromText]);
+
   const processExcelFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
       const reader = new FileReader();
@@ -146,20 +276,25 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           
           console.log('📋 Headers from row 4:', headers);
           
-          // Filter out "Total" column from headers and processing
-          const filteredHeaders = headers.filter((header: string) => 
-            !header?.toLowerCase().includes('total') || 
-            !header?.toLowerCase().includes('$')
-          );
+          // Improved filtering: keep quantity totals but exclude price totals
+          const filteredHeaders = headers.filter((header: string) => {
+            if (!header) return false;
+            const normalizedHeader = header.toLowerCase();
+            // Exclude only price/cost totals, keep quantity totals
+            return !(normalizedHeader.includes('total') && 
+                    (normalizedHeader.includes('$') || 
+                     normalizedHeader.includes('price') || 
+                     normalizedHeader.includes('cost')));
+          });
           
-          console.log('📋 Filtered headers (no Total):', filteredHeaders);
+          console.log('📋 Filtered headers (no price totals):', filteredHeaders);
           
           if (filteredHeaders.length === 0) {
             throw new Error('No valid headers found in row 4. Please check your Excel file format.');
           }
           
-          // Detect column mappings using filtered headers
-          const columnMapping = detectColumns(filteredHeaders);
+          // Detect column mappings using original headers (not filtered)
+          const columnMapping = detectColumns(headers);
           console.log('🗺️ Column mapping:', columnMapping);
           
           // Process data rows starting from row 5 (index 4)
@@ -170,14 +305,6 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           console.log(`📊 Processing ${dataRows.length} data rows`);
           
           const processedGuests: ProcessedGuest[] = dataRows.map((row, index) => {
-            // Create filtered row that corresponds to filtered headers
-            const filteredRow: any[] = [];
-            headers.forEach((header: string, headerIndex: number) => {
-              if (!header?.toLowerCase().includes('total') || !header?.toLowerCase().includes('$')) {
-                filteredRow.push(row[headerIndex]);
-              }
-            });
-            
             const guest: ProcessedGuest = {
               original_row_index: index,
               ticket_data: extractTicketData(row, headers)
@@ -185,7 +312,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             
             // Map the detected columns to guest properties
             Object.entries(columnMapping).forEach(([field, colIndex]) => {
-              const value = filteredRow[colIndex];
+              const value = row[colIndex];
               if (value !== undefined && value !== null && value !== '') {
                 if (field === 'total_quantity') {
                   // Ensure total_quantity is a number
@@ -222,7 +349,10 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             });
             
             // Process show time extraction after all fields are populated
-            const processedGuest = processGuestShowTime(guest);
+            let processedGuest = processGuestShowTime(guest);
+            
+            // Process total quantity calculation after all fields are populated
+            processedGuest = processGuestTotalQuantity(processedGuest);
             
             return processedGuest;
           }).filter(guest => 
@@ -230,7 +360,12 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           );
           
           console.log(`✅ Successfully processed ${processedGuests.length} guests from Excel`);
-          console.log('👥 Sample processed guests with show times:', processedGuests.slice(0, 3));
+          console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
+          
+          // Log summary of quantity calculations
+          const guestsWithCalculatedQuantity = processedGuests.filter(g => g.total_quantity && g.total_quantity > 1);
+          console.log(`📊 Found ${guestsWithCalculatedQuantity.length} guests with quantities > 1:`, 
+            guestsWithCalculatedQuantity.map(g => `${g.booker_name}: ${g.total_quantity}`));
           
           resolve(processedGuests);
         } catch (error) {
@@ -242,7 +377,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       reader.onerror = () => reject(new Error('Failed to read Excel file'));
       reader.readAsArrayBuffer(file);
     });
-  }, [extractTicketData, processGuestShowTime]);
+  }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity]);
 
   const processCsvFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
@@ -299,13 +434,16 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               });
               
               // Process show time extraction after all fields are populated
-              const processedGuest = processGuestShowTime(guest);
+              let processedGuest = processGuestShowTime(guest);
+              
+              // Process total quantity calculation after all fields are populated
+              processedGuest = processGuestTotalQuantity(processedGuest);
               
               return processedGuest;
             }).filter(guest => guest.booker_name || guest.booking_code);
             
             console.log(`✅ Successfully processed ${processedGuests.length} guests from CSV`);
-            console.log('👥 Sample processed guests with show times:', processedGuests.slice(0, 3));
+            console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
             
             resolve(processedGuests);
           } catch (error) {
@@ -315,7 +453,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
         error: (error) => reject(error)
       });
     });
-  }, [extractTicketData, processGuestShowTime]);
+  }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity]);
 
   const uploadGuests = async (guests: ProcessedGuest[]) => {
     if (!user?.id) {
