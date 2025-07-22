@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,20 +12,32 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { extractShowTimeFromText, normalizeShowTime, isValidShowTime } from '@/utils/showTimeExtractor';
 
-// Date extraction utility function
+// FIXED: Date extraction utility function with proper debugging and month handling
 const extractDateFromFilename = (filename: string): Date | null => {
   const cleanName = filename.replace(/\.(csv|xlsx)$/i, '');
   console.log(`🔍 Extracting date from filename: "${filename}" -> cleaned: "${cleanName}"`);
   
-  // Pattern 1: "July 26 2025" or "July 26, 2025"
+  // Pattern 1: "July 26 2025" or "July 26, 2025" - FIXED: Use Date constructor properly
   const monthNamePattern = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i;
   const monthNameMatch = cleanName.match(monthNamePattern);
   if (monthNameMatch) {
-    const [, month, day, year] = monthNameMatch;
-    const monthIndex = new Date(`${month} 1, 2000`).getMonth();
-    const extractedDate = new Date(parseInt(year), monthIndex, parseInt(day));
-    console.log(`✅ Extracted date using month name pattern: ${month} ${day}, ${year} -> ${extractedDate.toDateString()}`);
-    return extractedDate;
+    const [, monthName, day, year] = monthNameMatch;
+    console.log(`🔍 Month name extraction: month="${monthName}", day="${day}", year="${year}"`);
+    
+    // FIXED: Create date using the proper Date constructor
+    // Format: "Month DD, YYYY" - this ensures correct parsing
+    const dateString = `${monthName} ${day}, ${year}`;
+    const extractedDate = new Date(dateString);
+    
+    console.log(`✅ Extracted date using month name pattern: "${dateString}" -> ${extractedDate.toDateString()}`);
+    console.log(`📅 Date components: Year=${extractedDate.getFullYear()}, Month=${extractedDate.getMonth() + 1}, Day=${extractedDate.getDate()}`);
+    
+    // Validate the date is valid
+    if (!isNaN(extractedDate.getTime())) {
+      return extractedDate;
+    } else {
+      console.log(`❌ Invalid date created from: "${dateString}"`);
+    }
   }
   
   // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
@@ -34,7 +47,10 @@ const extractDateFromFilename = (filename: string): Date | null => {
     const [, day, month, year] = ddmmyyyyMatch;
     const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     console.log(`✅ Extracted date using DD/MM/YYYY pattern: ${day}/${month}/${year} -> ${extractedDate.toDateString()}`);
-    return extractedDate;
+    
+    if (!isNaN(extractedDate.getTime())) {
+      return extractedDate;
+    }
   }
   
   // Pattern 3: YYYY-MM-DD
@@ -44,7 +60,10 @@ const extractDateFromFilename = (filename: string): Date | null => {
     const [, year, month, day] = yyyymmddMatch;
     const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     console.log(`✅ Extracted date using YYYY-MM-DD pattern: ${year}-${month}-${day} -> ${extractedDate.toDateString()}`);
-    return extractedDate;
+    
+    if (!isNaN(extractedDate.getTime())) {
+      return extractedDate;
+    }
   }
   
   console.log(`❌ No date pattern matched for: "${cleanName}"`);
@@ -240,23 +259,19 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       }
     }
 
-    // FIXED: Check if this is a Viator booking using ticket_data.Status instead of booking_code
+    // Check if this is a Viator booking using ticket_data.Status
     const isViatorBooking = guest.ticket_data?.Status === 'VIATOR';
-    console.log(`🔍 Checking Viator status for guest "${guest.booker_name || 'Unknown'}": 
-      - ticket_data.Status: "${guest.ticket_data?.Status}" 
-      - isViatorBooking: ${isViatorBooking}
-      - booking_code: "${guest.booking_code}"`);
-
-    if (isViatorBooking) {
-      const dateToCheck = eventDate || new Date();
-      const dayOfWeek = dateToCheck.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday, 6 = Saturday
+    
+    if (isViatorBooking && eventDate) {
+      const dayOfWeek = eventDate.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday, 6 = Saturday
       
-      console.log(`📅 Viator booking detected for "${guest.booker_name}":
-        - Event date: ${dateToCheck.toDateString()}
+      console.log(`📅 FIXED Viator booking detected for "${guest.booker_name}":
+        - Event date: ${eventDate.toDateString()} 
         - Day of week: ${dayOfWeek} (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]})
-        - Total quantity: ${guest.total_quantity}`);
+        - Total quantity: ${guest.total_quantity}
+        - Current item_details: "${guest.item_details}"`);
       
-      // If it's Thursday, it's a prosecco package
+      // CONFIRMED: Only Thursday (day 4) gets prosecco package
       if (dayOfWeek === 4) {
         // Prosecco package: 1 prosecco per person, 1 pizza + 1 fries per couple
         const proseccoCount = guest.total_quantity || 1;
@@ -264,13 +279,15 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
         
         guest.item_details = `${proseccoCount} x Prosecco, ${coupleCount} x Pizza, ${coupleCount} x Fries`;
         guest.notes = guest.notes ? `${guest.notes} | Viator Prosecco Package` : 'Viator Prosecco Package';
-        console.log(`🍾 Applied Viator Prosecco Package: ${guest.item_details}`);
+        console.log(`🍾 Applied Viator Prosecco Package (Thursday): ${guest.item_details}`);
       } else {
-        // Friday or Saturday - show only
+        // Friday (5) or Saturday (6) - show only
         guest.item_details = 'Show Only';
         guest.notes = guest.notes ? `${guest.notes} | Viator Show Only` : 'Viator Show Only';
-        console.log(`🎭 Applied Viator Show Only: ${guest.item_details}`);
+        console.log(`🎭 Applied Viator Show Only (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]}): ${guest.item_details}`);
       }
+    } else if (isViatorBooking && !eventDate) {
+      console.log(`⚠️ Viator booking found but no event date available for "${guest.booker_name}" - cannot apply day-specific logic`);
     }
     
     return guest;
@@ -376,9 +393,13 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           
           console.log(`📊 Processing ${dataRows.length} data rows`);
           
-          // Extract event date from filename with improved logging
+          // FIXED: Extract event date from filename with improved logic
           const eventDate = extractDateFromFilename(file.name);
-          console.log(`📅 Final extracted event date from filename "${file.name}":`, eventDate?.toDateString() || 'None');
+          console.log(`📅 FIXED - Final extracted event date from filename "${file.name}":`, {
+            date: eventDate?.toDateString() || 'None',
+            dayOfWeek: eventDate ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][eventDate.getDay()] : 'N/A',
+            isoString: eventDate?.toISOString() || 'N/A'
+          });
           
           const processedGuests: ProcessedGuest[] = dataRows.map((row, index) => {
             const guest: ProcessedGuest = {
@@ -424,7 +445,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               }
             });
             
-            // Process show time extraction and Viator logic using event date
+            // Process show time extraction and Viator logic using FIXED event date
             let processedGuest = processGuestShowTime(guest, eventDate || undefined);
             
             // Process total quantity calculation after all fields are populated
@@ -438,9 +459,9 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           console.log(`✅ Successfully processed ${processedGuests.length} guests from Excel`);
           console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
           
-          // Log summary of Viator bookings
+          // Log summary of Viator bookings with FIXED date logic
           const viatorGuests = processedGuests.filter(g => g.ticket_data?.Status === 'VIATOR');
-          console.log(`🎭 Found ${viatorGuests.length} Viator bookings:`, 
+          console.log(`🎭 FIXED - Found ${viatorGuests.length} Viator bookings with correct date logic:`, 
             viatorGuests.map(g => `${g.booker_name} (${g.booking_code}): ${g.item_details}`));
           
           resolve(processedGuests);
@@ -471,9 +492,12 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             const headers = rows[0];
             const columnMapping = detectColumns(headers);
             
-            // Extract event date from filename
+            // FIXED: Extract event date from filename
             const eventDate = extractDateFromFilename(file.name);
-            console.log(`📅 Extracted event date from filename "${file.name}":`, eventDate);
+            console.log(`📅 FIXED - Extracted event date from CSV filename "${file.name}":`, {
+              date: eventDate?.toDateString() || 'None',
+              dayOfWeek: eventDate ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][eventDate.getDay()] : 'N/A'
+            });
             
             const processedGuests: ProcessedGuest[] = rows.slice(1).map((row, index) => {
               const guest: ProcessedGuest = {
@@ -513,7 +537,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
                 }
               });
               
-              // Process show time extraction and Viator logic using event date
+              // Process show time extraction and Viator logic using FIXED event date
               let processedGuest = processGuestShowTime(guest, eventDate || undefined);
               
               // Process total quantity calculation after all fields are populated
