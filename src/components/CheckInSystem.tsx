@@ -643,6 +643,72 @@ const CheckInSystem = ({
     return addons;
   };
 
+  // Utility function to detect day of week from show time or current date
+  const getShowDayOfWeek = (guest: Guest): string => {
+    // Try to extract day from show_time if available
+    const showTime = guest.show_time?.toLowerCase() || '';
+    
+    // Check if show_time contains day information
+    if (showTime.includes('thursday') || showTime.includes('thu')) return 'thursday';
+    if (showTime.includes('friday') || showTime.includes('fri')) return 'friday';
+    if (showTime.includes('saturday') || showTime.includes('sat')) return 'saturday';
+    if (showTime.includes('sunday') || showTime.includes('sun')) return 'sunday';
+    if (showTime.includes('monday') || showTime.includes('mon')) return 'monday';
+    if (showTime.includes('tuesday') || showTime.includes('tue')) return 'tuesday';
+    if (showTime.includes('wednesday') || showTime.includes('wed')) return 'wednesday';
+    
+    // If no day in show_time, use current date (fallback)
+    const today = new Date();
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    return days[today.getDay()];
+  };
+
+  // Utility function to detect if it's evening show (7pm or 9pm)
+  const isEveningShow = (guest: Guest): boolean => {
+    const showTime = guest.show_time?.toLowerCase() || '';
+    return showTime.includes('7pm') || showTime.includes('9pm') || 
+           showTime.includes('19:00') || showTime.includes('21:00');
+  };
+
+  // Enhanced Viator detection with day/time-based logic
+  const getViatorTicketType = (guest: Guest): 'prosecco-package' | 'show-only' | 'not-viator' => {
+    // First check if it's actually a Viator booking
+    const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
+    const statusStr = typeof statusField === 'object' && statusField?.value
+      ? String(statusField.value).toLowerCase()
+      : String(statusField || '').toLowerCase();
+
+    const noteRaw = guest.Note || guest.note || guest.ticket_data?.Note;
+    const noteStr = typeof noteRaw === 'object' && noteRaw?.value
+      ? String(noteRaw.value).toLowerCase()
+      : String(noteRaw || '').toLowerCase();
+    
+    const ticketDataStr = JSON.stringify(guest.ticket_data || {}).toLowerCase();
+    const viatorField = guest.ticket_data?.Viator || '';
+    
+    const isViatorBooking =
+      statusStr === "viator" ||
+      (viatorField && viatorField.toLowerCase().includes("viator booking reference")) ||
+      statusStr.includes("viator booking") ||
+      (guest?.booking_source?.toLowerCase?.() === "viator");
+
+    if (!isViatorBooking) return 'not-viator';
+
+    // Get day and time information
+    const dayOfWeek = getShowDayOfWeek(guest);
+    const isEvening = isEveningShow(guest);
+
+    // Logic: Friday/Saturday 7pm & 9pm = Show Only, Thursday = Prosecco Package
+    if ((dayOfWeek === 'friday' || dayOfWeek === 'saturday') && isEvening) {
+      return 'show-only';
+    } else if (dayOfWeek === 'thursday') {
+      return 'prosecco-package';
+    }
+    
+    // Default for other days/times - treat as prosecco package (existing behavior)
+    return 'prosecco-package';
+  };
+
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
     // Debug: Check if manual override exists and is working
@@ -696,13 +762,9 @@ const CheckInSystem = ({
       noteStr.includes("gyg booking reference") ||
       ticketDataStr.includes("paid in gyg");
 
-    // More precise Viator detection - must have actual Viator content, not just empty fields
-    const viatorField = guest.ticket_data?.Viator || '';
-    const isViatorBooking =
-      statusStr === "viator" ||
-      (viatorField && viatorField.toLowerCase().includes("viator booking reference")) ||
-      statusStr.includes("viator booking") ||
-      (guest?.booking_source?.toLowerCase?.() === "viator");
+    // Enhanced Viator detection with day/time logic
+    const viatorType = getViatorTicketType(guest);
+    const isViatorBooking = viatorType !== 'not-viator';
     
     // DEBUG: Show actual guest data structure to find where GYG/Viator info is stored
     console.log("🔍 COMPLETE GUEST DEBUG for", guest.booker_name, {
@@ -773,26 +835,43 @@ const CheckInSystem = ({
       return orderItems.join(', ');
     }
 
-    // Step 3: Viator Logic (Second Priority)
+    // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority)
     if (isViatorBooking) {
-      const orderSummary = {
-        prosecco: guestCount,
-        pizza: Math.floor(guestCount / 2),
-        fries: Math.floor(guestCount / 2)
-      };
+      const dayOfWeek = getShowDayOfWeek(guest);
+      const isEvening = isEveningShow(guest);
       
-      orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
-      if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
-      if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
-      
-      console.log(`🔵 Viator Detected for ${guest.booker_name}: ${guestCount} guests`);
-      
-      // Add any addon items
-      if (addonItems.length > 0) {
-        orderItems.push(...addonItems);
+      if (viatorType === 'show-only') {
+        // Friday/Saturday 7pm & 9pm = Show Only
+        console.log(`🔵 Viator Show Only Detected for ${guest.booker_name}: ${dayOfWeek} ${guest.show_time} - ${guestCount} guests`);
+        
+        // Add any addon items
+        if (addonItems.length > 0) {
+          orderItems.push(...addonItems);
+          return `Viator - Show Only, ${orderItems.join(', ')}`;
+        }
+        
+        return "Viator - Show Only";
+      } else {
+        // Thursday or other days = Prosecco Package (existing behavior)
+        const orderSummary = {
+          prosecco: guestCount,
+          pizza: Math.floor(guestCount / 2),
+          fries: Math.floor(guestCount / 2)
+        };
+        
+        orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
+        if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
+        if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
+        
+        console.log(`🔵 Viator Prosecco Package Detected for ${guest.booker_name}: ${dayOfWeek} ${guest.show_time} - ${guestCount} guests`);
+        
+        // Add any addon items
+        if (addonItems.length > 0) {
+          orderItems.push(...addonItems);
+        }
+        
+        return `Viator - Prosecco Package, ${orderItems.join(', ')}`;
       }
-      
-      return orderItems.join(', ');
     }
 
     // Step 4: Check if guest has explicit ticket mappings FIRST
