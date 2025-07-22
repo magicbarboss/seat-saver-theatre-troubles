@@ -14,6 +14,7 @@ import { extractShowTimeFromText, normalizeShowTime, isValidShowTime } from '@/u
 // Date extraction utility function
 const extractDateFromFilename = (filename: string): Date | null => {
   const cleanName = filename.replace(/\.(csv|xlsx)$/i, '');
+  console.log(`🔍 Extracting date from filename: "${filename}" -> cleaned: "${cleanName}"`);
   
   // Pattern 1: "July 26 2025" or "July 26, 2025"
   const monthNamePattern = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i;
@@ -21,7 +22,9 @@ const extractDateFromFilename = (filename: string): Date | null => {
   if (monthNameMatch) {
     const [, month, day, year] = monthNameMatch;
     const monthIndex = new Date(`${month} 1, 2000`).getMonth();
-    return new Date(parseInt(year), monthIndex, parseInt(day));
+    const extractedDate = new Date(parseInt(year), monthIndex, parseInt(day));
+    console.log(`✅ Extracted date using month name pattern: ${month} ${day}, ${year} -> ${extractedDate.toDateString()}`);
+    return extractedDate;
   }
   
   // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
@@ -29,7 +32,9 @@ const extractDateFromFilename = (filename: string): Date | null => {
   const ddmmyyyyMatch = cleanName.match(ddmmyyyyPattern);
   if (ddmmyyyyMatch) {
     const [, day, month, year] = ddmmyyyyMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    console.log(`✅ Extracted date using DD/MM/YYYY pattern: ${day}/${month}/${year} -> ${extractedDate.toDateString()}`);
+    return extractedDate;
   }
   
   // Pattern 3: YYYY-MM-DD
@@ -37,9 +42,12 @@ const extractDateFromFilename = (filename: string): Date | null => {
   const yyyymmddMatch = cleanName.match(yyyymmddPattern);
   if (yyyymmddMatch) {
     const [, year, month, day] = yyyymmddMatch;
-    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    const extractedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    console.log(`✅ Extracted date using YYYY-MM-DD pattern: ${year}-${month}-${day} -> ${extractedDate.toDateString()}`);
+    return extractedDate;
   }
   
+  console.log(`❌ No date pattern matched for: "${cleanName}"`);
   return null;
 };
 
@@ -232,10 +240,21 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       }
     }
 
-    // Check if this is a Viator booking and determine package based on event date
-    if (guest.booking_code?.toLowerCase().includes('viator')) {
+    // FIXED: Check if this is a Viator booking using ticket_data.Status instead of booking_code
+    const isViatorBooking = guest.ticket_data?.Status === 'VIATOR';
+    console.log(`🔍 Checking Viator status for guest "${guest.booker_name || 'Unknown'}": 
+      - ticket_data.Status: "${guest.ticket_data?.Status}" 
+      - isViatorBooking: ${isViatorBooking}
+      - booking_code: "${guest.booking_code}"`);
+
+    if (isViatorBooking) {
       const dateToCheck = eventDate || new Date();
       const dayOfWeek = dateToCheck.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday, 6 = Saturday
+      
+      console.log(`📅 Viator booking detected for "${guest.booker_name}":
+        - Event date: ${dateToCheck.toDateString()}
+        - Day of week: ${dayOfWeek} (${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek]})
+        - Total quantity: ${guest.total_quantity}`);
       
       // If it's Thursday, it's a prosecco package
       if (dayOfWeek === 4) {
@@ -245,10 +264,12 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
         
         guest.item_details = `${proseccoCount} x Prosecco, ${coupleCount} x Pizza, ${coupleCount} x Fries`;
         guest.notes = guest.notes ? `${guest.notes} | Viator Prosecco Package` : 'Viator Prosecco Package';
+        console.log(`🍾 Applied Viator Prosecco Package: ${guest.item_details}`);
       } else {
         // Friday or Saturday - show only
         guest.item_details = 'Show Only';
         guest.notes = guest.notes ? `${guest.notes} | Viator Show Only` : 'Viator Show Only';
+        console.log(`🎭 Applied Viator Show Only: ${guest.item_details}`);
       }
     }
     
@@ -355,9 +376,9 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           
           console.log(`📊 Processing ${dataRows.length} data rows`);
           
-          // Extract event date from filename
+          // Extract event date from filename with improved logging
           const eventDate = extractDateFromFilename(file.name);
-          console.log(`📅 Extracted event date from filename "${file.name}":`, eventDate);
+          console.log(`📅 Final extracted event date from filename "${file.name}":`, eventDate?.toDateString() || 'None');
           
           const processedGuests: ProcessedGuest[] = dataRows.map((row, index) => {
             const guest: ProcessedGuest = {
@@ -417,10 +438,10 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           console.log(`✅ Successfully processed ${processedGuests.length} guests from Excel`);
           console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
           
-          // Log summary of quantity calculations
-          const guestsWithCalculatedQuantity = processedGuests.filter(g => g.total_quantity && g.total_quantity > 1);
-          console.log(`📊 Found ${guestsWithCalculatedQuantity.length} guests with quantities > 1:`, 
-            guestsWithCalculatedQuantity.map(g => `${g.booker_name}: ${g.total_quantity}`));
+          // Log summary of Viator bookings
+          const viatorGuests = processedGuests.filter(g => g.ticket_data?.Status === 'VIATOR');
+          console.log(`🎭 Found ${viatorGuests.length} Viator bookings:`, 
+            viatorGuests.map(g => `${g.booker_name} (${g.booking_code}): ${g.item_details}`));
           
           resolve(processedGuests);
         } catch (error) {
@@ -522,6 +543,22 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     // Extract event date from filename if available
     const eventDate = file ? extractDateFromFilename(file.name) : null;
     const defaultName = file ? file.name.replace(/\.(csv|xlsx)$/i, '') : `Guest List ${new Date().toLocaleDateString()}`;
+
+    // Check for existing guest list with the same name to prevent duplicates
+    const { data: existingLists } = await supabase
+      .from('guest_lists')
+      .select('id, name')
+      .eq('name', guestListName || defaultName)
+      .eq('uploaded_by', user.id);
+
+    if (existingLists && existingLists.length > 0) {
+      console.log(`⚠️ Found existing guest list with name "${guestListName || defaultName}"`);
+      toast({
+        title: "Duplicate guest list detected",
+        description: `A guest list named "${guestListName || defaultName}" already exists. Consider using a different name.`,
+        variant: "destructive"
+      });
+    }
 
     const { data: guestList, error: listError } = await supabase
       .from('guest_lists')
