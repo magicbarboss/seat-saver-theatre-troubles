@@ -1138,6 +1138,14 @@ const TableAllocation = ({
       // Support both assignment (selectedGuest) and move (guestToMove) scenarios
       
       const currentGuest = selectedGuest || guestToMove;
+      console.log('DEBUG getAvailableOptions:', {
+        selectedGuest: selectedGuest?.name,
+        guestToMove: guestToMove?.name, 
+        currentGuest: currentGuest?.name,
+        currentGuestCount: currentGuest?.count,
+        tableName: table.name
+      });
+      
       const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
       const canFitAsWholeTable = currentGuest && totalAvailableCapacity >= currentGuest.count;
       
