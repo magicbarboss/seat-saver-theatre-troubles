@@ -712,6 +712,16 @@ const TableAllocation = ({
   };
 
   const handleMoveGuest = (guest: CheckedInGuest, sectionId: string) => {
+    // SAFETY: Temporarily disable moves for groups of 4+ until bug is fixed
+    if (guest.count >= 4) {
+      toast({
+        title: "⚠️ Move Disabled",
+        description: "Moving groups of 4+ people is temporarily disabled due to a bug. Use individual table allocation instead.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setGuestToMove(guest);
     setCurrentSectionId(sectionId);
     setShowMoveDialog(true);
