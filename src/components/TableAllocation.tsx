@@ -2375,7 +2375,7 @@ const TableAllocation = ({
               onClick={() => setShowManualMoveDialog(true)}
               variant="default"
               size="sm"
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+              className="flex items-center gap-2"
             >
               <ArrowRightLeft className="h-4 w-4" />
               Manual Move
