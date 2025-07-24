@@ -1135,10 +1135,11 @@ const TableAllocation = ({
 
     tables.forEach(table => {
       // FIXED: Prioritize whole table options over individual sections when sufficient capacity exists
+      // Support both assignment (selectedGuest) and move (guestToMove) scenarios
       
-      // First, check if we should show whole table option
+      const currentGuest = selectedGuest || guestToMove;
       const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
-      const canFitAsWholeTable = selectedGuest && totalAvailableCapacity >= selectedGuest.count;
+      const canFitAsWholeTable = currentGuest && totalAvailableCapacity >= currentGuest.count;
       
       // For tables with sections, prioritize whole table when guest can fit
       if (table.hasSections && canFitAsWholeTable) {
