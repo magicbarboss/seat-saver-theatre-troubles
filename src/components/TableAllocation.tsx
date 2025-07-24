@@ -1134,40 +1134,58 @@ const TableAllocation = ({
     });
 
     tables.forEach(table => {
-      // Add individual sections that have available capacity (including partially allocated ones)
-      table.sections.forEach(section => {
-        const availableCapacity = getSectionAvailableCapacity(section);
-        console.log(`Checking section ${section.id}: status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, availableCapacity=${availableCapacity}`);
-        
-        if (availableCapacity > 0) {
-          const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
-          let capacityDisplay = '';
-          
-          if (section.status === 'ALLOCATED' && section.allocatedCount && section.allocatedCount > 0) {
-            capacityDisplay = `${availableCapacity} seats left (${section.allocatedCount} used)`;
-          } else {
-            capacityDisplay = `${section.capacity} seats`;
-          }
-          
+      // FIXED: Prioritize whole table options over individual sections when sufficient capacity exists
+      
+      // First, check if we should show whole table option
+      const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
+      const canFitAsWholeTable = selectedGuest && totalAvailableCapacity >= selectedGuest.count;
+      
+      // For tables with sections, prioritize whole table when guest can fit
+      if (table.hasSections && canFitAsWholeTable) {
+        // If all sections are available, show whole table option
+        if (table.sections.every(s => s.status === 'AVAILABLE')) {
           options.push({
-            type: 'section',
-            section,
+            type: 'whole-table',
             table,
-            totalCapacity: availableCapacity,
-            display: `${table.name} ${sectionDisplay} - ${capacityDisplay}`,
+            totalCapacity: table.totalCapacity,
+            display: `${table.name} Whole Table - ${table.totalCapacity} seats`,
+            tableIds: [table.id]
+          });
+        } else {
+          // If sections are partially used but total capacity fits, show combined capacity
+          options.push({
+            type: 'whole-table',
+            table,
+            totalCapacity: totalAvailableCapacity,
+            display: `${table.name} Whole Table - ${totalAvailableCapacity} seats available`,
             tableIds: [table.id]
           });
         }
-      });
-
-      // For tables with sections, add whole table option ONLY if ALL sections are completely available
-      if (table.hasSections && table.sections.every(s => s.status === 'AVAILABLE')) {
-        options.push({
-          type: 'whole-table',
-          table,
-          totalCapacity: table.totalCapacity,
-          display: `${table.name} Whole Table - ${table.totalCapacity} seats`,
-          tableIds: [table.id]
+      } else {
+        // Only show individual sections if guest can't fit in whole table or for tables without sections
+        table.sections.forEach(section => {
+          const availableCapacity = getSectionAvailableCapacity(section);
+          console.log(`Checking section ${section.id}: status=${section.status}, capacity=${section.capacity}, allocatedCount=${section.allocatedCount || 0}, availableCapacity=${availableCapacity}`);
+          
+          if (availableCapacity > 0) {
+            const sectionDisplay = section.section === 'whole' ? 'Table' : `${section.section}`;
+            let capacityDisplay = '';
+            
+            if (section.status === 'ALLOCATED' && section.allocatedCount && section.allocatedCount > 0) {
+              capacityDisplay = `${availableCapacity} seats left (${section.allocatedCount} used)`;
+            } else {
+              capacityDisplay = `${section.capacity} seats`;
+            }
+            
+            options.push({
+              type: 'section',
+              section,
+              table,
+              totalCapacity: availableCapacity,
+              display: `${table.name} ${sectionDisplay} - ${capacityDisplay}`,
+              tableIds: [table.id]
+            });
+          }
         });
       }
     });
@@ -2523,9 +2541,46 @@ const TableAllocation = ({
                             if (firstAvailable) {
                               moveGuestToSection(firstAvailable.id);
                             }
+                          } else if (option.type === 'whole-table') {
+                            // Handle whole table moves by calling assignWholeTable
+                            if (option.table && guestToMove) {
+                              // First, remove guest from current location
+                              if (currentSectionId) {
+                                const currentSection = tables.flatMap(t => t.sections).find(s => s.id === currentSectionId);
+                                if (currentSection) {
+                                  // Remove guest from current section
+                                  setTables(prevTables =>
+                                    prevTables.map(t => ({
+                                      ...t,
+                                      sections: t.sections.map(s => {
+                                        if (s.id === currentSectionId && s.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+                                          return {
+                                            ...s,
+                                            status: 'AVAILABLE' as const,
+                                            allocatedTo: undefined,
+                                            allocatedGuest: undefined,
+                                            allocatedCount: 0,
+                                            seatedCount: 0,
+                                          };
+                                        }
+                                        return s;
+                                      })
+                                    }))
+                                  );
+                                }
+                              }
+                              
+                              // Set the guest as selected and assign to whole table
+                              setSelectedGuest(guestToMove);
+                              setTimeout(() => {
+                                assignWholeTable(option.table!);
+                                setShowMoveDialog(false);
+                                setGuestToMove(null);
+                                setSelectedGuest(null);
+                              }, 100);
+                            }
                           } else {
-                            // For whole table moves, we'd need to implement this differently
-                            // For now, just use the first available section
+                            // For other option types, use first available section
                             const firstAvailable = option.table!.sections.find(s => s.status === 'AVAILABLE');
                             if (firstAvailable) {
                               moveGuestToSection(firstAvailable.id);
