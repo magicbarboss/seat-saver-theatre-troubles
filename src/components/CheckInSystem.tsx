@@ -318,8 +318,7 @@ const CheckInSystem = ({
           party_groups: Object.fromEntries(partyGroups) as any,
           friendship_groups: Object.fromEntries(friendshipGroups) as any,
           booking_comments: Object.fromEntries(bookingComments) as any,
-          walk_in_guests: walkInGuests as any,
-          manual_links: Object.fromEntries(manualLinks) as any // Add manual links to save
+          walk_in_guests: walkInGuests as any
         };
         const {
           error
