@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ManualMoveDialog } from './seating/ManualMoveDialog';
 
 interface CheckedInGuest {
   name: string;
@@ -181,6 +182,7 @@ const TableAllocation = ({
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [currentSectionId, setCurrentSectionId] = useState<string>('');
   const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
+  const [showManualMoveDialog, setShowManualMoveDialog] = useState(false);
   const [showWalkInDialog, setShowWalkInDialog] = useState(false);
   const [walkInForm, setWalkInForm] = useState({
     name: '',
@@ -909,6 +911,65 @@ const TableAllocation = ({
     setShowMoveDialog(false);
     setGuestToMove(null);
     setCurrentSectionId('');
+  };
+
+  // Manual move handler - clean and predictable
+  const handleManualMove = (guestToMove: CheckedInGuest, fromSectionId: string, toSectionId: string) => {
+    console.log(`Manual move: ${guestToMove.name} from ${fromSectionId} to ${toSectionId}`);
+    
+    setTables(prevTables =>
+      prevTables.map(table => ({
+        ...table,
+        sections: table.sections.map(section => {
+          // Remove guest from source section
+          if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+            const remainingAllocated = (section.allocatedCount || 0) - guestToMove.count;
+            const remainingSeated = guestToMove.hasBeenSeated ? 
+              Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
+              (section.seatedCount || 0);
+            
+            if (remainingAllocated <= 0) {
+              return {
+                ...section,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+                seatedCount: undefined,
+              };
+            } else {
+              return {
+                ...section,
+                allocatedCount: remainingAllocated,
+                seatedCount: remainingSeated,
+                status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+              };
+            }
+          }
+          
+          // Add guest to destination section
+          if (section.id === toSectionId) {
+            const currentAllocated = section.allocatedCount || 0;
+            const currentSeated = section.seatedCount || 0;
+            const newAllocatedCount = currentAllocated + guestToMove.count;
+            const newAllocatedTo = section.allocatedTo ? `${section.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
+            const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
+            const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
+            
+            return {
+              ...section,
+              status: newStatus,
+              allocatedTo: newAllocatedTo,
+              allocatedGuest: guestToMove,
+              allocatedCount: newAllocatedCount,
+              seatedCount: newSeatedCount,
+            };
+          }
+          
+          return section;
+        })
+      }))
+    );
   };
 
   const markGuestSeated = (sectionId: string) => {
@@ -1942,15 +2003,16 @@ const TableAllocation = ({
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Seat
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleMoveGuest(section.allocatedGuest!, section.id)}
-                className="flex-1 text-xs py-1"
-              >
-                <ArrowRightLeft className="h-3 w-3 mr-1" />
-                Move
-              </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {/* Move functionality replaced by Manual Move */}}
+                  className="flex-1 text-xs py-1"
+                  disabled
+                >
+                  <ArrowRightLeft className="h-3 w-3 mr-1" />
+                  Use Manual Move
+                </Button>
             </div>
           </div>
         )}
@@ -1972,15 +2034,16 @@ const TableAllocation = ({
               Free
             </Button>
             {section.allocatedGuest && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleMoveGuest(section.allocatedGuest!, section.id)}
-                className="flex-1 text-xs py-1"
-              >
-                <ArrowRightLeft className="h-3 w-3 mr-1" />
-                Move
-              </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {/* Move functionality replaced by Manual Move */}}
+                  className="flex-1 text-xs py-1"
+                  disabled
+                >
+                  <ArrowRightLeft className="h-3 w-3 mr-1" />
+                  Use Manual Move
+                </Button>
             )}
           </div>
         )}
@@ -2308,6 +2371,15 @@ const TableAllocation = ({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-3">
+            <Button 
+              onClick={() => setShowManualMoveDialog(true)}
+              variant="default"
+              size="sm"
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Manual Move
+            </Button>
             <Button 
               onClick={() => adjustAllTablesCapacity(1)}
               variant="outline"
@@ -2732,6 +2804,14 @@ const TableAllocation = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Manual Move Dialog */}
+      <ManualMoveDialog
+        open={showManualMoveDialog}
+        onOpenChange={setShowManualMoveDialog}
+        tables={tables}
+        onMove={handleManualMove}
+      />
     </div>
   );
 };
