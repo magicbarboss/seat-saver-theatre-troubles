@@ -1138,19 +1138,15 @@ const TableAllocation = ({
       // Support both assignment (selectedGuest) and move (guestToMove) scenarios
       
       const currentGuest = selectedGuest || guestToMove;
-      console.log('DEBUG getAvailableOptions:', {
-        selectedGuest: selectedGuest?.name,
-        guestToMove: guestToMove?.name, 
-        currentGuest: currentGuest?.name,
-        currentGuestCount: currentGuest?.count,
-        tableName: table.name
-      });
-      
       const totalAvailableCapacity = table.sections.reduce((sum, s) => sum + getSectionAvailableCapacity(s), 0);
       const canFitAsWholeTable = currentGuest && totalAvailableCapacity >= currentGuest.count;
       
+      // ADDITIONAL FIX: For 4+ seat tables, always prioritize whole table for groups of 3+ people
+      const shouldPrioritizeWholeTable = canFitAsWholeTable || 
+        (table.totalCapacity >= 4 && currentGuest && currentGuest.count >= 3 && totalAvailableCapacity >= currentGuest.count);
+      
       // For tables with sections, prioritize whole table when guest can fit
-      if (table.hasSections && canFitAsWholeTable) {
+      if (table.hasSections && shouldPrioritizeWholeTable) {
         // If all sections are available, show whole table option
         if (table.sections.every(s => s.status === 'AVAILABLE')) {
           options.push({
