@@ -2074,7 +2074,27 @@ const CheckInSystem = ({
 
 
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-            <GuestTable bookingGroups={filteredBookings} checkedInGuests={checkedInGuests} seatedGuests={seatedGuests} allocatedGuests={allocatedGuests} pagerAssignments={pagerAssignments} guestTableAllocations={guestTableAllocations} partyGroups={partyGroups} bookingComments={bookingComments} walkInGuests={walkInGuests} getOrderSummary={getOrderSummary} getPackageDetails={getPackageDetails} extractGuestName={extractGuestName} onCheckIn={handleCheckIn} onPagerAction={handlePagerAction} onTableAllocate={handleTableAllocate} onSeat={handleSeat} onComment={handleComment} onManualEdit={handleManualEdit} />
+            <GuestTable 
+              bookingGroups={filteredBookings} 
+              guests={guests}
+              checkedInGuests={checkedInGuests} 
+              seatedGuests={seatedGuests} 
+              allocatedGuests={allocatedGuests} 
+              pagerAssignments={pagerAssignments} 
+              guestTableAllocations={guestTableAllocations} 
+              partyGroups={partyGroups} 
+              bookingComments={bookingComments} 
+              walkInGuests={walkInGuests} 
+              getOrderSummary={getOrderSummary} 
+              getPackageDetails={getPackageDetails} 
+              extractGuestName={extractGuestName} 
+              onCheckIn={handleCheckIn} 
+              onPagerAction={handlePagerAction} 
+              onTableAllocate={handleTableAllocate} 
+              onSeat={handleSeat} 
+              onComment={handleComment} 
+              onManualEdit={handleManualEdit} 
+            />
           </div>
         </TabsContent>
 

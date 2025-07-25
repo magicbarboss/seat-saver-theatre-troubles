@@ -32,6 +32,7 @@ interface PartyGroup {
 
 interface GuestTableProps {
   bookingGroups: BookingGroup[];
+  guests: Guest[];
   checkedInGuests: Set<number>;
   seatedGuests: Set<number>;
   allocatedGuests: Set<number>;
@@ -57,6 +58,7 @@ interface GuestTableProps {
 
 export const GuestTable = ({
   bookingGroups,
+  guests,
   checkedInGuests,
   seatedGuests,
   allocatedGuests,
@@ -89,6 +91,11 @@ export const GuestTable = ({
     return { isInParty: false, partySize: 0, partyMembers: [] };
   };
 
+  // Helper function to get current guest data from guests array
+  const getCurrentGuest = (originalIndex: number): Guest => {
+    return guests[originalIndex] || bookingGroups.find(g => g.originalIndex === originalIndex)?.mainBooking || ({} as Guest);
+  };
+
   return (
     <Table>
       <TableHeader>
@@ -105,28 +112,31 @@ export const GuestTable = ({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {bookingGroups.map((group) => (
-          <GuestRow
-            key={group.originalIndex}
-            guest={group.mainBooking}
-            index={group.originalIndex}
-            isCheckedIn={checkedInGuests.has(group.originalIndex)}
-            isSeated={seatedGuests.has(group.originalIndex)}
-            isAllocated={allocatedGuests.has(group.originalIndex)}
-            pagerNumber={pagerAssignments.get(group.originalIndex)}
-            tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
-            orderSummary={getOrderSummary(group.mainBooking, group.mainBooking.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0), group.addOns)}
-            packageDetails={getPackageDetails(group.mainBooking)}
-            comment={bookingComments.get(group.originalIndex)}
-            partyInfo={getPartyInfo(group.originalIndex)}
-            onCheckIn={onCheckIn}
-            onPagerAction={onPagerAction}
-            onTableAllocate={onTableAllocate}
-            onSeat={onSeat}
-            onComment={onComment}
-            onManualEdit={onManualEdit}
-          />
-        ))}
+        {bookingGroups.map((group) => {
+          const currentGuest = getCurrentGuest(group.originalIndex);
+          return (
+            <GuestRow
+              key={group.originalIndex}
+              guest={currentGuest}
+              index={group.originalIndex}
+              isCheckedIn={checkedInGuests.has(group.originalIndex)}
+              isSeated={seatedGuests.has(group.originalIndex)}
+              isAllocated={allocatedGuests.has(group.originalIndex)}
+              pagerNumber={pagerAssignments.get(group.originalIndex)}
+              tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
+              orderSummary={getOrderSummary(currentGuest, currentGuest.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0), group.addOns)}
+              packageDetails={getPackageDetails(currentGuest)}
+              comment={bookingComments.get(group.originalIndex)}
+              partyInfo={getPartyInfo(group.originalIndex)}
+              onCheckIn={onCheckIn}
+              onPagerAction={onPagerAction}
+              onTableAllocate={onTableAllocate}
+              onSeat={onSeat}
+              onComment={onComment}
+              onManualEdit={onManualEdit}
+            />
+          );
+        })}
         
         {walkInGuests.map((walkIn, index) => {
           const walkInIndex = 10000 + index; // Use large index to avoid conflicts
