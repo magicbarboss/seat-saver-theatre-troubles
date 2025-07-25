@@ -1335,17 +1335,33 @@ const CheckInSystem = ({
         
         friendNames.forEach(friendName => {
           console.log(`  🔎 Looking for friend: "${friendName}"`);
-          // Find matching guests by name (case-insensitive, flexible matching)
+          // Find matching guests by exact name matching only
           const matchingGuestIndices = guests.map((g, i) => ({ guest: g, index: i }))
             .filter(({ guest }) => {
               if (!guest?.booker_name) return false;
-              const guestName = guest.booker_name.toLowerCase();
-              const searchName = friendName.toLowerCase();
+              const guestName = guest.booker_name.toLowerCase().trim();
+              const searchName = friendName.toLowerCase().trim();
               
-              // Check for exact match, partial match, or name contains the search term
-              return guestName.includes(searchName) || searchName.includes(guestName) ||
-                     guestName.split(' ').some(part => searchName.includes(part)) ||
-                     searchName.split(' ').some(part => guestName.includes(part));
+              // Only exact name match or exact first/last name combinations
+              const guestNameParts = guestName.split(/\s+/);
+              const searchNameParts = searchName.split(/\s+/);
+              
+              // Exact full name match
+              if (guestName === searchName) return true;
+              
+              // Check if friend name matches any combination of guest's first/last names
+              if (searchNameParts.length === 1) {
+                // Single word friend name should match first or last name exactly
+                return guestNameParts.includes(searchName);
+              } else if (searchNameParts.length === 2 && guestNameParts.length >= 2) {
+                // Two word friend name should match first+last exactly
+                return (guestNameParts[0] === searchNameParts[0] && 
+                        guestNameParts[guestNameParts.length - 1] === searchNameParts[1]) ||
+                       (guestNameParts[0] === searchNameParts[1] && 
+                        guestNameParts[guestNameParts.length - 1] === searchNameParts[0]);
+              }
+              
+              return false;
             })
             .map(({ index: i }) => i);
           
@@ -1703,7 +1719,48 @@ const CheckInSystem = ({
         description: "All related assignments have been cleared"
       });
     } else {
+      // Checking in - check for friendship groups first
+      const friendshipGroups = processFriendshipGroups;
+      let linkedGuests: number[] = [];
+      
+      // Find if this guest is part of any friendship group
+      for (const [, groupMembers] of friendshipGroups.entries()) {
+        if (groupMembers.includes(guestIndex)) {
+          linkedGuests = groupMembers.filter(i => i !== guestIndex && !checkedInGuests.has(i));
+          break;
+        }
+      }
+      
+      if (linkedGuests.length > 0) {
+        const guest = guests[guestIndex];
+        const linkedGuestNames = linkedGuests.map(i => extractGuestName(guests[i].booker_name)).join(', ');
+        const currentPartySize = guest.total_quantity;
+        const linkedPartySize = linkedGuests.reduce((sum, i) => sum + guests[i].total_quantity, 0);
+        const newPartySize = currentPartySize + linkedPartySize;
+        
+        const confirmed = window.confirm(
+          `${extractGuestName(guest.booker_name)} is linked with ${linkedGuestNames}.\n\n` +
+          `Would you like to check in the entire group?\n` +
+          `Party size will be ${currentPartySize} + ${linkedPartySize} = ${newPartySize} guests.`
+        );
+        
+        if (confirmed) {
+          // Check in all linked guests
+          linkedGuests.forEach(linkedIndex => newCheckedIn.add(linkedIndex));
+          toast({
+            title: "Friendship Group Checked In",
+            description: `Checked in ${linkedGuests.length + 1} guests from the linked group`
+          });
+        } else {
+          toast({
+            title: "Guest Checked In",
+            description: "Only this guest was checked in (linked guests remain unchecked)"
+          });
+        }
+      }
+      
       newCheckedIn.add(guestIndex);
+      
       // Auto-open pager assignment dialog when checking in
       setTimeout(() => {
         setSelectedGuestForPager(guestIndex);
