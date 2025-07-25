@@ -67,9 +67,15 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
   const getAllocatedGuests = (): AllocatedGuest[] => {
     const allocatedGuests: AllocatedGuest[] = [];
     
+    console.log(`🔧 DEBUG ManualMoveDialog: Checking for allocated guests...`);
+    
     tables.forEach(table => {
       table.sections.forEach(section => {
-        if (section.allocatedGuest && section.status !== 'AVAILABLE') {
+        console.log(`🔧 Section ${section.id} status: ${section.status}, has allocatedGuest: ${!!section.allocatedGuest}, allocatedCount: ${section.allocatedCount || 0}`);
+        
+        // Check for allocated guests (including those with ALLOCATED status)
+        if (section.allocatedGuest && (section.status === 'ALLOCATED' || section.status === 'OCCUPIED')) {
+          console.log(`🔧 Found allocated guest: ${section.allocatedGuest.name} in section ${section.id}`);
           allocatedGuests.push({
             guest: section.allocatedGuest,
             sectionId: section.id,
@@ -82,6 +88,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
       });
     });
     
+    console.log(`🔧 DEBUG ManualMoveDialog: Found ${allocatedGuests.length} allocated guests`);
     return allocatedGuests;
   };
 

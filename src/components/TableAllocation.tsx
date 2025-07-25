@@ -777,11 +777,18 @@ const TableAllocation = ({
                 
                 console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
+                console.log(`🔧 DEBUG: Setting allocatedGuest for section ${sectionId}:`, {
+                  guestName: selectedGuest.name,
+                  guestCount: selectedGuest.count,
+                  originalIndex: selectedGuest.originalIndex,
+                  pagerNumber: selectedGuest.pagerNumber
+                });
+
                 return {
                   ...s,
                   status: newStatus,
                   allocatedTo: newAllocatedTo,
-                  allocatedGuest: selectedGuest,
+                  allocatedGuest: selectedGuest, // This is the key fix for Manual Move
                   allocatedCount: newAllocatedCount,
                   seatedCount: s.seatedCount || 0, // Keep existing seated count
                 };

@@ -710,12 +710,28 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
-  // Debug: Check if manual override exists and is working
-    console.log(`🔧 DEBUG: Guest ${guest.booker_name} manual_override status:`, {
-      hasManualOverride: guest.manual_override,
+    console.log(`🔧 DEBUG: Guest ${guest.booker_name} order summary check:`, {
       hasManualOrderSummary: !!guest.ticket_data?.manual_order_summary,
-      manualOrderSummary: guest.ticket_data?.manual_order_summary
+      manualOrderSummary: guest.ticket_data?.manual_order_summary,
+      hasManualOverride: guest.manual_override
     });
+
+    // Check for Viator booking first
+    const viatorType = getViatorTicketType(guest);
+    const isViatorBooking = viatorType !== 'not-viator';
+    
+    // For Viator bookings, ALWAYS show "Viator" as the main order type
+    if (isViatorBooking) {
+      let orderSummary = "Viator";
+      
+      // If there's a manual order summary, add it underneath
+      if (guest.ticket_data?.manual_order_summary?.trim()) {
+        orderSummary += ` + ${guest.ticket_data.manual_order_summary}`;
+      }
+      
+      console.log(`🔧 Viator booking detected for ${guest.booker_name}, showing:`, orderSummary);
+      return orderSummary;
+    }
     
     // If guest has manual override, use a simpler display based on extracted tickets
     if (guest.manual_override) {
@@ -762,9 +778,7 @@ const CheckInSystem = ({
       noteStr.includes("gyg booking reference") ||
       ticketDataStr.includes("paid in gyg");
 
-    // Enhanced Viator detection with day/time logic
-    const viatorType = getViatorTicketType(guest);
-    const isViatorBooking = viatorType !== 'not-viator';
+    // Enhanced Viator detection with day/time logic (already detected above)
     
     // DEBUG: Show actual guest data structure to find where GYG/Viator info is stored
     console.log("🔍 COMPLETE GUEST DEBUG for", guest.booker_name, {
