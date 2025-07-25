@@ -1897,6 +1897,7 @@ const CheckInSystem = ({
         bookingGroups={groupedBookings}
         checkedInGuests={checkedInGuests}
         manualLinks={manualLinks}
+        friendshipGroups={friendshipGroups}
         onCreateManualLink={handleCreateManualLink}
         onRemoveManualLink={handleRemoveManualLink}
         extractGuestName={extractGuestName}

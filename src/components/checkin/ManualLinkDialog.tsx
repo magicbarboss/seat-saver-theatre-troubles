@@ -10,6 +10,7 @@ interface ManualLinkDialogProps {
   bookingGroups: BookingGroup[];
   checkedInGuests: Set<number>;
   manualLinks: Map<string, number[]>;
+  friendshipGroups: Map<string, number[]>;
   onCreateLink: (guestIndices: number[]) => void;
   onRemoveLink: (linkId: string) => void;
   extractGuestName: (name: string) => string;
@@ -19,6 +20,7 @@ export const ManualLinkDialog = ({
   bookingGroups,
   checkedInGuests,
   manualLinks,
+  friendshipGroups,
   onCreateLink,
   onRemoveLink,
   extractGuestName
@@ -110,6 +112,35 @@ export const ManualLinkDialog = ({
                   >
                     <Unlink className="h-3 w-3" />
                   </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Friendship Groups */}
+          {friendshipGroups.size > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm">Detected Friendship Groups:</h4>
+              <p className="text-xs text-muted-foreground">
+                These groups were automatically detected from the guest data.
+              </p>
+              {Array.from(friendshipGroups.entries()).map(([groupName, guestIndices]) => (
+                <div key={groupName} className="flex items-center gap-2 p-3 border rounded-lg bg-green-50/50 border-green-200">
+                  <Users className="h-4 w-4 text-green-600" />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm text-green-800">{groupName}</div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {guestIndices.map((index, i) => (
+                        <Badge key={index} variant="outline" className="text-xs border-green-300 text-green-700">
+                          {getGuestNameByIndex(index)}
+                          {i < guestIndices.length - 1 && ','}
+                        </Badge>
+                      ))}
+                    </div>
+                    <span className="text-xs text-green-600">
+                      (Group of {guestIndices.length})
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

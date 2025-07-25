@@ -14,6 +14,7 @@ interface CheckInActionsProps {
   bookingGroups: BookingGroup[];
   checkedInGuests: Set<number>;
   manualLinks: Map<string, number[]>;
+  friendshipGroups: Map<string, number[]>;
   onCreateManualLink: (guestIndices: number[]) => void;
   onRemoveManualLink: (linkId: string) => void;
   extractGuestName: (name: string) => string;
@@ -27,6 +28,7 @@ export const CheckInActions = ({
   bookingGroups,
   checkedInGuests,
   manualLinks,
+  friendshipGroups,
   onCreateManualLink,
   onRemoveManualLink,
   extractGuestName
@@ -47,6 +49,7 @@ export const CheckInActions = ({
         bookingGroups={bookingGroups}
         checkedInGuests={checkedInGuests}
         manualLinks={manualLinks}
+        friendshipGroups={friendshipGroups}
         onCreateLink={onCreateManualLink}
         onRemoveLink={onRemoveManualLink}
         extractGuestName={extractGuestName}
