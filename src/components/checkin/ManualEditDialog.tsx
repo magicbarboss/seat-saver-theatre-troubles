@@ -82,14 +82,17 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         manual_override: true, // Flag to prevent automatic processing override
       };
 
-      // Handle manual order summary (for Viator bookings)
+      // Handle manual order summary - save for any booking type, not just Viator
       if (formData.manual_order_summary.trim()) {
-        console.log(`🔧 Saving manual order summary for ${guest.booker_name}:`, formData.manual_order_summary.trim());
+        console.log(`💾 DEBUG: Saving manual order summary for ${guest.booker_name}:`, formData.manual_order_summary.trim());
         const newTicketData = {
           ...guest.ticket_data,
           manual_order_summary: formData.manual_order_summary.trim()
         };
         updates.ticket_data = newTicketData;
+        
+        // Also ensure we persist this data properly
+        console.log(`💾 DEBUG: Updated ticket_data will be:`, newTicketData);
       }
 
       // If a ticket type was selected, update the ticket_data
@@ -222,7 +225,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
           </div>
 
           <div>
-            <Label htmlFor="manual_order_summary">Manual Order Summary (Viator Only)</Label>
+            <Label htmlFor="manual_order_summary">Manual Order Summary</Label>
             <Textarea
               id="manual_order_summary"
               value={formData.manual_order_summary}

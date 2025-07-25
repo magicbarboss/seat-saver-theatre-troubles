@@ -838,19 +838,17 @@ const CheckInSystem = ({
     // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority) 
     // Check for manual override first - if guest has been manually edited, use that data
     if (isViatorBooking) {
-      // Check if this guest has manual override and stored manual order summary
-      if (guest.manual_override && guest.ticket_data?.manual_order_summary) {
-        console.log(`🔵 Viator booking with manual override for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
-        return guest.ticket_data.manual_order_summary;
-      }
+      console.log(`🔵 Viator booking detected for ${guest.booker_name}`);
       
-      // Also check if manual_order_summary exists without manual_override flag (in case flag is missing)
+      // Check if manual_order_summary exists (with or without manual_override flag)
       if (guest.ticket_data?.manual_order_summary) {
-        console.log(`🔵 Viator booking with manual order summary for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
-        return guest.ticket_data.manual_order_summary;
+        console.log(`📝 Using manual order summary for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
+        // For Viator bookings, show "Viator" as the main order type, with additional details underneath
+        const additionalDetails = guest.ticket_data.manual_order_summary;
+        return additionalDetails === "Viator" ? "Viator" : `Viator\n+ ${additionalDetails}`;
       }
       
-      console.log(`🔵 Viator booking detected for ${guest.booker_name} - showing "Viator" for manual editing`);
+      console.log(`🔵 Standard Viator booking for ${guest.booker_name} - showing "Viator"`);
       return "Viator";
     }
 
@@ -1568,37 +1566,67 @@ const CheckInSystem = ({
     const newCheckedIn = new Set(checkedInGuests);
     if (newCheckedIn.has(guestIndex)) {
       // When unchecking a guest, clear all their related states
+      console.log(`🔄 DEBUG: Unchecking guest at index ${guestIndex}`);
+      console.log(`🔄 Before uncheck - guest states:`, {
+        checkedIn: checkedInGuests.has(guestIndex),
+        seated: seatedGuests.has(guestIndex),
+        allocated: allocatedGuests.has(guestIndex),
+        hasPager: pagerAssignments.has(guestIndex),
+        hasTableAllocation: guestTableAllocations.has(guestIndex)
+      });
+      
       newCheckedIn.delete(guestIndex);
       
       // Clear pager assignment
+      const pagerNumber = pagerAssignments.get(guestIndex);
       if (pagerAssignments.has(guestIndex)) {
         const newPagerAssignments = new Map(pagerAssignments);
         newPagerAssignments.delete(guestIndex);
         setPagerAssignments(newPagerAssignments);
+        if (pagerNumber) {
+          console.log(`🔔 DEBUG: Released pager ${pagerNumber} during uncheck`);
+        }
       }
       
       // Clear seating status
+      const wasSeated = seatedGuests.has(guestIndex);
       if (seatedGuests.has(guestIndex)) {
         const newSeatedGuests = new Set(seatedGuests);
         newSeatedGuests.delete(guestIndex);
         setSeatedGuests(newSeatedGuests);
+        if (wasSeated) {
+          console.log(`🪑 DEBUG: Removed seated status during uncheck`);
+        }
       }
       
       // Clear allocation status
+      const wasAllocated = allocatedGuests.has(guestIndex);
       if (allocatedGuests.has(guestIndex)) {
         const newAllocatedGuests = new Set(allocatedGuests);
         newAllocatedGuests.delete(guestIndex);
         setAllocatedGuests(newAllocatedGuests);
+        if (wasAllocated) {
+          console.log(`📋 DEBUG: Removed allocated status during uncheck`);
+        }
       }
       
       // Clear table allocations
+      const hadTableAllocation = guestTableAllocations.has(guestIndex);
       if (guestTableAllocations.has(guestIndex)) {
         const newGuestTableAllocations = new Map(guestTableAllocations);
         newGuestTableAllocations.delete(guestIndex);
         setGuestTableAllocations(newGuestTableAllocations);
+        if (hadTableAllocation) {
+          console.log(`🗓️ DEBUG: Removed table allocation during uncheck`);
+        }
       }
       
-      console.log(`🔄 Unchecked guest ${guestIndex} (${guests[guestIndex]?.booker_name}) and cleared all related states`);
+      console.log(`✅ DEBUG: Successfully unchecked guest ${guestIndex} (${guests[guestIndex]?.booker_name}) and cleared all states`);
+      
+      toast({
+        title: "Guest Unchecked",
+        description: "All related assignments have been cleared"
+      });
     } else {
       newCheckedIn.add(guestIndex);
       // Auto-open pager assignment dialog when checking in

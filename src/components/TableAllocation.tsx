@@ -1085,7 +1085,40 @@ const TableAllocation = ({
     
     if (!table || !section) return;
 
-    console.log(`Freeing section ${sectionId}`);
+    console.log(`🆓 DEBUG: Freeing section ${sectionId}`, {
+      hadAllocatedGuest: !!section.allocatedGuest,
+      guestName: section.allocatedGuest?.name,
+      guestIndex: section.allocatedGuest?.originalIndex,
+      hadPager: !!section.allocatedGuest?.pagerNumber
+    });
+
+    // Clear guest states when freeing the section
+    if (section.allocatedGuest) {
+      const guestIndex = section.allocatedGuest.originalIndex;
+      
+      // Call parent callbacks to update guest states
+      console.log(`🔄 Updating guest states for index ${guestIndex}`);
+      
+      // Update seated status - mark as not seated anymore
+      if (section.allocatedGuest.hasBeenSeated) {
+        console.log(`🪑 Removing seated status for guest ${section.allocatedGuest.name}`);
+        onGuestSeated({ 
+          originalIndex: guestIndex, 
+          sectionId: '', // Empty sectionId means removing from seat
+          guestCount: section.allocatedGuest.count 
+        });
+      }
+      
+      // Update table allocation status - mark as not allocated anymore
+      console.log(`📋 Removing table allocation for guest ${section.allocatedGuest.name}`);
+      onTableAllocated(guestIndex, []); // Empty array means removing allocation
+      
+      // Release pager if assigned
+      if (section.allocatedGuest.pagerNumber) {
+        console.log(`🔔 Releasing pager ${section.allocatedGuest.pagerNumber} for ${section.allocatedGuest.name}`);
+        onPagerRelease(section.allocatedGuest.pagerNumber);
+      }
+    }
 
     setTables(prevTables =>
       prevTables.map(t => {
@@ -1110,8 +1143,8 @@ const TableAllocation = ({
 
     const sectionDisplay = section.section === 'whole' ? '' : ` ${section.section}`;
     toast({
-      title: "🔄 Section Freed",
-      description: `${table.name}${sectionDisplay} is now available`,
+      title: "✅ Table Freed",
+      description: `${table.name}${sectionDisplay} is now available and guest states have been updated`,
     });
   };
 
