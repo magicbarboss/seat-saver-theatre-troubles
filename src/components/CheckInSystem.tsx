@@ -717,7 +717,9 @@ const CheckInSystem = ({
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
     // Check for staff updated order first - highest priority
+    console.log(`🔍 ORDER SUMMARY DEBUG for ${guest.booker_name}: staff_updated_order = "${guest.staff_updated_order}"`);
     if (guest.staff_updated_order?.trim()) {
+      console.log(`✅ USING STAFF ORDER: "${guest.staff_updated_order}"`);
       return `STAFF UPDATED: ${guest.staff_updated_order}`;
     }
 
@@ -1837,6 +1839,10 @@ const CheckInSystem = ({
         );
         setGuests(updatedGuests);
         console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, updatedGuests[guestIndex]);
+        console.log(`🔍 STAFF ORDER CHECK: staff_updated_order = "${updatedGuests[guestIndex].staff_updated_order}"`);
+        
+        // Force immediate re-render to ensure UI updates
+        setLastSaved(new Date());
       }
 
       toast({
