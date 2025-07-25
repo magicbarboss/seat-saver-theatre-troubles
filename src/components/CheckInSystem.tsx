@@ -1822,17 +1822,15 @@ const CheckInSystem = ({
       
       console.log(`✅ DATABASE UPDATE SUCCESS for guest ${guestId}`);
 
-      // Update local state by forcing a re-render
+      // Update the guest in the original guests array to trigger UI update
       const guestIndex = guests.findIndex(g => g.id === guestId);
       if (guestIndex !== -1) {
-        const updatedGuest = { ...guests[guestIndex], ...updates };
-        console.log(`🔄 LOCAL STATE UPDATING for guest ${guestId}:`, updatedGuest);
-        
-        // Trigger state update to force component re-render
-        setLastSaved(new Date());
-        
-        // Update the guest object in place for immediate UI feedback
+        // Directly update the guest object properties
         Object.assign(guests[guestIndex], updates);
+        console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, guests[guestIndex]);
+        
+        // Force component re-render by updating a state value
+        setLastSaved(new Date());
       }
 
       toast({
