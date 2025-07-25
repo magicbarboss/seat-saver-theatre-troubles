@@ -710,6 +710,11 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
+    // Check for staff updated order first - highest priority
+    if (guest.staff_updated_order?.trim()) {
+      return `STAFF UPDATED: ${guest.staff_updated_order}`;
+    }
+
     console.log(`🔧 DEBUG: Guest ${guest.booker_name} order summary check:`, {
       hasManualOrderSummary: !!guest.ticket_data?.manual_order_summary,
       manualOrderSummary: guest.ticket_data?.manual_order_summary,

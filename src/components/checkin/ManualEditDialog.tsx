@@ -47,7 +47,8 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
     magic_info: '',
     ticket_type: '',
     custom_ticket_type: '',
-    manual_order_summary: ''
+    manual_order_summary: '',
+    staff_updated_order: ''
   });
   const [isCustomTicket, setIsCustomTicket] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,7 +63,8 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         magic_info: guest.magic_info || '',
         ticket_type: '',
         custom_ticket_type: '',
-        manual_order_summary: guest.ticket_data?.manual_order_summary || ''
+        manual_order_summary: guest.ticket_data?.manual_order_summary || '',
+        staff_updated_order: guest.staff_updated_order || ''
       });
       setIsCustomTicket(false);
     }
@@ -79,6 +81,8 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         show_time: formData.show_time,
         diet_info: formData.diet_info || null,
         magic_info: formData.magic_info || null,
+        staff_updated_order: formData.staff_updated_order.trim() || null,
+        order_last_updated_at: formData.staff_updated_order.trim() ? new Date().toISOString() : null,
         manual_override: true, // Flag to prevent automatic processing override
       };
 
@@ -141,6 +145,24 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         </DialogHeader>
         
         <div className="space-y-4">
+          <div>
+            <Label htmlFor="staff_updated_order" className="text-primary font-semibold">
+              Updated Order (Staff Override)
+            </Label>
+            <Input
+              id="staff_updated_order"
+              value={formData.staff_updated_order}
+              onChange={(e) => setFormData(prev => ({ ...prev, staff_updated_order: e.target.value }))}
+              placeholder="Enter updated order details (overrides all automatic detection)"
+              className="border-primary"
+            />
+            {formData.staff_updated_order && (
+              <p className="text-sm text-muted-foreground mt-1">
+                ✅ This will override all automatic order detection
+              </p>
+            )}
+          </div>
+          
           <div>
             <Label htmlFor="booker_name">Guest Name</Label>
             <Input
@@ -232,7 +254,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
           </div>
 
           <div>
-            <Label htmlFor="manual_order_summary">Manual Order Summary</Label>
+            <Label htmlFor="manual_order_summary">Manual Order Summary (Legacy)</Label>
             <Textarea
               id="manual_order_summary"
               value={formData.manual_order_summary}
@@ -240,6 +262,9 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
               placeholder="e.g., 2 Proseccos, 1 Pizza, 1 Fries"
               rows={2}
             />
+            <p className="text-sm text-muted-foreground mt-1">
+              Use "Updated Order" field above for new entries
+            </p>
           </div>
 
           <div className="flex gap-2 pt-4">

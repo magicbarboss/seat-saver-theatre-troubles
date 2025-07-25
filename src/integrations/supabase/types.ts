@@ -116,10 +116,13 @@ export type Database = {
           magic_info: string | null
           manual_override: boolean | null
           notes: string | null
+          order_last_updated_at: string | null
+          order_last_updated_by: string | null
           original_row_index: number | null
           pager_number: number | null
           seated_at: string | null
           show_time: string | null
+          staff_updated_order: string | null
           table_assignments: number[] | null
           ticket_data: Json | null
           total_quantity: number | null
@@ -141,10 +144,13 @@ export type Database = {
           magic_info?: string | null
           manual_override?: boolean | null
           notes?: string | null
+          order_last_updated_at?: string | null
+          order_last_updated_by?: string | null
           original_row_index?: number | null
           pager_number?: number | null
           seated_at?: string | null
           show_time?: string | null
+          staff_updated_order?: string | null
           table_assignments?: number[] | null
           ticket_data?: Json | null
           total_quantity?: number | null
@@ -166,10 +172,13 @@ export type Database = {
           magic_info?: string | null
           manual_override?: boolean | null
           notes?: string | null
+          order_last_updated_at?: string | null
+          order_last_updated_by?: string | null
           original_row_index?: number | null
           pager_number?: number | null
           seated_at?: string | null
           show_time?: string | null
+          staff_updated_order?: string | null
           table_assignments?: number[] | null
           ticket_data?: Json | null
           total_quantity?: number | null
