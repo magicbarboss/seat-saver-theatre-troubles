@@ -1318,6 +1318,8 @@ const CheckInSystem = ({
   const processFriendshipGroups = useMemo(() => {
     if (!guests || guests.length === 0) return new Map<string, number[]>();
     
+    console.log('🔍 Processing friendship groups for', guests.length, 'guests');
+    
     const connections = new Map<number, Set<number>>();
     
     // First pass: Find all friend connections
@@ -1328,9 +1330,11 @@ const CheckInSystem = ({
       const friendsData = guest.ticket_data.Friends || guest.ticket_data.friends;
       
       if (friendsData && typeof friendsData === 'string' && friendsData.trim() !== '') {
+        console.log(`📝 Guest ${guest.booker_name} (${index}) has friends: "${friendsData}"`);
         const friendNames = friendsData.split(/[,;&]/).map(name => name.trim()).filter(name => name.length > 0);
         
         friendNames.forEach(friendName => {
+          console.log(`  🔎 Looking for friend: "${friendName}"`);
           // Find matching guests by name (case-insensitive, flexible matching)
           const matchingGuestIndices = guests.map((g, i) => ({ guest: g, index: i }))
             .filter(({ guest }) => {
