@@ -148,21 +148,25 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-          <div>
-            <Label htmlFor="staff_updated_order" className="text-primary font-semibold">
-              Updated Order (Staff Override)
+          {/* STAFF ORDER OVERRIDE - Most prominent field */}
+          <div className="bg-primary/5 border-2 border-primary rounded-lg p-3">
+            <Label htmlFor="staff_updated_order" className="text-primary font-bold text-base">
+              🍽️ Staff Order Override
             </Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Type exactly what this guest should receive (e.g., "4 Prosecco 2 Pizzas 2 Fries")
+            </p>
             <Input
               id="staff_updated_order"
               value={formData.staff_updated_order}
               onChange={(e) => setFormData(prev => ({ ...prev, staff_updated_order: e.target.value }))}
-              placeholder="Enter updated order details (overrides all automatic detection)"
-              className="border-primary"
+              placeholder="e.g., 1 x Prosecco 1 x Pizza"
+              className="border-primary font-medium"
             />
             {formData.staff_updated_order && (
-              <p className="text-sm text-muted-foreground mt-1">
-                ✅ This will override all automatic order detection
-              </p>
+              <div className="text-sm text-primary font-medium mt-2 p-2 bg-primary/10 rounded">
+                ✅ Will show: "STAFF UPDATED: {formData.staff_updated_order}"
+              </div>
             )}
           </div>
           
