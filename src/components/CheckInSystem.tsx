@@ -1822,20 +1822,21 @@ const CheckInSystem = ({
       
       console.log(`✅ DATABASE UPDATE SUCCESS for guest ${guestId}`);
 
-      // Update local state with proper mutation to trigger re-renders
+      // Update local state by forcing a re-render
       const guestIndex = guests.findIndex(g => g.id === guestId);
       if (guestIndex !== -1) {
         const updatedGuest = { ...guests[guestIndex], ...updates };
-        guests[guestIndex] = updatedGuest;
-        console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, updatedGuest);
+        console.log(`🔄 LOCAL STATE UPDATING for guest ${guestId}:`, updatedGuest);
         
-        // Force state update by calling setters to trigger React re-renders
-        // This ensures the UI shows the updated order summary immediately
+        // Trigger state update to force component re-render
         setLastSaved(new Date());
+        
+        // Update the guest object in place for immediate UI feedback
+        Object.assign(guests[guestIndex], updates);
       }
 
       toast({
-        title: "✅ Guest Updated",
+        title: "✅ Guest Updated", 
         description: "Guest information has been corrected and order summary updated.",
       });
       
