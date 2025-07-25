@@ -710,10 +710,11 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
-    // Debug: Check if manual override exists and is working
+  // Debug: Check if manual override exists and is working
     console.log(`🔧 DEBUG: Guest ${guest.booker_name} manual_override status:`, {
       hasManualOverride: guest.manual_override,
-      guestObject: guest
+      hasManualOrderSummary: !!guest.ticket_data?.manual_order_summary,
+      manualOrderSummary: guest.ticket_data?.manual_order_summary
     });
     
     // If guest has manual override, use a simpler display based on extracted tickets
@@ -837,9 +838,15 @@ const CheckInSystem = ({
     // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority) 
     // Check for manual override first - if guest has been manually edited, use that data
     if (isViatorBooking) {
-      // Check if this guest has manual override and stored ticket data
+      // Check if this guest has manual override and stored manual order summary
       if (guest.manual_override && guest.ticket_data?.manual_order_summary) {
         console.log(`🔵 Viator booking with manual override for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
+        return guest.ticket_data.manual_order_summary;
+      }
+      
+      // Also check if manual_order_summary exists without manual_override flag (in case flag is missing)
+      if (guest.ticket_data?.manual_order_summary) {
+        console.log(`🔵 Viator booking with manual order summary for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
         return guest.ticket_data.manual_order_summary;
       }
       
@@ -1591,7 +1598,7 @@ const CheckInSystem = ({
         setGuestTableAllocations(newGuestTableAllocations);
       }
       
-      console.log(`🔄 Unchecked guest ${guestIndex} and cleared all related states`);
+      console.log(`🔄 Unchecked guest ${guestIndex} (${guests[guestIndex]?.booker_name}) and cleared all related states`);
     } else {
       newCheckedIn.add(guestIndex);
       // Auto-open pager assignment dialog when checking in

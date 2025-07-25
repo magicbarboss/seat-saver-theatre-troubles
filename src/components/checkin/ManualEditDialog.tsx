@@ -84,6 +84,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
 
       // Handle manual order summary (for Viator bookings)
       if (formData.manual_order_summary.trim()) {
+        console.log(`🔧 Saving manual order summary for ${guest.booker_name}:`, formData.manual_order_summary.trim());
         const newTicketData = {
           ...guest.ticket_data,
           manual_order_summary: formData.manual_order_summary.trim()

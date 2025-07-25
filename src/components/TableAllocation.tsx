@@ -2373,12 +2373,25 @@ const TableAllocation = ({
           <div className="flex flex-wrap items-center gap-3">
             <Button 
               onClick={() => {
-                const allocatedGuestsCount = tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length;
-                console.log("Manual Move button clicked, allocated guests:", allocatedGuestsCount);
+                const allocatedSections = tables.flatMap(t => t.sections.filter(s => s.allocatedGuest));
+                const allocatedGuestsCount = allocatedSections.length;
+                console.log("🔧 Manual Move button clicked:", {
+                  allocatedGuestsCount,
+                  allocatedSections: allocatedSections.map(s => ({ 
+                    id: s.id, 
+                    guest: s.allocatedGuest?.name, 
+                    status: s.status 
+                  })),
+                  checkedInGuests: checkedInGuests.filter(g => 
+                    currentShowTime === 'all' || g.showTime === currentShowTime
+                  ).length,
+                  currentShowTime
+                });
+                
                 if (allocatedGuestsCount === 0) {
                   toast({
                     title: "No Guests to Move",
-                    description: "You need to allocate guests to tables first before you can move them.",
+                    description: "You need to check in guests and allocate them to tables first before you can move them. Check the guest check-in list above.",
                     variant: "destructive"
                   });
                   return;
@@ -2389,6 +2402,11 @@ const TableAllocation = ({
               size="sm"
               className="flex items-center gap-2"
               disabled={tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0}
+              title={
+                tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0
+                  ? "No guests are allocated to tables yet. Check in guests and allocate them to tables first."
+                  : "Move allocated guests between tables"
+              }
             >
               <ArrowRightLeft className="h-4 w-4" />
               Manual Move
