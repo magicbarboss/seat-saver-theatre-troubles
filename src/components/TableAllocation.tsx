@@ -2372,7 +2372,11 @@ const TableAllocation = ({
         <CardContent>
           <div className="flex flex-wrap items-center gap-3">
             <Button 
-              onClick={() => setShowManualMoveDialog(true)}
+              onClick={() => {
+                console.log("Manual Move button clicked, allocated guests:", 
+                  tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length);
+                setShowManualMoveDialog(true);
+              }}
               variant="default"
               size="sm"
               className="flex items-center gap-2"

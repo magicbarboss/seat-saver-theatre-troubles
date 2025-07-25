@@ -834,43 +834,11 @@ const CheckInSystem = ({
       return orderItems.join(', ');
     }
 
-    // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority)
+    // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority) 
+    // DISABLED - Manual editing preferred for Viator bookings
     if (isViatorBooking) {
-      const dayOfWeek = getShowDayOfWeek(guest);
-      const isEvening = isEveningShow(guest);
-      
-      if (viatorType === 'show-only') {
-        // Friday/Saturday 7pm & 9pm = Show Only
-        console.log(`🔵 Viator Show Only Detected for ${guest.booker_name}: ${dayOfWeek} ${guest.show_time} - ${guestCount} guests`);
-        
-        // Add any addon items
-        if (addonItems.length > 0) {
-          orderItems.push(...addonItems);
-          return `Viator - Show Only, ${orderItems.join(', ')}`;
-        }
-        
-        return "Viator - Show Only";
-      } else {
-        // Thursday or other days = Prosecco Package (existing behavior)
-        const orderSummary = {
-          prosecco: guestCount,
-          pizza: Math.floor(guestCount / 2),
-          fries: Math.floor(guestCount / 2)
-        };
-        
-        orderItems.push(`${orderSummary.prosecco} Prosecco${orderSummary.prosecco > 1 ? 's' : ''}`);
-        if (orderSummary.pizza > 0) orderItems.push(`${orderSummary.pizza} Pizza${orderSummary.pizza > 1 ? 's' : ''}`);
-        if (orderSummary.fries > 0) orderItems.push(`${orderSummary.fries} Fries`);
-        
-        console.log(`🔵 Viator Prosecco Package Detected for ${guest.booker_name}: ${dayOfWeek} ${guest.show_time} - ${guestCount} guests`);
-        
-        // Add any addon items
-        if (addonItems.length > 0) {
-          orderItems.push(...addonItems);
-        }
-        
-        return `Viator - Prosecco Package, ${orderItems.join(', ')}`;
-      }
+      console.log(`🔵 Viator booking detected for ${guest.booker_name} - showing "Viator" for manual editing`);
+      return "Viator";
     }
 
     // Step 4: Check if guest has explicit ticket mappings FIRST
