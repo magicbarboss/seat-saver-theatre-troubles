@@ -64,8 +64,9 @@ const GuestManager = () => {
             table: 'guests',
             filter: `guest_list_id=eq.${activeGuestList.id}`
           },
-          () => {
-            console.log('Real-time update detected, refetching guests...');
+           (payload) => {
+            console.log('🔄 Real-time update detected:', payload);
+            console.log('🔄 Refetching guests to get latest data...');
             fetchGuests(activeGuestList.id);
           }
         )

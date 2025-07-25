@@ -67,15 +67,23 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
   const getAllocatedGuests = (): AllocatedGuest[] => {
     const allocatedGuests: AllocatedGuest[] = [];
     
-    console.log(`🔧 DEBUG ManualMoveDialog: Checking for allocated guests...`);
+    console.log(`🔧 DEBUG ManualMoveDialog: Checking ${tables.length} tables for allocated guests...`);
     
-    tables.forEach(table => {
-      table.sections.forEach(section => {
-        console.log(`🔧 Section ${section.id} status: ${section.status}, has allocatedGuest: ${!!section.allocatedGuest}, allocatedCount: ${section.allocatedCount || 0}`);
+    tables.forEach((table, tableIndex) => {
+      console.log(`🔧 Table ${tableIndex}: ${table.name} has ${table.sections.length} sections`);
+      table.sections.forEach((section, sectionIndex) => {
+        console.log(`🔧 Section ${section.id} (${sectionIndex}):`, {
+          status: section.status,
+          hasAllocatedGuest: !!section.allocatedGuest,
+          allocatedCount: section.allocatedCount || 0,
+          allocatedTo: section.allocatedTo,
+          guestName: section.allocatedGuest?.name || 'none'
+        });
         
-        // Check for allocated guests (including those with ALLOCATED status)
-        if (section.allocatedGuest && (section.status === 'ALLOCATED' || section.status === 'OCCUPIED')) {
-          console.log(`🔧 Found allocated guest: ${section.allocatedGuest.name} in section ${section.id}`);
+        // Check for ANY guest that has been allocated to this section
+        // This includes ALLOCATED, OCCUPIED, or any section with allocatedGuest data
+        if (section.allocatedGuest && section.allocatedCount > 0) {
+          console.log(`🔧 ✅ FOUND allocated guest: ${section.allocatedGuest.name} in section ${section.id}`);
           allocatedGuests.push({
             guest: section.allocatedGuest,
             sectionId: section.id,
@@ -84,6 +92,8 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
             isSeated: section.status === 'OCCUPIED',
             pagerNumber: section.allocatedGuest.pagerNumber
           });
+        } else {
+          console.log(`🔧 ❌ Section ${section.id} has no allocated guest`);
         }
       });
     });

@@ -115,8 +115,15 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         updates.ticket_data = { ...updates.ticket_data, ...newTicketData };
       }
 
+      console.log(`🔄 BEFORE SAVE: Guest ${guest.booker_name} updates:`, updates);
       await onSave(guest.id, updates);
-      onClose();
+      console.log(`✅ SAVE COMPLETE: Guest ${guest.booker_name} saved successfully`);
+      
+      // Force a slight delay to ensure UI refreshes properly
+      setTimeout(() => {
+        console.log(`🔄 UI REFRESH: Forcing refresh for ${guest.booker_name}`);
+        onClose();
+      }, 100);
     } catch (error) {
       console.error('Error saving guest updates:', error);
     } finally {

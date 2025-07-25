@@ -1693,25 +1693,37 @@ const CheckInSystem = ({
 
   const handleSaveManualEdit = async (guestId: string, updates: Partial<Guest>) => {
     try {
+      console.log(`🔄 SAVING GUEST: ${guestId} with updates:`, updates);
+      
       const { error } = await supabase
         .from('guests')
         .update(updates)
         .eq('id', guestId);
 
       if (error) throw error;
+      
+      console.log(`✅ DATABASE UPDATE SUCCESS for guest ${guestId}`);
 
-      // Update local state
+      // Update local state with proper mutation to trigger re-renders
       const guestIndex = guests.findIndex(g => g.id === guestId);
       if (guestIndex !== -1) {
-        guests[guestIndex] = { ...guests[guestIndex], ...updates };
+        const updatedGuest = { ...guests[guestIndex], ...updates };
+        guests[guestIndex] = updatedGuest;
+        console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, updatedGuest);
+        
+        // Force state update by calling setters to trigger React re-renders
+        // This ensures the UI shows the updated order summary immediately
+        setLastSaved(new Date());
       }
 
       toast({
-        title: "Guest Updated",
-        description: "Guest information has been corrected successfully.",
+        title: "✅ Guest Updated",
+        description: "Guest information has been corrected and order summary updated.",
       });
+      
+      console.log(`🎉 COMPLETE: Guest ${guestId} update process finished`);
     } catch (error) {
-      console.error('Error updating guest:', error);
+      console.error('❌ Error updating guest:', error);
       toast({
         title: "Error",
         description: "Failed to update guest information.",
