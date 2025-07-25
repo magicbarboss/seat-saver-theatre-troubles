@@ -1318,8 +1318,9 @@ const CheckInSystem = ({
   const processFriendshipGroups = useMemo(() => {
     if (!guests || guests.length === 0) return new Map<string, number[]>();
     
-    const groups = new Map<string, number[]>();
+    const connections = new Map<number, Set<number>>();
     
+    // First pass: Find all friend connections
     guests.forEach((guest, index) => {
       if (!guest || !guest.ticket_data) return;
       
@@ -1327,33 +1328,84 @@ const CheckInSystem = ({
       const friendsData = guest.ticket_data.Friends || guest.ticket_data.friends;
       
       if (friendsData && typeof friendsData === 'string' && friendsData.trim() !== '') {
-        const friendsValue = friendsData.trim();
+        const friendNames = friendsData.split(/[,;&]/).map(name => name.trim()).filter(name => name.length > 0);
         
-        // If this friendship group already exists, add this guest to it
-        if (groups.has(friendsValue)) {
-          const existingGroup = groups.get(friendsValue)!;
-          if (!existingGroup.includes(index)) {
-            existingGroup.push(index);
-          }
-        } else {
-          // Create new friendship group
-          groups.set(friendsValue, [index]);
+        friendNames.forEach(friendName => {
+          // Find matching guests by name (case-insensitive, flexible matching)
+          const matchingGuestIndices = guests.map((g, i) => ({ guest: g, index: i }))
+            .filter(({ guest }) => {
+              if (!guest?.booker_name) return false;
+              const guestName = guest.booker_name.toLowerCase();
+              const searchName = friendName.toLowerCase();
+              
+              // Check for exact match, partial match, or name contains the search term
+              return guestName.includes(searchName) || searchName.includes(guestName) ||
+                     guestName.split(' ').some(part => searchName.includes(part)) ||
+                     searchName.split(' ').some(part => guestName.includes(part));
+            })
+            .map(({ index: i }) => i);
+          
+          // Create bidirectional connections
+          matchingGuestIndices.forEach(matchedIndex => {
+            if (matchedIndex !== index) {
+              // Add connection from current guest to matched guest
+              if (!connections.has(index)) {
+                connections.set(index, new Set());
+              }
+              connections.get(index)!.add(matchedIndex);
+              
+              // Add reverse connection
+              if (!connections.has(matchedIndex)) {
+                connections.set(matchedIndex, new Set());
+              }
+              connections.get(matchedIndex)!.add(index);
+              
+              console.log(`Created friendship connection: ${guest.booker_name} (${index}) ↔ ${guests[matchedIndex]?.booker_name} (${matchedIndex})`);
+            }
+          });
+        });
+      }
+    });
+    
+    // Second pass: Create friendship groups from connections
+    const groups = new Map<string, number[]>();
+    const processedIndices = new Set<number>();
+    
+    connections.forEach((connectedIndices, startIndex) => {
+      if (processedIndices.has(startIndex)) return;
+      
+      // Use BFS to find all connected guests
+      const groupMembers = new Set<number>([startIndex]);
+      const queue = [startIndex];
+      
+      while (queue.length > 0) {
+        const currentIndex = queue.shift()!;
+        processedIndices.add(currentIndex);
+        
+        const currentConnections = connections.get(currentIndex);
+        if (currentConnections) {
+          currentConnections.forEach(connectedIndex => {
+            if (!groupMembers.has(connectedIndex)) {
+              groupMembers.add(connectedIndex);
+              queue.push(connectedIndex);
+            }
+          });
         }
+      }
+      
+      if (groupMembers.size > 1) {
+        const memberNames = Array.from(groupMembers)
+          .map(i => guests[i]?.booker_name)
+          .filter(name => name)
+          .sort()
+          .join(' & ');
         
-        console.log(`Found friendship group "${friendsValue}" for guest ${guest.booker_name} (index ${index})`);
+        groups.set(`Friends: ${memberNames}`, Array.from(groupMembers).sort());
+        console.log(`Friendship group created: "${memberNames}" with ${groupMembers.size} members:`, Array.from(groupMembers));
       }
     });
     
-    // Only keep groups with more than one member
-    const filteredGroups = new Map<string, number[]>();
-    groups.forEach((indices, groupName) => {
-      if (indices.length > 1) {
-        filteredGroups.set(groupName, indices);
-        console.log(`Friendship group "${groupName}" has ${indices.length} members:`, indices);
-      }
-    });
-    
-    return filteredGroups;
+    return groups;
   }, [guests]);
 
   // Update friendship groups state when processed groups change
