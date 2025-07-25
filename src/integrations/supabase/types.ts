@@ -22,6 +22,7 @@ export type Database = {
           created_at: string
           friendship_groups: Json | null
           guest_list_id: string
+          guest_notes: Json | null
           guest_table_allocations: Json | null
           id: string
           pager_assignments: Json | null
@@ -40,6 +41,7 @@ export type Database = {
           created_at?: string
           friendship_groups?: Json | null
           guest_list_id: string
+          guest_notes?: Json | null
           guest_table_allocations?: Json | null
           id?: string
           pager_assignments?: Json | null
@@ -58,6 +60,7 @@ export type Database = {
           created_at?: string
           friendship_groups?: Json | null
           guest_list_id?: string
+          guest_notes?: Json | null
           guest_table_allocations?: Json | null
           id?: string
           pager_assignments?: Json | null
