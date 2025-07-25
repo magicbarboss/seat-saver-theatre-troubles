@@ -835,8 +835,14 @@ const CheckInSystem = ({
     }
 
     // Step 3: Enhanced Viator Logic with Day/Time Detection (Second Priority) 
-    // DISABLED - Manual editing preferred for Viator bookings
+    // Check for manual override first - if guest has been manually edited, use that data
     if (isViatorBooking) {
+      // Check if this guest has manual override and stored ticket data
+      if (guest.manual_override && guest.ticket_data?.manual_order_summary) {
+        console.log(`🔵 Viator booking with manual override for ${guest.booker_name}:`, guest.ticket_data.manual_order_summary);
+        return guest.ticket_data.manual_order_summary;
+      }
+      
       console.log(`🔵 Viator booking detected for ${guest.booker_name} - showing "Viator" for manual editing`);
       return "Viator";
     }
@@ -1554,7 +1560,38 @@ const CheckInSystem = ({
   const handleCheckIn = (guestIndex: number) => {
     const newCheckedIn = new Set(checkedInGuests);
     if (newCheckedIn.has(guestIndex)) {
+      // When unchecking a guest, clear all their related states
       newCheckedIn.delete(guestIndex);
+      
+      // Clear pager assignment
+      if (pagerAssignments.has(guestIndex)) {
+        const newPagerAssignments = new Map(pagerAssignments);
+        newPagerAssignments.delete(guestIndex);
+        setPagerAssignments(newPagerAssignments);
+      }
+      
+      // Clear seating status
+      if (seatedGuests.has(guestIndex)) {
+        const newSeatedGuests = new Set(seatedGuests);
+        newSeatedGuests.delete(guestIndex);
+        setSeatedGuests(newSeatedGuests);
+      }
+      
+      // Clear allocation status
+      if (allocatedGuests.has(guestIndex)) {
+        const newAllocatedGuests = new Set(allocatedGuests);
+        newAllocatedGuests.delete(guestIndex);
+        setAllocatedGuests(newAllocatedGuests);
+      }
+      
+      // Clear table allocations
+      if (guestTableAllocations.has(guestIndex)) {
+        const newGuestTableAllocations = new Map(guestTableAllocations);
+        newGuestTableAllocations.delete(guestIndex);
+        setGuestTableAllocations(newGuestTableAllocations);
+      }
+      
+      console.log(`🔄 Unchecked guest ${guestIndex} and cleared all related states`);
     } else {
       newCheckedIn.add(guestIndex);
       // Auto-open pager assignment dialog when checking in

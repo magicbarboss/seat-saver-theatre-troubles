@@ -46,7 +46,8 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
     diet_info: '',
     magic_info: '',
     ticket_type: '',
-    custom_ticket_type: ''
+    custom_ticket_type: '',
+    manual_order_summary: ''
   });
   const [isCustomTicket, setIsCustomTicket] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,7 +61,8 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         diet_info: guest.diet_info || '',
         magic_info: guest.magic_info || '',
         ticket_type: '',
-        custom_ticket_type: ''
+        custom_ticket_type: '',
+        manual_order_summary: guest.ticket_data?.manual_order_summary || ''
       });
       setIsCustomTicket(false);
     }
@@ -80,6 +82,15 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         manual_override: true, // Flag to prevent automatic processing override
       };
 
+      // Handle manual order summary (for Viator bookings)
+      if (formData.manual_order_summary.trim()) {
+        const newTicketData = {
+          ...guest.ticket_data,
+          manual_order_summary: formData.manual_order_summary.trim()
+        };
+        updates.ticket_data = newTicketData;
+      }
+
       // If a ticket type was selected, update the ticket_data
       const ticketType = isCustomTicket ? formData.custom_ticket_type : formData.ticket_type;
       if (ticketType) {
@@ -97,7 +108,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
         });
         newTicketData[ticketType] = formData.total_quantity.toString();
         
-        updates.ticket_data = newTicketData;
+        updates.ticket_data = { ...updates.ticket_data, ...newTicketData };
       }
 
       await onSave(guest.id, updates);
@@ -205,6 +216,17 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
               value={formData.magic_info}
               onChange={(e) => setFormData(prev => ({ ...prev, magic_info: e.target.value }))}
               placeholder="Any special messages for the magic show"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="manual_order_summary">Manual Order Summary (Viator Only)</Label>
+            <Textarea
+              id="manual_order_summary"
+              value={formData.manual_order_summary}
+              onChange={(e) => setFormData(prev => ({ ...prev, manual_order_summary: e.target.value }))}
+              placeholder="e.g., 2 Proseccos, 1 Pizza, 1 Fries"
               rows={2}
             />
           </div>

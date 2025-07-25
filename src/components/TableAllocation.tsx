@@ -2373,16 +2373,28 @@ const TableAllocation = ({
           <div className="flex flex-wrap items-center gap-3">
             <Button 
               onClick={() => {
-                console.log("Manual Move button clicked, allocated guests:", 
-                  tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length);
+                const allocatedGuestsCount = tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length;
+                console.log("Manual Move button clicked, allocated guests:", allocatedGuestsCount);
+                if (allocatedGuestsCount === 0) {
+                  toast({
+                    title: "No Guests to Move",
+                    description: "You need to allocate guests to tables first before you can move them.",
+                    variant: "destructive"
+                  });
+                  return;
+                }
                 setShowManualMoveDialog(true);
               }}
               variant="default"
               size="sm"
               className="flex items-center gap-2"
+              disabled={tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0}
             >
               <ArrowRightLeft className="h-4 w-4" />
               Manual Move
+              {tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0 && (
+                <span className="text-xs ml-1">(No allocated guests)</span>
+              )}
             </Button>
             <Button 
               onClick={() => adjustAllTablesCapacity(1)}
