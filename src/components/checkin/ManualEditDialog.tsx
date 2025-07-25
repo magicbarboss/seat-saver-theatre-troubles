@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 interface Guest {
   [key: string]: any;
@@ -52,6 +54,7 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
   });
   const [isCustomTicket, setIsCustomTicket] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     if (guest && isOpen) {
@@ -139,12 +142,12 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Edit Guest: {guest.booker_name}</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-3 pr-2">
           <div>
             <Label htmlFor="staff_updated_order" className="text-primary font-semibold">
               Updated Order (Staff Override)
@@ -193,88 +196,89 @@ export const ManualEditDialog = ({ isOpen, onClose, guest, onSave }: ManualEditD
             />
           </div>
 
-          <div>
-            <Label htmlFor="ticket_type">Correct Ticket Type (Optional)</Label>
-            <Select 
-              value={isCustomTicket ? 'custom' : formData.ticket_type} 
-              onValueChange={(value) => {
-                if (value === 'custom') {
-                  setIsCustomTicket(true);
-                  setFormData(prev => ({ ...prev, ticket_type: '' }));
-                } else {
-                  setIsCustomTicket(false);
-                  setFormData(prev => ({ ...prev, ticket_type: value, custom_ticket_type: '' }));
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select ticket type to correct" />
-              </SelectTrigger>
-              <SelectContent>
-                {commonTicketTypes.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-                <SelectItem value="custom">Custom Ticket Type</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="flex items-center justify-between w-full p-0 h-auto text-sm font-medium"
+              >
+                Advanced Options
+                <ChevronDown className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 mt-2">
+              <div>
+                <Label htmlFor="ticket_type">Correct Ticket Type (Optional)</Label>
+                <Select 
+                  value={isCustomTicket ? 'custom' : formData.ticket_type} 
+                  onValueChange={(value) => {
+                    if (value === 'custom') {
+                      setIsCustomTicket(true);
+                      setFormData(prev => ({ ...prev, ticket_type: '' }));
+                    } else {
+                      setIsCustomTicket(false);
+                      setFormData(prev => ({ ...prev, ticket_type: value, custom_ticket_type: '' }));
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select ticket type to correct" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {commonTicketTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom Ticket Type</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {isCustomTicket && (
-            <div>
-              <Label htmlFor="custom_ticket_type">Custom Ticket Type</Label>
-              <Input
-                id="custom_ticket_type"
-                value={formData.custom_ticket_type}
-                onChange={(e) => setFormData(prev => ({ ...prev, custom_ticket_type: e.target.value }))}
-                placeholder="Enter custom ticket type"
-              />
-            </div>
-          )}
+              {isCustomTicket && (
+                <div>
+                  <Label htmlFor="custom_ticket_type">Custom Ticket Type</Label>
+                  <Input
+                    id="custom_ticket_type"
+                    value={formData.custom_ticket_type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, custom_ticket_type: e.target.value }))}
+                    placeholder="Enter custom ticket type"
+                  />
+                </div>
+              )}
 
-          <div>
-            <Label htmlFor="diet_info">Dietary Info</Label>
-            <Textarea
-              id="diet_info"
-              value={formData.diet_info}
-              onChange={(e) => setFormData(prev => ({ ...prev, diet_info: e.target.value }))}
-              placeholder="Any dietary requirements"
-              rows={2}
-            />
-          </div>
+              <div>
+                <Label htmlFor="diet_info">Dietary Info</Label>
+                <Textarea
+                  id="diet_info"
+                  value={formData.diet_info}
+                  onChange={(e) => setFormData(prev => ({ ...prev, diet_info: e.target.value }))}
+                  placeholder="Any dietary requirements"
+                  rows={1}
+                  className="resize-none"
+                />
+              </div>
 
-          <div>
-            <Label htmlFor="magic_info">Magic Show Message</Label>
-            <Textarea
-              id="magic_info"
-              value={formData.magic_info}
-              onChange={(e) => setFormData(prev => ({ ...prev, magic_info: e.target.value }))}
-              placeholder="Any special messages for the magic show"
-              rows={2}
-            />
-          </div>
+              <div>
+                <Label htmlFor="magic_info">Magic Show Message</Label>
+                <Textarea
+                  id="magic_info"
+                  value={formData.magic_info}
+                  onChange={(e) => setFormData(prev => ({ ...prev, magic_info: e.target.value }))}
+                  placeholder="Any special messages for the magic show"
+                  rows={1}
+                  className="resize-none"
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
 
-          <div>
-            <Label htmlFor="manual_order_summary">Manual Order Summary (Legacy)</Label>
-            <Textarea
-              id="manual_order_summary"
-              value={formData.manual_order_summary}
-              onChange={(e) => setFormData(prev => ({ ...prev, manual_order_summary: e.target.value }))}
-              placeholder="e.g., 2 Proseccos, 1 Pizza, 1 Fries"
-              rows={2}
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Use "Updated Order" field above for new entries
-            </p>
-          </div>
-
-          <div className="flex gap-2 pt-4">
-            <Button onClick={onClose} variant="outline" className="flex-1">
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </div>
+        <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0">
+          <Button onClick={onClose} variant="outline" className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
