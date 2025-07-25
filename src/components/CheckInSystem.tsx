@@ -838,8 +838,8 @@ const CheckInSystem = ({
       isWowcherCocktail
     });
 
-    // Step 2: GYG Logic (Highest Priority)
-    if (isGYGBooking) {
+    // Step 2: GYG Logic (Highest Priority - but ONLY if no staff override)
+    if (isGYGBooking && !guest.staff_updated_order?.trim()) {
       const orderSummary = {
         prosecco: guestCount,
         pizza: 1, // always 1 pizza for GYG
