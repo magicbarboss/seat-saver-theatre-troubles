@@ -21,7 +21,7 @@ import { ManualEditDialog } from './checkin/ManualEditDialog';
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
 
 const CheckInSystem = ({
-  guests,
+  guests: guestsProp,
   headers,
   showTimes,
   guestListId
@@ -29,6 +29,7 @@ const CheckInSystem = ({
   const {
     user
   } = useAuth();
+  const [guests, setGuests] = useState<Guest[]>(guestsProp);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
@@ -56,6 +57,11 @@ const CheckInSystem = ({
   
   // Add manual links state
   const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
+
+  // Sync local guests state with prop
+  useEffect(() => {
+    setGuests(guestsProp);
+  }, [guestsProp]);
 
   // Initialize show filter
   useEffect(() => {
@@ -1822,20 +1828,15 @@ const CheckInSystem = ({
       
       console.log(`✅ DATABASE UPDATE SUCCESS for guest ${guestId}`);
 
-      // Find and update the guest in the local array to force UI update
+      // Update the guest in the local array to trigger UI update
       const guestIndex = guests.findIndex(g => g.id === guestId);
       if (guestIndex !== -1) {
-        // Directly update the guest object properties
-        Object.assign(guests[guestIndex], updates);
-        console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, guests[guestIndex]);
-        
-        // Force component re-render by creating a new date object and updating state
-        setLastSaved(new Date());
-        
-        // Add a small delay to ensure everything processes
-        setTimeout(() => {
-          setLastSaved(new Date());
-        }, 50);
+        // Create a new array with the updated guest object to trigger React re-render
+        const updatedGuests = guests.map((guest, index) => 
+          index === guestIndex ? { ...guest, ...updates } : guest
+        );
+        setGuests(updatedGuests);
+        console.log(`🔄 LOCAL STATE UPDATED for guest ${guestId}:`, updatedGuests[guestIndex]);
       }
 
       toast({
