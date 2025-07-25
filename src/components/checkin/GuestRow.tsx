@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit } from 'lucide-react';
 
 interface Guest {
@@ -36,6 +37,7 @@ interface GuestRowProps {
     details: string[];
   }>;
   comment?: string;
+  notes?: string;
   isWalkIn?: boolean;
   partyInfo?: {
     isInParty: boolean;
@@ -47,6 +49,7 @@ interface GuestRowProps {
   onTableAllocate: (index: number) => void;
   onSeat: (index: number) => void;
   onComment: (index: number) => void;
+  onNotesChange: (index: number, notes: string) => void;
   onManualEdit?: (index: number) => void;
 }
 
@@ -61,6 +64,7 @@ export const GuestRow = ({
   orderSummary,
   packageDetails,
   comment,
+  notes,
   isWalkIn,
   partyInfo,
   onCheckIn,
@@ -68,6 +72,7 @@ export const GuestRow = ({
   onTableAllocate,
   onSeat,
   onComment,
+  onNotesChange,
   onManualEdit
 }: GuestRowProps) => {
   const guestName = guest.booker_name || 'Unknown Guest';
@@ -103,10 +108,11 @@ export const GuestRow = ({
       <TableCell>{showTime}</TableCell>
       
       <TableCell>
-        <div className="flex items-center gap-2">
-          <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
-            {orderSummary}
-          </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
+              {orderSummary}
+            </div>
           {onManualEdit && (
             <Button
               variant="ghost"
@@ -171,6 +177,18 @@ export const GuestRow = ({
               </PopoverContent>
             </Popover>
           ) : null}
+          </div>
+          
+          {/* Notes Textarea */}
+          <div className="w-full">
+            <Textarea
+              placeholder="Add your notes here..."
+              value={notes || ''}
+              onChange={(e) => onNotesChange(index, e.target.value)}
+              className="min-h-[60px] text-xs resize-none"
+              rows={2}
+            />
+          </div>
         </div>
       </TableCell>
 

@@ -54,6 +54,7 @@ const CheckInSystem = ({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedGuestForEdit, setSelectedGuestForEdit] = useState<Guest | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [guestNotes, setGuestNotes] = useState<Map<number, string>>(new Map());
   
   // Add manual links state
   const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
@@ -260,6 +261,10 @@ const CheckInSystem = ({
           const manualLinksData = (currentSession as any).manual_links || {};
           setManualLinks(new Map(Object.entries(manualLinksData).map(([k, v]) => [k, v as number[]])));
           
+          // Load guest notes
+          const guestNotesData = (currentSession as any).guest_notes || {};
+          setGuestNotes(new Map(Object.entries(guestNotesData).map(([k, v]) => [parseInt(k), v as string])));
+          
           setSessionDate(today);
           const savedDataCount = (currentSession.checked_in_guests || []).length;
           if (savedDataCount > 0) {
@@ -324,6 +329,7 @@ const CheckInSystem = ({
           party_groups: Object.fromEntries(partyGroups) as any,
           friendship_groups: Object.fromEntries(friendshipGroups) as any,
           booking_comments: Object.fromEntries(bookingComments) as any,
+          guest_notes: Object.fromEntries(guestNotes) as any,
           walk_in_guests: walkInGuests as any
         };
         const {
@@ -343,7 +349,7 @@ const CheckInSystem = ({
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, walkInGuests, manualLinks]); // Add manualLinks to dependency
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, walkInGuests, manualLinks]); // Add guestNotes and manualLinks to dependency
 
   // Extract guest name utility
   const extractGuestName = (bookerName: string) => {
@@ -1809,6 +1815,16 @@ const CheckInSystem = ({
     setCommentDialogOpen(true);
   };
 
+  const handleNotesChange = (guestIndex: number, notes: string) => {
+    const newNotes = new Map(guestNotes);
+    if (notes.trim()) {
+      newNotes.set(guestIndex, notes);
+    } else {
+      newNotes.delete(guestIndex);
+    }
+    setGuestNotes(newNotes);
+  };
+
   const handleManualEdit = (guestIndex: number) => {
     const guest = guests[guestIndex];
     if (guest) {
@@ -2076,7 +2092,7 @@ const CheckInSystem = ({
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
             <GuestTable 
               bookingGroups={filteredBookings} 
-              guests={guests}
+              guests={guests} 
               checkedInGuests={checkedInGuests} 
               seatedGuests={seatedGuests} 
               allocatedGuests={allocatedGuests} 
@@ -2084,6 +2100,7 @@ const CheckInSystem = ({
               guestTableAllocations={guestTableAllocations} 
               partyGroups={partyGroups} 
               bookingComments={bookingComments} 
+              guestNotes={guestNotes}
               walkInGuests={walkInGuests} 
               getOrderSummary={getOrderSummary} 
               getPackageDetails={getPackageDetails} 
@@ -2093,6 +2110,7 @@ const CheckInSystem = ({
               onTableAllocate={handleTableAllocate} 
               onSeat={handleSeat} 
               onComment={handleComment} 
+              onNotesChange={handleNotesChange}
               onManualEdit={handleManualEdit} 
             />
           </div>

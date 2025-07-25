@@ -40,6 +40,7 @@ interface GuestTableProps {
   guestTableAllocations: Map<number, number[]>;
   partyGroups: Map<string, PartyGroup>;
   bookingComments: Map<number, string>;
+  guestNotes: Map<number, string>;
   walkInGuests: Guest[];
   getOrderSummary: (guest: Guest, totalGuestCount?: number, addOnGuests?: Guest[]) => string;
   getPackageDetails: (guest: Guest) => Array<{
@@ -53,6 +54,7 @@ interface GuestTableProps {
   onTableAllocate: (index: number) => void;
   onSeat: (index: number) => void;
   onComment: (index: number) => void;
+  onNotesChange: (index: number, notes: string) => void;
   onManualEdit?: (index: number) => void;
 }
 
@@ -66,6 +68,7 @@ export const GuestTable = ({
   guestTableAllocations,
   partyGroups,
   bookingComments,
+  guestNotes,
   walkInGuests,
   getOrderSummary,
   getPackageDetails,
@@ -75,6 +78,7 @@ export const GuestTable = ({
   onTableAllocate,
   onSeat,
   onComment,
+  onNotesChange,
   onManualEdit
 }: GuestTableProps) => {
   // Helper function to get party info for a guest
@@ -127,12 +131,14 @@ export const GuestTable = ({
               orderSummary={getOrderSummary(currentGuest, currentGuest.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0), group.addOns)}
               packageDetails={getPackageDetails(currentGuest)}
               comment={bookingComments.get(group.originalIndex)}
+              notes={guestNotes.get(group.originalIndex) || ''}
               partyInfo={getPartyInfo(group.originalIndex)}
               onCheckIn={onCheckIn}
               onPagerAction={onPagerAction}
               onTableAllocate={onTableAllocate}
               onSeat={onSeat}
               onComment={onComment}
+              onNotesChange={onNotesChange}
               onManualEdit={onManualEdit}
             />
           );
@@ -153,12 +159,14 @@ export const GuestTable = ({
               orderSummary={getOrderSummary(walkIn)}
               packageDetails={getPackageDetails(walkIn)}
               comment={bookingComments.get(walkInIndex)}
+              notes={guestNotes.get(walkInIndex) || ''}
               isWalkIn={true}
               onCheckIn={onCheckIn}
               onPagerAction={onPagerAction}
               onTableAllocate={onTableAllocate}
               onSeat={onSeat}
               onComment={onComment}
+              onNotesChange={onNotesChange}
               onManualEdit={onManualEdit}
             />
           );
