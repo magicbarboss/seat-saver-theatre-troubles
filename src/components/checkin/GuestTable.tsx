@@ -132,6 +132,7 @@ export const GuestTable = ({
               packageDetails={getPackageDetails(currentGuest)}
               comment={bookingComments.get(group.originalIndex)}
               notes={guestNotes.get(group.originalIndex) || ''}
+              addOnGuests={group.addOns}
               partyInfo={getPartyInfo(group.originalIndex)}
               onCheckIn={onCheckIn}
               onPagerAction={onPagerAction}

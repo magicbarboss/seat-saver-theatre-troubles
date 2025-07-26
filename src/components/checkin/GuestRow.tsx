@@ -39,6 +39,7 @@ interface GuestRowProps {
   comment?: string;
   notes?: string;
   isWalkIn?: boolean;
+  addOnGuests?: Guest[];
   partyInfo?: {
     isInParty: boolean;
     partySize: number;
@@ -66,6 +67,7 @@ export const GuestRow = ({
   comment,
   notes,
   isWalkIn,
+  addOnGuests,
   partyInfo,
   onCheckIn,
   onPagerAction,
@@ -75,9 +77,30 @@ export const GuestRow = ({
   onNotesChange,
   onManualEdit
 }: GuestRowProps) => {
-  const guestName = guest.booker_name || 'Unknown Guest';
+const guestName = guest.booker_name || 'Unknown Guest';
   const guestCount = guest.total_quantity || 1;
   const showTime = guest.show_time || guest['Show time'] || 'N/A';
+
+  // Format add-on items for display
+  const formatAddOns = (addOns: Guest[]) => {
+    const addOnItems: string[] = [];
+    
+    addOns.forEach((addon) => {
+      // Extract add-on details from ticket data or other fields
+      const quantity = addon.total_quantity || 1;
+      
+      // Check various fields that might contain add-on info
+      const itemName = addon.booker_name || 
+                      addon.ticket_data?.Item ||
+                      addon.ticket_data?.Package ||
+                      addon.ticket_data?.Description ||
+                      'Add-on Item';
+      
+      addOnItems.push(`x${quantity} ${itemName}`);
+    });
+    
+    return addOnItems;
+  };
 
   return (
     <TableRow className={`${isCheckedIn ? 'bg-green-50 dark:bg-green-950/20' : ''} ${isWalkIn ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
@@ -176,19 +199,33 @@ export const GuestRow = ({
                 </div>
               </PopoverContent>
             </Popover>
-          ) : null}
-          </div>
-          
-          {/* Notes Textarea */}
-          <div className="w-full">
-            <Textarea
-              placeholder="Add your notes here..."
-              value={notes || ''}
-              onChange={(e) => onNotesChange(index, e.target.value)}
-              className="min-h-[60px] text-xs resize-none"
-              rows={2}
-            />
-          </div>
+           ) : null}
+           </div>
+           
+           {/* Add-ons Section */}
+           {addOnGuests && addOnGuests.length > 0 && (
+             <div className="bg-blue-50 px-3 py-2 rounded-md border border-blue-200 mt-2">
+               <div className="font-medium text-sm text-blue-900 mb-1">Add-ons:</div>
+               <div className="space-y-1">
+                 {formatAddOns(addOnGuests).map((addOn, idx) => (
+                   <div key={idx} className="text-sm text-blue-800">
+                     • {addOn}
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
+           
+           {/* Notes Textarea */}
+           <div className="w-full">
+             <Textarea
+               placeholder="Add your notes here..."
+               value={notes || ''}
+               onChange={(e) => onNotesChange(index, e.target.value)}
+               className="min-h-[60px] text-xs resize-none"
+               rows={2}
+             />
+           </div>
         </div>
       </TableCell>
 
