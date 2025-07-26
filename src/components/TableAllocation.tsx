@@ -248,7 +248,9 @@ const TableAllocation = ({
       } catch (error) {
         console.error('Failed to load joined tables state:', error);
       }
-    } else {
+    }
+    
+    if (!savedTables) {
       // Reset to default state if no saved state for this show
       setTables([
         // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -454,6 +456,7 @@ const TableAllocation = ({
         })
       }))
     );
+  }, [checkedInGuests, currentShowTime]);
 
   // Get guests that can be assigned tables (checked in but not seated) - filtered by show time
   const availableForAllocation = checkedInGuests.filter(guest => 
