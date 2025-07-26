@@ -386,6 +386,75 @@ const TableAllocation = ({
     localStorage.setItem(joinedTablesKey, JSON.stringify(joinedTables));
   }, [joinedTables, currentShowTime]);
 
+  // Restore allocated guests from session data - NEW SYNC LOGIC
+  useEffect(() => {
+    console.log(`🔄 Restoring table allocations from session data for show: ${currentShowTime}`);
+    
+    // Filter guests by current show time
+    const showFilteredGuests = checkedInGuests.filter(guest => 
+      currentShowTime === 'all' || guest.showTime === currentShowTime
+    );
+    
+    // Find guests with table allocations that need to be restored
+    const guestsWithAllocations = showFilteredGuests.filter(guest => guest.hasTableAllocated);
+    
+    console.log('🔄 Guests with table allocations to restore:', guestsWithAllocations.map(g => ({
+      name: g.name,
+      index: g.originalIndex,
+      hasTableAllocated: g.hasTableAllocated,
+      hasBeenSeated: g.hasBeenSeated
+    })));
+
+    if (guestsWithAllocations.length > 0) {
+      setTables(prevTables => {
+        const newTables = prevTables.map(table => ({
+          ...table,
+          sections: table.sections.map(section => {
+            // Clear any existing allocations for this show time first
+            if (section.allocatedGuest && !showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex)) {
+              return {
+                ...section,
+                status: 'AVAILABLE' as const,
+                allocatedTo: undefined,
+                allocatedGuest: undefined,
+                allocatedCount: undefined,
+                seatedCount: undefined,
+              };
+            }
+            return section;
+          })
+        }));
+
+        // Now restore allocations for guests with hasTableAllocated = true
+        // For now, assign to first available section since we don't have the specific section mapping
+        // This is a simplified restoration - in a full implementation, we'd store section IDs
+        guestsWithAllocations.forEach(guest => {
+          const availableSection = newTables
+            .flatMap(t => t.sections)
+            .find(s => s.status === 'AVAILABLE' && s.capacity >= guest.count);
+          
+          if (availableSection) {
+            const tableIndex = newTables.findIndex(t => t.sections.some(s => s.id === availableSection.id));
+            const sectionIndex = newTables[tableIndex].sections.findIndex(s => s.id === availableSection.id);
+            
+            newTables[tableIndex].sections[sectionIndex] = {
+              ...availableSection,
+              status: guest.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED',
+              allocatedTo: guest.name,
+              allocatedGuest: guest,
+              allocatedCount: guest.count,
+              seatedCount: guest.hasBeenSeated ? guest.count : 0,
+            };
+            
+            console.log(`🔄 Restored allocation: ${guest.name} → Section ${availableSection.id}`);
+          }
+        });
+
+        return newTables;
+      });
+    }
+  }, [checkedInGuests, currentShowTime]);
+
   // Update table statuses based on current guest states - SHOW TIME AWARE + DATABASE SYNC
   useEffect(() => {
     console.log(`Syncing table state with guest state for show: ${currentShowTime}`);
@@ -406,13 +475,6 @@ const TableAllocation = ({
       prevTables.map(table => ({
         ...table,
         sections: table.sections.map(section => {
-          // Check if this section should be marked as occupied based on parent state
-          const isSeatedFromParent = showFilteredGuests.some(guest => 
-            guest.hasBeenSeated && guest.originalIndex !== undefined
-          );
-          
-          console.log(`DEBUG: Section ${section.id} - checking seated guests from parent`);
-          
           if (section.allocatedGuest) {
             const currentGuest = showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
             
