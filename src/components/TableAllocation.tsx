@@ -779,14 +779,11 @@ const TableAllocation = ({
                 // FIXED: Status should be ALLOCATED when assigned, OCCUPIED only when seated
                 const newStatus: 'ALLOCATED' | 'OCCUPIED' = 'ALLOCATED';
                 
+                console.log(`✔️ Assigned ${selectedGuest.name} to section ${sectionId}`);
+                console.log('Allocated guest object:', selectedGuest);
                 console.log(`AFTER ASSIGNMENT: Section ${sectionId} will have allocatedCount: ${newAllocatedCount}, status: ${newStatus}`);
                 
-                console.log(`🔧 DEBUG: Setting allocatedGuest for section ${sectionId}:`, {
-                  guestName: selectedGuest.name,
-                  guestCount: selectedGuest.count,
-                  originalIndex: selectedGuest.originalIndex,
-                  pagerNumber: selectedGuest.pagerNumber
-                });
+                console.log(`🧠 allocatedGuest snapshot:`, JSON.stringify(selectedGuest, null, 2));
 
                 return {
                   ...s,
@@ -1474,6 +1471,8 @@ const TableAllocation = ({
   const assignWholeTable = (table: Table) => {
     if (!selectedGuest) return;
 
+    console.log(`✔️ Assigned ${selectedGuest.name} to whole table ${table.name}`);
+    console.log('Allocated guest object:', selectedGuest);
     console.log('=== WHOLE TABLE ASSIGNMENT DEBUG ===');
     console.log('Assigning whole table:', table.name, 'for guest:', selectedGuest.name, 'count:', selectedGuest.count, 'table capacity:', table.totalCapacity);
     console.log('Current table sections state:');
@@ -1550,6 +1549,7 @@ const TableAllocation = ({
       })
     );
 
+    console.log(`🧠 allocatedGuest snapshot:`, JSON.stringify(selectedGuest, null, 2));
     console.log('=== END WHOLE TABLE ASSIGNMENT DEBUG ===');
 
     // Call the parent callback to track allocation
@@ -2417,22 +2417,20 @@ const TableAllocation = ({
           <div className="flex flex-wrap items-center gap-3">
             <Button 
               onClick={() => {
-                const allocatedSections = tables.flatMap(t => t.sections.filter(s => s.allocatedGuest));
-                const allocatedGuestsCount = allocatedSections.length;
-                console.log("🔧 Manual Move button clicked:", {
-                  allocatedGuestsCount,
-                  allocatedSections: allocatedSections.map(s => ({ 
-                    id: s.id, 
-                    guest: s.allocatedGuest?.name, 
-                    status: s.status 
-                  })),
-                  checkedInGuests: checkedInGuests.filter(g => 
-                    currentShowTime === 'all' || g.showTime === currentShowTime
-                  ).length,
-                  currentShowTime
+                console.log("🔧 Manual Move button clicked. Allocated sections:");
+                tables.forEach(t => {
+                  t.sections.forEach(s => {
+                    if (s.allocatedGuest) {
+                      console.log(` - ${s.id}: ${s.allocatedGuest.name} (${s.allocatedGuest.count})`);
+                    }
+                  });
                 });
                 
-                if (allocatedGuestsCount === 0) {
+                const hasAllocatedGuests = tables.some(t => 
+                  t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0)
+                );
+                
+                if (!hasAllocatedGuests) {
                   toast({
                     title: "No Guests to Move",
                     description: "You need to check in guests and allocate them to tables first before you can move them. Check the guest check-in list above.",
@@ -2440,14 +2438,18 @@ const TableAllocation = ({
                   });
                   return;
                 }
-                setShowManualMoveDialog(true);
+                
+                // Add state delay workaround
+                setTimeout(() => {
+                  setShowManualMoveDialog(true);
+                }, 100);
               }}
               variant="default"
               size="sm"
               className="flex items-center gap-2"
-              disabled={tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0}
+              disabled={!tables.some(t => t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0))}
               title={
-                tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0
+                !tables.some(t => t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0))
                   ? "No guests are allocated to tables yet. Check in guests and allocate them to tables first."
                   : "Move allocated guests between tables"
               }
