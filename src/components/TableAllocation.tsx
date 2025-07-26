@@ -802,6 +802,19 @@ const TableAllocation = ({
       })
     );
 
+    // Bonus: Add Confirmation Logging
+    console.log("✅ Tables state updated. Checking allocated guests:");
+    // We need to check the updated state, so let's log after the state update
+    setTimeout(() => {
+      tables.forEach(t =>
+        t.sections.forEach(s => {
+          if (s.allocatedGuest) {
+            console.log(` - ${s.id}: ${s.allocatedGuest.name}`);
+          }
+        })
+      );
+    }, 50);
+
     // Call the parent callback to track allocation
     onTableAllocated(selectedGuest.originalIndex, [table.id]);
 
@@ -1548,6 +1561,19 @@ const TableAllocation = ({
         return t;
       })
     );
+
+    // Bonus: Add Confirmation Logging
+    console.log("✅ Tables state updated. Checking allocated guests:");
+    // We need to check the updated state, so let's log after the state update
+    setTimeout(() => {
+      tables.forEach(t =>
+        t.sections.forEach(s => {
+          if (s.allocatedGuest) {
+            console.log(` - ${s.id}: ${s.allocatedGuest.name}`);
+          }
+        })
+      );
+    }, 50);
 
     console.log(`🧠 allocatedGuest snapshot:`, JSON.stringify(selectedGuest, null, 2));
     console.log('=== END WHOLE TABLE ASSIGNMENT DEBUG ===');
@@ -2415,51 +2441,49 @@ const TableAllocation = ({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-3">
-            <Button 
-              onClick={() => {
-                console.log("🔧 Manual Move button clicked. Allocated sections:");
-                tables.forEach(t => {
+            {(() => {
+              const handleManualMoveClick = () => {
+                // Optional debug log
+                console.log("🔧 Manual Move button clicked. Tables at time of click:");
+                tables.forEach(t =>
                   t.sections.forEach(s => {
                     if (s.allocatedGuest) {
-                      console.log(` - ${s.id}: ${s.allocatedGuest.name} (${s.allocatedGuest.count})`);
+                      console.log(` - ${s.id}: ${s.allocatedGuest.name}`);
                     }
-                  });
-                });
-                
-                const hasAllocatedGuests = tables.some(t => 
-                  t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0)
+                  })
                 );
-                
-                if (!hasAllocatedGuests) {
-                  toast({
-                    title: "No Guests to Move",
-                    description: "You need to check in guests and allocate them to tables first before you can move them. Check the guest check-in list above.",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                
-                // Add state delay workaround
+
+                // Delay dialog open to allow state sync
                 setTimeout(() => {
                   setShowManualMoveDialog(true);
                 }, 100);
-              }}
-              variant="default"
-              size="sm"
-              className="flex items-center gap-2"
-              disabled={!tables.some(t => t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0))}
-              title={
-                !tables.some(t => t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0))
-                  ? "No guests are allocated to tables yet. Check in guests and allocate them to tables first."
-                  : "Move allocated guests between tables"
-              }
-            >
-              <ArrowRightLeft className="h-4 w-4" />
-              Manual Move
-              {tables.flatMap(t => t.sections.filter(s => s.allocatedGuest)).length === 0 && (
-                <span className="text-xs ml-1">(No allocated guests)</span>
-              )}
-            </Button>
+              };
+
+              const hasAllocatedGuests = tables.some(t =>
+                t.sections.some(s => s.allocatedGuest && (s.allocatedCount || 0) > 0)
+              );
+
+              return (
+                <Button 
+                  onClick={handleManualMoveClick}
+                  variant="default"
+                  size="sm"
+                  className="flex items-center gap-2"
+                  disabled={!hasAllocatedGuests}
+                  title={
+                    !hasAllocatedGuests
+                      ? "No guests are allocated to tables yet. Check in guests and allocate them to tables first."
+                      : "Move allocated guests between tables"
+                  }
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Manual Move
+                  {!hasAllocatedGuests && (
+                    <span className="text-xs ml-1">(No allocated guests)</span>
+                  )}
+                </Button>
+              );
+            })()}
             <Button 
               onClick={() => adjustAllTablesCapacity(1)}
               variant="outline"
