@@ -164,7 +164,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -172,42 +172,42 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[70vh]">
+        <div className="flex flex-col gap-4">
           {/* Step 1: Select Guest to Move */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                Step 1: Select Guest to Move
-                <Badge variant="secondary" className="ml-2">{allocatedGuests.length}</Badge>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>Step 1: Select Guest to Move</span>
+                <Badge variant="secondary">{allocatedGuests.length} guests</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[50vh]">
-                <div className="space-y-3">
+              <ScrollArea className="max-h-[30vh]">
+                <div className="space-y-2 pr-3">
                   {allocatedGuests.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
+                    <p className="text-center text-muted-foreground py-6">
                       No guests are currently allocated to tables
                     </p>
                   ) : (
                     allocatedGuests.map((allocatedGuest, index) => (
                       <div
                         key={`${allocatedGuest.sectionId}-${index}`}
-                        className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                        className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
                           selectedGuest?.sectionId === allocatedGuest.sectionId
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                             : 'border-border hover:border-primary/50 hover:bg-accent/50'
                         }`}
                         onClick={() => setSelectedGuest(allocatedGuest)}
                       >
                         <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="font-semibold text-foreground">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-foreground truncate">
                               {allocatedGuest.guest.name}
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {allocatedGuest.guest.count} guests • {allocatedGuest.guest.showTime}
                             </div>
-                            <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center gap-1 mt-2 flex-wrap">
                               <Badge variant="outline" className="text-xs">
                                 <MapPin className="h-3 w-3 mr-1" />
                                 {allocatedGuest.tableName} {allocatedGuest.sectionName}
@@ -223,7 +223,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
                               )}
                               {allocatedGuest.pagerNumber && (
                                 <Badge className="bg-purple-600 text-white text-xs">
-                                  Pager #{allocatedGuest.pagerNumber}
+                                  #{allocatedGuest.pagerNumber}
                                 </Badge>
                               )}
                             </div>
@@ -239,36 +239,36 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
 
           {/* Step 2: Select Destination */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                Step 2: Select Destination
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>Step 2: Select Destination</span>
                 {selectedGuest && (
-                  <Badge variant="secondary" className="ml-2">
-                    For {selectedGuest.guest.name} ({selectedGuest.guest.count} guests)
+                  <Badge variant="secondary" className="text-xs">
+                    For {selectedGuest.guest.name} ({selectedGuest.guest.count})
                   </Badge>
                 )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[50vh]">
-                <div className="space-y-3">
+              <ScrollArea className="max-h-[30vh]">
+                <div className="space-y-2 pr-3">
                   {!selectedGuest ? (
-                    <p className="text-center text-muted-foreground py-8">
+                    <p className="text-center text-muted-foreground py-6">
                       Select a guest first to see available destinations
                     </p>
                   ) : availableDestinations.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
+                    <p className="text-center text-muted-foreground py-6">
                       No available destinations for this guest
                     </p>
                   ) : (
                     availableDestinations.map((destination) => (
                       <div
                         key={destination.sectionId}
-                        className={`p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                        className={`p-3 border rounded-lg cursor-pointer transition-all duration-200 ${
                           !destination.canFit
                             ? 'border-destructive/30 bg-destructive/5 opacity-60 cursor-not-allowed'
                             : selectedDestination === destination.sectionId
-                            ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                             : 'border-border hover:border-primary/50 hover:bg-accent/50'
                         }`}
                         onClick={() => {
@@ -279,7 +279,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-semibold">
+                            <div className="font-medium">
                               {destination.tableName} {destination.sectionName}
                             </div>
                             <div className="text-sm text-muted-foreground">
