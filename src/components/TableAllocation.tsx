@@ -407,36 +407,6 @@ const TableAllocation = ({
       prevTables.map(table => ({
         ...table,
         sections: table.sections.map(section => {
-          // Check if this section should have an allocated guest based on current guest state
-          const allocatedGuest = showFilteredGuests.find(guest => 
-            guest.hasTableAllocated && !guest.hasBeenSeated && 
-            section.allocatedTo && section.allocatedTo.includes(guest.name)
-          );
-          
-          const seatedGuest = showFilteredGuests.find(guest => 
-            guest.hasBeenSeated && 
-            section.allocatedTo && section.allocatedTo.includes(guest.name)
-          );
-
-          // Update section based on current guest states
-          if (allocatedGuest) {
-            return {
-              ...section,
-              status: 'ALLOCATED' as const,
-              allocatedGuest: allocatedGuest,
-              allocatedCount: allocatedGuest.count,
-              seatedCount: 0,
-            };
-          } else if (seatedGuest) {
-            return {
-              ...section,
-              status: 'OCCUPIED' as const,
-              allocatedGuest: seatedGuest,
-              allocatedCount: seatedGuest.count,
-              seatedCount: seatedGuest.count,
-            };
-          }
-          
           if (section.allocatedGuest) {
             const currentGuest = showFilteredGuests.find(g => g.originalIndex === section.allocatedGuest?.originalIndex);
             
@@ -453,13 +423,22 @@ const TableAllocation = ({
               };
             }
             
-            // Update status based on guest state
+            // Update status based on current guest state
             if (currentGuest.hasBeenSeated) {
-              console.log(`DEBUG: Guest ${currentGuest.name} is seated, marking section ${section.id} as OCCUPIED`);
-              return { ...section, status: 'OCCUPIED' as const };
-            } else if (!currentGuest.hasTableAllocated) {
-              // Guest lost table allocation, clear it
-              console.log(`Guest ${currentGuest.name} lost table allocation, clearing section ${section.id}`);
+              return {
+                ...section,
+                status: 'OCCUPIED' as const,
+                seatedCount: section.allocatedCount,
+              };
+            } else if (currentGuest.hasTableAllocated) {
+              return {
+                ...section,
+                status: 'ALLOCATED' as const,
+                seatedCount: 0,
+              };
+            } else {
+              // Guest is no longer allocated, clear the section
+              console.log(`Guest ${currentGuest.name} is no longer allocated, clearing section ${section.id}`);
               return {
                 ...section,
                 status: 'AVAILABLE' as const,
@@ -469,14 +448,12 @@ const TableAllocation = ({
                 seatedCount: undefined,
               };
             }
-            
-            return section;
           }
+          
           return section;
         })
       }))
     );
-  }, [checkedInGuests, currentShowTime]);
 
   // Get guests that can be assigned tables (checked in but not seated) - filtered by show time
   const availableForAllocation = checkedInGuests.filter(guest => 
