@@ -86,14 +86,16 @@ const guestName = guest.booker_name || 'Unknown Guest';
     const addOnItems: string[] = [];
     
     addOns.forEach((addon) => {
-      // Extract add-on details from ticket data or other fields
       const quantity = addon.total_quantity || 1;
       
-      // Check various fields that might contain add-on info
-      const itemName = addon.booker_name || 
+      // Prioritize actual item/product fields over guest name
+      const itemName = addon.item_details ||
                       addon.ticket_data?.Item ||
                       addon.ticket_data?.Package ||
                       addon.ticket_data?.Description ||
+                      addon.ticket_data?.Product ||
+                      addon.staff_updated_order ||
+                      addon.notes ||
                       'Add-on Item';
       
       addOnItems.push(`x${quantity} ${itemName}`);
