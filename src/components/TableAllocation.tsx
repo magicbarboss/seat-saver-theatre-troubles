@@ -2429,6 +2429,45 @@ const TableAllocation = ({
     });
   };
 
+  // Function to clear localStorage table state for debugging
+  const clearTableState = () => {
+    console.log(`🔧 CLEARING TABLE STATE for show: ${currentShowTime}`);
+    
+    // Clear relevant localStorage keys
+    const keysToRemove = [
+      currentShowTime === 'all' ? 'table-allocation-state-v3' : `table-allocation-state-v3-${currentShowTime}`,
+      currentShowTime === 'all' ? 'joined-tables-v1' : `joined-tables-v1-${currentShowTime}`
+    ];
+    
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+      console.log(`🔧 Removed localStorage key: ${key}`);
+    });
+    
+    // Reset tables to initial state
+    setTables(prevTables => 
+      prevTables.map(table => ({
+        ...table,
+        sections: table.sections.map(section => ({
+          ...section,
+          status: 'AVAILABLE' as const,
+          allocatedTo: undefined,
+          allocatedGuest: undefined,
+          allocatedCount: undefined,
+          seatedCount: undefined,
+        }))
+      }))
+    );
+    
+    // Clear joined tables
+    setJoinedTables({});
+    
+    toast({
+      title: "🔧 Table State Cleared",
+      description: `Cleared all table allocations and localStorage for ${currentShowTime}`,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Bulk Controls Section */}
@@ -2501,6 +2540,14 @@ const TableAllocation = ({
             >
               <Minus className="h-4 w-4" />
               Remove 1 Seat from All Tables
+            </Button>
+            <Button 
+              onClick={clearTableState}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 text-orange-600 border-orange-200 hover:bg-orange-50"
+            >
+              🔧 Clear Table State
             </Button>
             <div className="flex items-center gap-2">
               <Input

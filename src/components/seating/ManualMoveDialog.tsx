@@ -102,11 +102,27 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
     return allocatedGuests;
   };
 
-  // Get available destinations
+  // Get available destinations with comprehensive debugging
   const getAvailableDestinations = () => {
     if (!selectedGuest) return [];
     
-    const destinations: Array<{
+    console.log(`🔧 DEBUG getAvailableDestinations: Selected guest "${selectedGuest.guest.name}" (${selectedGuest.guest.count} people) from section ${selectedGuest.sectionId}`);
+    
+    const allSections: Array<{
+      sectionId: string;
+      tableName: string;
+      sectionName: string;
+      capacity: number;
+      allocatedCount: number;
+      seatedCount: number;
+      usedCapacity: number;
+      availableCapacity: number;
+      canFit: boolean;
+      status: string;
+      reason?: string;
+    }> = [];
+    
+    const validDestinations: Array<{
       sectionId: string;
       tableName: string;
       sectionName: string;
@@ -116,27 +132,71 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
     
     tables.forEach(table => {
       table.sections.forEach(section => {
-        // Skip the current section
-        if (section.id === selectedGuest.sectionId) return;
-        
         const allocatedCount = section.allocatedCount || 0;
         const seatedCount = section.seatedCount || 0;
         const usedCapacity = Math.max(allocatedCount, seatedCount);
         const availableCapacity = section.capacity - usedCapacity;
+        const canFit = availableCapacity >= selectedGuest.guest.count;
         
-        if (availableCapacity > 0) {
-          destinations.push({
+        const sectionData = {
+          sectionId: section.id,
+          tableName: table.name,
+          sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
+          capacity: section.capacity,
+          allocatedCount,
+          seatedCount,
+          usedCapacity,
+          availableCapacity,
+          canFit,
+          status: section.status
+        };
+        
+        // Determine why section might be excluded
+        let reason = '';
+        if (section.id === selectedGuest.sectionId) {
+          reason = 'Current section (excluded)';
+        } else if (availableCapacity <= 0) {
+          reason = `No capacity (used: ${usedCapacity}/${section.capacity})`;
+        } else if (!canFit) {
+          reason = `Too small (need ${selectedGuest.guest.count}, have ${availableCapacity})`;
+        } else {
+          reason = 'Available';
+        }
+        
+        allSections.push({ ...sectionData, reason });
+        
+        // Only add to valid destinations if it meets criteria
+        if (section.id !== selectedGuest.sectionId && availableCapacity > 0) {
+          validDestinations.push({
             sectionId: section.id,
             tableName: table.name,
             sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
             availableCapacity,
-            canFit: availableCapacity >= selectedGuest.guest.count
+            canFit
           });
         }
       });
     });
     
-    return destinations.sort((a, b) => {
+    // Log comprehensive debug info
+    console.log(`🔧 DEBUG: ALL SECTIONS ANALYSIS (${allSections.length} total):`);
+    allSections.forEach(section => {
+      console.log(`🔧   ${section.tableName} ${section.sectionName}: ${section.reason}`, {
+        capacity: section.capacity,
+        allocated: section.allocatedCount,
+        seated: section.seatedCount,
+        available: section.availableCapacity,
+        status: section.status,
+        canFit: section.canFit
+      });
+    });
+    
+    console.log(`🔧 DEBUG: VALID DESTINATIONS (${validDestinations.length} sections):`);
+    validDestinations.forEach(dest => {
+      console.log(`🔧   ✅ ${dest.tableName} ${dest.sectionName}: ${dest.availableCapacity} seats, canFit: ${dest.canFit}`);
+    });
+    
+    return validDestinations.sort((a, b) => {
       // Sort by: can fit first, then by available capacity
       if (a.canFit && !b.canFit) return -1;
       if (!a.canFit && b.canFit) return 1;
@@ -257,9 +317,17 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
                       Select a guest first to see available destinations
                     </p>
                   ) : availableDestinations.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-6">
-                      No available destinations for this guest
-                    </p>
+                    <div className="text-center py-6">
+                      <p className="text-muted-foreground mb-3">
+                        No available destinations for this guest
+                      </p>
+                      <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                        <p className="font-medium mb-2">💡 Debug Info:</p>
+                        <p>• Guest needs {selectedGuest?.guest.count} seats</p>
+                        <p>• Check console logs for detailed capacity analysis</p>
+                        <p>• This could indicate localStorage state persistence</p>
+                      </div>
+                    </div>
                   ) : (
                     availableDestinations.map((destination) => (
                       <div
