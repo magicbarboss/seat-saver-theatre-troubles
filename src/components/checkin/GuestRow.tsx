@@ -307,11 +307,35 @@ const guestName = guest.booker_name || 'Unknown Guest';
       </TableCell>
 
       <TableCell>
-        {guest.ticket_data?.Booking && (
-          <Badge variant="outline" className="text-xs">
-            {guest.ticket_data.Booking}
-          </Badge>
-        )}
+        <div className="space-y-2">
+          {guest.ticket_data?.Booking && (
+            <Badge variant="outline" className="text-xs">
+              {guest.ticket_data.Booking}
+            </Badge>
+          )}
+          
+          {/* Booking Notes */}
+          <div className="space-y-1 text-xs text-muted-foreground">
+            {guest.magic_info && (
+              <div className="flex items-start gap-1">
+                <span>•</span>
+                <span>{guest.magic_info}</span>
+              </div>
+            )}
+            {notes && notes.trim() && (
+              <div className="flex items-start gap-1">
+                <span>•</span>
+                <span>{notes.trim()}</span>
+              </div>
+            )}
+            {guest.diet_info && guest.diet_info.toLowerCase().includes('celebration') && (
+              <div className="flex items-start gap-1">
+                <span>•</span>
+                <span>{guest.diet_info}</span>
+              </div>
+            )}
+          </div>
+        </div>
       </TableCell>
 
       <TableCell>
