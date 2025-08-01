@@ -351,10 +351,33 @@ const CheckInSystem = ({
     };
   }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, walkInGuests, manualLinks]); // Add guestNotes and manualLinks to dependency
 
-  // Extract guest name utility
-  const extractGuestName = (bookerName: string) => {
-    if (!bookerName) return 'Unknown Guest';
-    return bookerName.trim();
+  // Extract guest name utility from ticket data or booker_name
+  const extractGuestName = (bookerName: string, ticketData?: any) => {
+    // First try to get full name from ticket data
+    if (ticketData) {
+      const firstName = ticketData['First Name'] || ticketData['first_name'] || '';
+      const lastName = ticketData['Last Name'] || ticketData['last_name'] || '';
+      
+      if (firstName && lastName) {
+        return `${firstName.trim()} ${lastName.trim()}`;
+      } else if (firstName) {
+        return firstName.trim();
+      } else if (lastName) {
+        return lastName.trim();
+      }
+      
+      // Also check for Booker field in ticket data
+      if (ticketData['Booker']) {
+        return ticketData['Booker'].trim();
+      }
+    }
+    
+    // Fall back to booker_name if ticket data doesn't have names
+    if (bookerName && bookerName.trim()) {
+      return bookerName.trim();
+    }
+    
+    return 'Unknown Guest';
   };
 
   // Enhanced ticket type mapping with calculation method support
@@ -1524,7 +1547,7 @@ const CheckInSystem = ({
   const filteredBookings = useMemo(() => {
     return groupedBookings.filter(booking => {
       if (!booking?.mainBooking) return false;
-      const matchesSearch = searchTerm === '' || extractGuestName(booking.mainBooking.booker_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = searchTerm === '' || extractGuestName(booking.mainBooking.booker_name || '', booking.mainBooking.ticket_data).toLowerCase().includes(searchTerm.toLowerCase());
       const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
       // If guest has no show time and we're filtering by a specific time, include them
       // If showFilter is 'all' or empty, include all guests
@@ -1747,13 +1770,13 @@ const CheckInSystem = ({
       
       if (linkedGuests.length > 0) {
         const guest = guests[guestIndex];
-        const linkedGuestNames = linkedGuests.map(i => extractGuestName(guests[i].booker_name)).join(', ');
+        const linkedGuestNames = linkedGuests.map(i => extractGuestName(guests[i].booker_name, guests[i].ticket_data)).join(', ');
         const currentPartySize = guest.total_quantity;
         const linkedPartySize = linkedGuests.reduce((sum, i) => sum + guests[i].total_quantity, 0);
         const newPartySize = currentPartySize + linkedPartySize;
         
         const confirmed = window.confirm(
-          `${extractGuestName(guest.booker_name)} is linked with ${linkedGuestNames}.\n\n` +
+          `${extractGuestName(guest.booker_name, guest.ticket_data)} is linked with ${linkedGuestNames}.\n\n` +
           `Would you like to check in the entire group?\n` +
           `Party size will be ${currentPartySize} + ${linkedPartySize} = ${newPartySize} guests.`
         );
@@ -1943,7 +1966,7 @@ const CheckInSystem = ({
           const booking = groupedBookings.find(b => b && b.originalIndex === index);
           if (booking?.mainBooking) {
             return {
-              name: extractGuestName(String(booking.mainBooking.booker_name || '')),
+              name: extractGuestName(String(booking.mainBooking.booker_name || ''), booking.mainBooking.ticket_data),
               count: Number(booking.mainBooking.total_quantity) || 1,
               showTime: String(booking.mainBooking.show_time || '7pm'),
               originalIndex: index,

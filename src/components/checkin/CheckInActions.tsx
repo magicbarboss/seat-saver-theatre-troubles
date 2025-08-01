@@ -17,7 +17,7 @@ interface CheckInActionsProps {
   friendshipGroups: Map<string, number[]>;
   onCreateManualLink: (guestIndices: number[]) => void;
   onRemoveManualLink: (linkId: string) => void;
-  extractGuestName: (name: string) => string;
+  extractGuestName: (name: string, ticketData?: any) => string;
 }
 
 export const CheckInActions = ({

@@ -77,7 +77,31 @@ export const GuestRow = ({
   onNotesChange,
   onManualEdit
 }: GuestRowProps) => {
-const guestName = guest.booker_name || 'Unknown Guest';
+  // Extract full name from ticket data if available
+  const extractFullName = (guest: Guest) => {
+    if (guest.ticket_data) {
+      const firstName = guest.ticket_data['First Name'] || guest.ticket_data['first_name'] || '';
+      const lastName = guest.ticket_data['Last Name'] || guest.ticket_data['last_name'] || '';
+      
+      if (firstName && lastName) {
+        return `${firstName.trim()} ${lastName.trim()}`;
+      } else if (firstName) {
+        return firstName.trim();
+      } else if (lastName) {
+        return lastName.trim();
+      }
+      
+      // Also check for Booker field in ticket data
+      if (guest.ticket_data['Booker']) {
+        return guest.ticket_data['Booker'].trim();
+      }
+    }
+    
+    // Fall back to booker_name if ticket data doesn't have names
+    return guest.booker_name || 'Unknown Guest';
+  };
+
+  const guestName = extractFullName(guest);
   const guestCount = guest.total_quantity || 1;
   const showTime = guest.show_time || guest['Show time'] || 'N/A';
 

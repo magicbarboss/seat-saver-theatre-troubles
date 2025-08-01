@@ -48,7 +48,7 @@ interface GuestTableProps {
     quantity: number;
     details: string[];
   }>;
-  extractGuestName: (name: string) => string;
+  extractGuestName: (name: string, ticketData?: any) => string;
   onCheckIn: (index: number) => void;
   onPagerAction: (index: number, pagerNumber?: number) => void;
   onTableAllocate: (index: number) => void;

@@ -13,7 +13,7 @@ interface ManualLinkDialogProps {
   friendshipGroups: Map<string, number[]>;
   onCreateLink: (guestIndices: number[]) => void;
   onRemoveLink: (linkId: string) => void;
-  extractGuestName: (name: string) => string;
+  extractGuestName: (name: string, ticketData?: any) => string;
 }
 
 export const ManualLinkDialog = ({
@@ -60,7 +60,7 @@ export const ManualLinkDialog = ({
   // Get guest name by index for display in existing links
   const getGuestNameByIndex = (index: number): string => {
     const booking = bookingGroups.find(b => b.originalIndex === index);
-    return booking ? extractGuestName(booking.mainBooking.booker_name || '') : 'Unknown Guest';
+    return booking ? extractGuestName(booking.mainBooking.booker_name || '', booking.mainBooking.ticket_data) : 'Unknown Guest';
   };
 
   return (
@@ -174,7 +174,7 @@ export const ManualLinkDialog = ({
                     />
                     <div className="flex-1">
                       <div className="font-medium text-sm">
-                        {extractGuestName(booking.mainBooking.booker_name || '')}
+                        {extractGuestName(booking.mainBooking.booker_name || '', booking.mainBooking.ticket_data)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {booking.mainBooking.total_quantity || 1} guests • {booking.mainBooking.show_time || '7pm'}
