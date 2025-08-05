@@ -984,12 +984,18 @@ const TableAllocation = ({
     const destinationTableId = parseInt(toSectionId.split('-')[0]);
     const newTableAssignments = [destinationTableId];
     
+    // Find the destination table to check if we need multi-section distribution
+    const destinationTable = tables.find(t => t.id === destinationTableId);
+    const needsMultiSectionDistribution = destinationTable && guestToMove.count > 2 && destinationTable.hasSections;
+    
     console.log(`📋 Move details:`, {
       guestName: guestToMove.name,
       guestIndex: guestToMove.originalIndex,
+      guestCount: guestToMove.count,
       fromSection: fromSectionId,
       toSection: toSectionId,
       destinationTableId,
+      needsMultiSectionDistribution,
       newTableAssignments,
       isSeated: guestToMove.hasBeenSeated || false,
       isAllocated: true
@@ -1027,65 +1033,193 @@ const TableAllocation = ({
 
     // Update localStorage state
     setTables(prevTables =>
-      prevTables.map(table => ({
-        ...table,
-        sections: table.sections.map(section => {
-          // Remove guest from source section
-          if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
-            const remainingAllocated = (section.allocatedCount || 0) - guestToMove.count;
-            const remainingSeated = guestToMove.hasBeenSeated ? 
-              Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
-              (section.seatedCount || 0);
+      prevTables.map(table => {
+        if (table.id !== destinationTableId) {
+          // For non-destination tables, only remove from source section
+          return {
+            ...table,
+            sections: table.sections.map(section => {
+              if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+                const remainingAllocated = (section.allocatedCount || 0) - guestToMove.count;
+                const remainingSeated = guestToMove.hasBeenSeated ? 
+                  Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
+                  (section.seatedCount || 0);
+                
+                console.log(`🔄 Clearing source section ${fromSectionId}:`, { remainingAllocated, remainingSeated });
+                
+                if (remainingAllocated <= 0) {
+                  return {
+                    ...section,
+                    status: 'AVAILABLE' as const,
+                    allocatedTo: undefined,
+                    allocatedGuest: undefined,
+                    allocatedCount: undefined,
+                    seatedCount: undefined,
+                  };
+                } else {
+                  return {
+                    ...section,
+                    allocatedCount: remainingAllocated,
+                    seatedCount: remainingSeated,
+                    status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                  };
+                }
+              }
+              return section;
+            })
+          };
+        }
+
+        // For destination table, handle multi-section distribution
+        if (needsMultiSectionDistribution) {
+          console.log(`🔄 Multi-section distribution for ${guestToMove.name} (${guestToMove.count} people) to table ${table.name}`);
+          
+          // Find available sections (excluding current section if it's in this table)
+          const availableSections = table.sections.filter(section => {
+            if (section.id === fromSectionId) return false; // Exclude current section
+            const usedCapacity = Math.max(section.allocatedCount || 0, section.seatedCount || 0);
+            return (section.capacity - usedCapacity) > 0;
+          }).sort((a, b) => {
+            // Sort by available capacity descending
+            const aAvailable = a.capacity - Math.max(a.allocatedCount || 0, a.seatedCount || 0);
+            const bAvailable = b.capacity - Math.max(b.allocatedCount || 0, b.seatedCount || 0);
+            return bAvailable - aAvailable;
+          });
+
+          console.log(`🔄 Available sections for distribution:`, availableSections.map(s => ({
+            id: s.id,
+            capacity: s.capacity,
+            used: Math.max(s.allocatedCount || 0, s.seatedCount || 0),
+            available: s.capacity - Math.max(s.allocatedCount || 0, s.seatedCount || 0)
+          })));
+
+          // Distribute guests across available sections
+          let remainingGuests = guestToMove.count;
+          const distributionPlan: Array<{ sectionId: string; count: number }> = [];
+          
+          for (const section of availableSections) {
+            if (remainingGuests <= 0) break;
             
-            console.log(`🔄 Clearing source section ${fromSectionId}:`, { remainingAllocated, remainingSeated });
+            const availableCapacity = section.capacity - Math.max(section.allocatedCount || 0, section.seatedCount || 0);
+            const guestsToAllocate = Math.min(remainingGuests, availableCapacity);
             
-            if (remainingAllocated <= 0) {
-              return {
-                ...section,
-                status: 'AVAILABLE' as const,
-                allocatedTo: undefined,
-                allocatedGuest: undefined,
-                allocatedCount: undefined,
-                seatedCount: undefined,
-              };
-            } else {
-              return {
-                ...section,
-                allocatedCount: remainingAllocated,
-                seatedCount: remainingSeated,
-                status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
-              };
+            if (guestsToAllocate > 0) {
+              distributionPlan.push({ sectionId: section.id, count: guestsToAllocate });
+              remainingGuests -= guestsToAllocate;
             }
           }
-          
-          // Add guest to destination section
-          if (section.id === toSectionId) {
-            const currentAllocated = section.allocatedCount || 0;
-            const currentSeated = section.seatedCount || 0;
-            const newAllocatedCount = currentAllocated + guestToMove.count;
-            const newAllocatedTo = section.allocatedTo ? `${section.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
-            const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
-            const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
-            
-            console.log(`🔄 Assigning to destination section ${toSectionId}:`, {
-              newAllocatedCount,
-              newSeatedCount,
-              newStatus
-            });
-            
-            return {
-              ...section,
-              status: newStatus,
-              allocatedTo: newAllocatedTo,
-              allocatedGuest: guestToMove,
-              allocatedCount: newAllocatedCount,
-              seatedCount: newSeatedCount,
-            };
-          }
-          
-          return section;
-        })
-      }))
+
+          console.log(`🔄 Distribution plan:`, distributionPlan);
+          console.log(`🔄 Remaining unallocated guests: ${remainingGuests}`);
+
+          // Apply the distribution
+          return {
+            ...table,
+            sections: table.sections.map(section => {
+              // Remove from source section if it's in this table
+              if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+                return {
+                  ...section,
+                  status: 'AVAILABLE' as const,
+                  allocatedTo: undefined,
+                  allocatedGuest: undefined,
+                  allocatedCount: undefined,
+                  seatedCount: undefined,
+                };
+              }
+
+              // Add to destination sections according to plan
+              const allocation = distributionPlan.find(p => p.sectionId === section.id);
+              if (allocation) {
+                const currentAllocated = section.allocatedCount || 0;
+                const currentSeated = section.seatedCount || 0;
+                const newAllocatedCount = currentAllocated + allocation.count;
+                const newAllocatedTo = section.allocatedTo ? `${section.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
+                const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + allocation.count : currentSeated;
+                const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
+                
+                console.log(`🔄 Assigning ${allocation.count} guests to section ${section.id}:`, {
+                  newAllocatedCount,
+                  newSeatedCount,
+                  newStatus
+                });
+                
+                return {
+                  ...section,
+                  status: newStatus,
+                  allocatedTo: newAllocatedTo,
+                  allocatedGuest: guestToMove,
+                  allocatedCount: newAllocatedCount,
+                  seatedCount: newSeatedCount,
+                };
+              }
+              
+              return section;
+            })
+          };
+        } else {
+          // Single section move (original logic)
+          return {
+            ...table,
+            sections: table.sections.map(section => {
+              // Remove guest from source section
+              if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
+                const remainingAllocated = (section.allocatedCount || 0) - guestToMove.count;
+                const remainingSeated = guestToMove.hasBeenSeated ? 
+                  Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
+                  (section.seatedCount || 0);
+                
+                console.log(`🔄 Clearing source section ${fromSectionId}:`, { remainingAllocated, remainingSeated });
+                
+                if (remainingAllocated <= 0) {
+                  return {
+                    ...section,
+                    status: 'AVAILABLE' as const,
+                    allocatedTo: undefined,
+                    allocatedGuest: undefined,
+                    allocatedCount: undefined,
+                    seatedCount: undefined,
+                  };
+                } else {
+                  return {
+                    ...section,
+                    allocatedCount: remainingAllocated,
+                    seatedCount: remainingSeated,
+                    status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
+                  };
+                }
+              }
+              
+              // Add guest to destination section
+              if (section.id === toSectionId) {
+                const currentAllocated = section.allocatedCount || 0;
+                const currentSeated = section.seatedCount || 0;
+                const newAllocatedCount = currentAllocated + guestToMove.count;
+                const newAllocatedTo = section.allocatedTo ? `${section.allocatedTo}, ${guestToMove.name}` : guestToMove.name;
+                const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
+                const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
+                
+                console.log(`🔄 Assigning to destination section ${toSectionId}:`, {
+                  newAllocatedCount,
+                  newSeatedCount,
+                  newStatus
+                });
+                
+                return {
+                  ...section,
+                  status: newStatus,
+                  allocatedTo: newAllocatedTo,
+                  allocatedGuest: guestToMove,
+                  allocatedCount: newAllocatedCount,
+                  seatedCount: newSeatedCount,
+                };
+              }
+              
+              return section;
+            })
+          };
+        }
+      })
     );
 
     // Call parent callback to update the checked-in guests state
