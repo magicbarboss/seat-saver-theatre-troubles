@@ -2023,8 +2023,10 @@ const CheckInSystem = ({
     setSeatedSections(newSeatedSections);
   };
 
-  const handleTableAllocated = (guestIndex: number, tableIds: number[]) => {
-    // Mark guest as allocated and store table assignments
+  const handleTableAllocated = async (guestIndex: number, tableIds: number[]) => {
+    console.log(`🔄 handleTableAllocated called for guest ${guestIndex} with tables:`, tableIds);
+    
+    // Update local state first
     const newAllocated = new Set(allocatedGuests);
     newAllocated.add(guestIndex);
     setAllocatedGuests(newAllocated);
@@ -2032,6 +2034,38 @@ const CheckInSystem = ({
     const newTableAllocations = new Map(guestTableAllocations);
     newTableAllocations.set(guestIndex, tableIds);
     setGuestTableAllocations(newTableAllocations);
+
+    // Also update the individual guest record in the database for consistency
+    try {
+      console.log(`📡 Updating individual guest record for index ${guestIndex}`);
+      
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          table_assignments: tableIds,
+          is_allocated: true,
+          // Don't change is_seated here as that's handled separately
+        })
+        .eq('original_row_index', guestIndex);
+
+      if (error) {
+        console.error('❌ Failed to update guest record:', error);
+        toast({
+          title: "Database Sync Warning",
+          description: "Local allocation successful but database sync failed",
+          variant: "destructive"
+        });
+      } else {
+        console.log(`✅ Successfully updated guest record for index ${guestIndex}`);
+      }
+    } catch (error) {
+      console.error('❌ Error updating guest record:', error);
+      toast({
+        title: "Database Sync Warning", 
+        description: "Local allocation successful but database sync failed",
+        variant: "destructive"
+      });
+    }
   };
 
   const saveComment = () => {

@@ -995,7 +995,7 @@ const TableAllocation = ({
       isAllocated: true
     });
 
-    // First update the database
+    // First update the individual guest record in the database
     const dbUpdateSuccess = await updateGuestInDatabase(
       guestToMove.originalIndex,
       newTableAssignments,
@@ -1006,6 +1006,23 @@ const TableAllocation = ({
     if (!dbUpdateSuccess) {
       console.log('❌ Database update failed, aborting move');
       return;
+    }
+
+    // Also update checkin_sessions table for consistency
+    try {
+      console.log(`📡 Updating checkin_sessions for manual move`);
+      
+      // We need to call the parent's handleTableAllocated to update the checkin_sessions
+      onTableAllocated(guestToMove.originalIndex, newTableAssignments);
+      
+      console.log(`✅ CheckIn session updated for manual move`);
+    } catch (error) {
+      console.error('❌ Failed to update checkin session:', error);
+      toast({
+        title: "Partial Update Warning",
+        description: "Guest moved but check-in session may need refresh",
+        variant: "destructive"
+      });
     }
 
     // Update localStorage state
