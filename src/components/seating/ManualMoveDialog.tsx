@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -224,7 +224,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -232,17 +232,17 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex flex-col gap-4">
+        <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
           {/* Step 1: Select Guest to Move */}
-          <Card>
+          <Card className="flex-1 min-h-0">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center justify-between">
                 <span>Step 1: Select Guest to Move</span>
                 <Badge variant="secondary">{allocatedGuests.length} guests</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-[30vh]">
+            <CardContent className="flex-1 min-h-0">
+              <ScrollArea className="h-[20vh]">
                 <div className="space-y-2 pr-3">
                   {allocatedGuests.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6">
@@ -298,7 +298,7 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
           </Card>
 
           {/* Step 2: Select Destination */}
-          <Card>
+          <Card className="flex-1 min-h-0">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center justify-between">
                 <span>Step 2: Select Destination</span>
@@ -309,8 +309,8 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <ScrollArea className="max-h-[30vh]">
+            <CardContent className="flex-1 min-h-0">
+              <ScrollArea className="h-[20vh]">
                 <div className="space-y-2 pr-3">
                   {!selectedGuest ? (
                     <p className="text-center text-muted-foreground py-6">
@@ -369,34 +369,35 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
           </Card>
         </div>
 
-        {/* Move Action */}
-        <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex items-center gap-4">
-            {selectedGuest && selectedDestination && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="font-medium">{selectedGuest.guest.name}</span>
-                <ArrowRight className="h-4 w-4" />
-                <span className="font-medium">
-                  {availableDestinations.find(d => d.sectionId === selectedDestination)?.tableName} {
-                    availableDestinations.find(d => d.sectionId === selectedDestination)?.sectionName
-                  }
-                </span>
-              </div>
-            )}
+        <DialogFooter className="flex-shrink-0 border-t pt-4">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-4">
+              {selectedGuest && selectedDestination && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="font-medium">{selectedGuest.guest.name}</span>
+                  <ArrowRight className="h-4 w-4" />
+                  <span className="font-medium">
+                    {availableDestinations.find(d => d.sectionId === selectedDestination)?.tableName} {
+                      availableDestinations.find(d => d.sectionId === selectedDestination)?.sectionName
+                    }
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleMove}
+                disabled={!selectedGuest || !selectedDestination}
+                className="bg-primary hover:bg-primary/90"
+              >
+                Move Guest
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleMove}
-              disabled={!selectedGuest || !selectedDestination}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Move Guest
-            </Button>
-          </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
