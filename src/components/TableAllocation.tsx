@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ManualMoveDialog } from './seating/ManualMoveDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CheckedInGuest {
   name: string;
@@ -934,10 +935,80 @@ const TableAllocation = ({
     setCurrentSectionId('');
   };
 
-  // Manual move handler - clean and predictable
-  const handleManualMove = (guestToMove: CheckedInGuest, fromSectionId: string, toSectionId: string) => {
-    console.log(`Manual move: ${guestToMove.name} from ${fromSectionId} to ${toSectionId}`);
+  // Database update function for guest table assignments
+  const updateGuestInDatabase = async (guestIndex: number, newTableAssignments: number[], isAllocated: boolean, isSeated: boolean) => {
+    try {
+      console.log(`📡 Updating database for guest index ${guestIndex}:`, {
+        newTableAssignments,
+        isAllocated,
+        isSeated
+      });
+
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          table_assignments: newTableAssignments,
+          is_allocated: isAllocated,
+          is_seated: isSeated,
+        })
+        .eq('original_row_index', guestIndex);
+
+      if (error) {
+        console.error('❌ Database update failed:', error);
+        toast({
+          title: "Database Update Failed",
+          description: "Failed to sync changes to database. Manual move completed locally only.",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      console.log(`✅ Database updated successfully for guest index ${guestIndex}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Database update error:', error);
+      toast({
+        title: "Database Update Error",
+        description: "Failed to sync changes to database. Manual move completed locally only.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+
+  // Manual move handler - clean and predictable with database sync
+  const handleManualMove = async (guestToMove: CheckedInGuest, fromSectionId: string, toSectionId: string) => {
+    console.log(`🔄 Manual move: ${guestToMove.name} from ${fromSectionId} to ${toSectionId}`);
     
+    // Extract destination table ID from section ID
+    const destinationTableId = parseInt(toSectionId.split('-')[0]);
+    const newTableAssignments = [destinationTableId];
+    
+    console.log(`📋 Move details:`, {
+      guestName: guestToMove.name,
+      guestIndex: guestToMove.originalIndex,
+      fromSection: fromSectionId,
+      toSection: toSectionId,
+      destinationTableId,
+      newTableAssignments,
+      isSeated: guestToMove.hasBeenSeated || false,
+      isAllocated: true
+    });
+
+    // First update the database
+    const dbUpdateSuccess = await updateGuestInDatabase(
+      guestToMove.originalIndex,
+      newTableAssignments,
+      true, // is_allocated = true
+      guestToMove.hasBeenSeated || false // preserve seated status
+    );
+
+    if (!dbUpdateSuccess) {
+      console.log('❌ Database update failed, aborting move');
+      return;
+    }
+
+    // Update localStorage state
     setTables(prevTables =>
       prevTables.map(table => ({
         ...table,
@@ -948,6 +1019,8 @@ const TableAllocation = ({
             const remainingSeated = guestToMove.hasBeenSeated ? 
               Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
               (section.seatedCount || 0);
+            
+            console.log(`🔄 Clearing source section ${fromSectionId}:`, { remainingAllocated, remainingSeated });
             
             if (remainingAllocated <= 0) {
               return {
@@ -977,6 +1050,12 @@ const TableAllocation = ({
             const newSeatedCount = guestToMove.hasBeenSeated ? currentSeated + guestToMove.count : currentSeated;
             const newStatus = guestToMove.hasBeenSeated ? 'OCCUPIED' : 'ALLOCATED';
             
+            console.log(`🔄 Assigning to destination section ${toSectionId}:`, {
+              newAllocatedCount,
+              newSeatedCount,
+              newStatus
+            });
+            
             return {
               ...section,
               status: newStatus,
@@ -991,6 +1070,16 @@ const TableAllocation = ({
         })
       }))
     );
+
+    // Call parent callback to update the checked-in guests state
+    onTableAllocated(guestToMove.originalIndex, newTableAssignments);
+
+    console.log(`✅ Manual move completed successfully for ${guestToMove.name}`);
+    
+    toast({
+      title: "🔄 Guest Moved Successfully",
+      description: `${guestToMove.name} has been moved and database updated`,
+    });
   };
 
   const markGuestSeated = (sectionId: string) => {
