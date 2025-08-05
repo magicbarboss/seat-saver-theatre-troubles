@@ -392,6 +392,7 @@ const CheckInSystem = ({
     };
     fries?: {
       quantity: number;
+      type?: 'regular' | 'loaded';
     };
     prosecco?: {
       quantity: number;
@@ -553,7 +554,8 @@ const CheckInSystem = ({
         quantity: 0.5
       },
       fries: {
-        quantity: 0.5
+        quantity: 0.5,
+        type: 'loaded'
       }
     },
     'Groupon Magic Show, Snack and Loaded Fries Package (per person)': {
@@ -590,7 +592,8 @@ const CheckInSystem = ({
         quantity: 0.5
       },
       fries: {
-        quantity: 0.5
+        quantity: 0.5,
+        type: 'loaded'
       }
     },
     // Smoke offers
@@ -974,7 +977,8 @@ const CheckInSystem = ({
             }
             
             if (quantity > 0) {
-              orderItems.push(`${quantity} Fries`);
+              const friesType = packageInfo.fries.type === 'loaded' ? 'Loaded Fries' : 'Fries';
+              orderItems.push(`${quantity} ${friesType}`);
             }
           }
           
