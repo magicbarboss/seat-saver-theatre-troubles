@@ -108,20 +108,6 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
     
     console.log(`🔧 DEBUG getAvailableDestinations: Selected guest "${selectedGuest.guest.name}" (${selectedGuest.guest.count} people) from section ${selectedGuest.sectionId}`);
     
-    const allSections: Array<{
-      sectionId: string;
-      tableName: string;
-      sectionName: string;
-      capacity: number;
-      allocatedCount: number;
-      seatedCount: number;
-      usedCapacity: number;
-      availableCapacity: number;
-      canFit: boolean;
-      status: string;
-      reason?: string;
-    }> = [];
-    
     const validDestinations: Array<{
       sectionId: string;
       tableName: string;
@@ -130,70 +116,91 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
       canFit: boolean;
     }> = [];
     
+    // Group sections by table to calculate combined capacity
+    const tableCapacities = new Map<string, {
+      table: Table;
+      totalAvailable: number;
+      availableSections: TableSection[];
+      excludedSections: TableSection[];
+    }>();
+    
     tables.forEach(table => {
+      let totalAvailable = 0;
+      const availableSections: TableSection[] = [];
+      const excludedSections: TableSection[] = [];
+      
       table.sections.forEach(section => {
+        const allocatedCount = section.allocatedCount || 0;
+        const seatedCount = section.seatedCount || 0;
+        const usedCapacity = Math.max(allocatedCount, seatedCount);
+        const availableCapacity = section.capacity - usedCapacity;
+        
+        // Exclude the guest's current section
+        if (section.id === selectedGuest.sectionId) {
+          excludedSections.push(section);
+          console.log(`🔧   Excluding current section: ${table.name} ${section.section}`);
+        } else if (availableCapacity > 0) {
+          totalAvailable += availableCapacity;
+          availableSections.push(section);
+          console.log(`🔧   Available section: ${table.name} ${section.section} (${availableCapacity} seats)`);
+        } else {
+          excludedSections.push(section);
+          console.log(`🔧   Full section: ${table.name} ${section.section} (${usedCapacity}/${section.capacity})`);
+        }
+      });
+      
+      if (availableSections.length > 0) {
+        tableCapacities.set(table.name, {
+          table,
+          totalAvailable,
+          availableSections,
+          excludedSections
+        });
+        console.log(`🔧   Table ${table.name}: ${totalAvailable} total available seats across ${availableSections.length} sections`);
+      }
+    });
+    
+    // Create destinations - both individual sections and combined table options
+    tableCapacities.forEach(({ table, totalAvailable, availableSections }) => {
+      const canFitInTable = totalAvailable >= selectedGuest.guest.count;
+      
+      if (table.hasSections && availableSections.length > 1 && canFitInTable) {
+        // For multi-section tables, offer the first available section as the target
+        // (the actual allocation logic will handle distributing across sections)
+        const primarySection = availableSections[0];
+        validDestinations.push({
+          sectionId: primarySection.id,
+          tableName: table.name,
+          sectionName: `Whole Table (${totalAvailable} seats)`,
+          availableCapacity: totalAvailable,
+          canFit: true
+        });
+        console.log(`🔧   ✅ Added whole table option: ${table.name} (${totalAvailable} seats)`);
+      }
+      
+      // Also add individual sections that can fit the guest
+      availableSections.forEach(section => {
         const allocatedCount = section.allocatedCount || 0;
         const seatedCount = section.seatedCount || 0;
         const usedCapacity = Math.max(allocatedCount, seatedCount);
         const availableCapacity = section.capacity - usedCapacity;
         const canFit = availableCapacity >= selectedGuest.guest.count;
         
-        const sectionData = {
+        validDestinations.push({
           sectionId: section.id,
           tableName: table.name,
           sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
-          capacity: section.capacity,
-          allocatedCount,
-          seatedCount,
-          usedCapacity,
           availableCapacity,
-          canFit,
-          status: section.status
-        };
+          canFit
+        });
         
-        // Determine why section might be excluded
-        let reason = '';
-        if (section.id === selectedGuest.sectionId) {
-          reason = 'Current section (excluded)';
-        } else if (availableCapacity <= 0) {
-          reason = `No capacity (used: ${usedCapacity}/${section.capacity})`;
-        } else if (!canFit) {
-          reason = `Too small (need ${selectedGuest.guest.count}, have ${availableCapacity})`;
-        } else {
-          reason = 'Available';
-        }
-        
-        allSections.push({ ...sectionData, reason });
-        
-        // Only add to valid destinations if it meets criteria
-        if (section.id !== selectedGuest.sectionId && availableCapacity > 0) {
-          validDestinations.push({
-            sectionId: section.id,
-            tableName: table.name,
-            sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
-            availableCapacity,
-            canFit
-          });
-        }
+        console.log(`🔧   ✅ Added section: ${table.name} ${section.section} (${availableCapacity} seats, canFit: ${canFit})`);
       });
     });
     
-    // Log comprehensive debug info
-    console.log(`🔧 DEBUG: ALL SECTIONS ANALYSIS (${allSections.length} total):`);
-    allSections.forEach(section => {
-      console.log(`🔧   ${section.tableName} ${section.sectionName}: ${section.reason}`, {
-        capacity: section.capacity,
-        allocated: section.allocatedCount,
-        seated: section.seatedCount,
-        available: section.availableCapacity,
-        status: section.status,
-        canFit: section.canFit
-      });
-    });
-    
-    console.log(`🔧 DEBUG: VALID DESTINATIONS (${validDestinations.length} sections):`);
+    console.log(`🔧 DEBUG: FINAL DESTINATIONS (${validDestinations.length} options):`);
     validDestinations.forEach(dest => {
-      console.log(`🔧   ✅ ${dest.tableName} ${dest.sectionName}: ${dest.availableCapacity} seats, canFit: ${dest.canFit}`);
+      console.log(`🔧   ${dest.canFit ? '✅' : '❌'} ${dest.tableName} ${dest.sectionName}: ${dest.availableCapacity} seats`);
     });
     
     return validDestinations.sort((a, b) => {
