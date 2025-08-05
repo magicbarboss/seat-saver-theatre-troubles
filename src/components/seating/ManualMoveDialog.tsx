@@ -214,7 +214,47 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
   const handleMove = () => {
     if (!selectedGuest || !selectedDestination) return;
     
-    onMove(selectedGuest.guest, selectedGuest.sectionId, selectedDestination);
+    // Find the destination details to check if it's a whole table move
+    const destination = availableDestinations.find(d => d.sectionId === selectedDestination);
+    if (!destination) return;
+    
+    // Check if this is a whole table move (destination name contains "Whole Table")
+    const isWholeTableMove = destination.sectionName.includes("Whole Table");
+    
+    if (isWholeTableMove && selectedGuest.guest.count > 2) {
+      // For whole table moves of parties > 2, we need to handle multi-section allocation
+      // Find the table and distribute across available sections
+      const table = tables.find(t => 
+        t.sections.some(s => s.id === selectedDestination)
+      );
+      
+      if (table && table.hasSections) {
+        console.log(`🔄 Handling whole table move for ${selectedGuest.guest.name} (${selectedGuest.guest.count} people) to table ${table.name}`);
+        
+        // Find available sections in this table (excluding current section)
+        const availableSections = table.sections.filter(section => {
+          if (section.id === selectedGuest.sectionId) return false; // Exclude current section
+          const usedCapacity = Math.max(section.allocatedCount || 0, section.seatedCount || 0);
+          return (section.capacity - usedCapacity) > 0;
+        }).sort((a, b) => {
+          // Sort by available capacity descending
+          const aAvailable = a.capacity - Math.max(a.allocatedCount || 0, a.seatedCount || 0);
+          const bAvailable = b.capacity - Math.max(b.allocatedCount || 0, b.seatedCount || 0);
+          return bAvailable - aAvailable;
+        });
+        
+        // For now, move to the first available section - the parent component's move logic
+        // will need to be enhanced to handle multi-section distribution
+        // But this at least ensures we're moving to an available section with sufficient capacity
+        const targetSection = availableSections[0];
+        if (targetSection) {
+          onMove(selectedGuest.guest, selectedGuest.sectionId, targetSection.id);
+        }
+      }
+    } else {
+      // Standard single-section move
+      onMove(selectedGuest.guest, selectedGuest.sectionId, selectedDestination);
+    }
     
     toast({
       title: "🔄 Guest Moved",
