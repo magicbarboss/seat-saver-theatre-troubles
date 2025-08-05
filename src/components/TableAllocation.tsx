@@ -1035,35 +1035,26 @@ const TableAllocation = ({
     setTables(prevTables =>
       prevTables.map(table => {
         if (table.id !== destinationTableId) {
-          // For non-destination tables, only remove from source section
+          // For non-destination tables, free ALL sections that have this guest's party
           return {
             ...table,
             sections: table.sections.map(section => {
-              if (section.id === fromSectionId && section.allocatedGuest?.originalIndex === guestToMove.originalIndex) {
-                const remainingAllocated = (section.allocatedCount || 0) - guestToMove.count;
-                const remainingSeated = guestToMove.hasBeenSeated ? 
-                  Math.max(0, (section.seatedCount || 0) - guestToMove.count) : 
-                  (section.seatedCount || 0);
+              // Check if this section contains any part of the guest's party by matching guest names
+              const hasThisParty = section.allocatedGuest && 
+                (section.allocatedGuest.name === guestToMove.name || 
+                 (section.allocatedTo && section.allocatedTo.includes(guestToMove.name)));
+              
+              if (hasThisParty) {
+                console.log(`🔄 Clearing section ${section.id} containing ${guestToMove.name}'s party`);
                 
-                console.log(`🔄 Clearing source section ${fromSectionId}:`, { remainingAllocated, remainingSeated });
-                
-                if (remainingAllocated <= 0) {
-                  return {
-                    ...section,
-                    status: 'AVAILABLE' as const,
-                    allocatedTo: undefined,
-                    allocatedGuest: undefined,
-                    allocatedCount: undefined,
-                    seatedCount: undefined,
-                  };
-                } else {
-                  return {
-                    ...section,
-                    allocatedCount: remainingAllocated,
-                    seatedCount: remainingSeated,
-                    status: remainingSeated > 0 ? 'OCCUPIED' as const : 'ALLOCATED' as const,
-                  };
-                }
+                return {
+                  ...section,
+                  status: 'AVAILABLE' as const,
+                  allocatedTo: undefined,
+                  allocatedGuest: undefined,
+                  allocatedCount: undefined,
+                  seatedCount: undefined,
+                };
               }
               return section;
             })
