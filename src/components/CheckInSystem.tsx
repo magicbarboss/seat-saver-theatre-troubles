@@ -926,51 +926,7 @@ const CheckInSystem = ({
       return "Viator";
     }
 
-    // Step 4: Check for Groupon cocktail package based on House Cocktail add-ons
-    const hasHouseCocktailAddons = addOnGuests.some(addon => 
-      addon.item_details?.toLowerCase().includes('house cocktail')
-    );
-    
-    if (hasHouseCocktailAddons && itemDetails.toLowerCase().includes('magic show')) {
-      console.log(`🍹 Detected Groupon Cocktails Package for ${guest.booker_name} based on House Cocktail add-ons`);
-      const packageInfo = TICKET_TYPE_MAPPING['Groupon Magic & Cocktails Package (per person)'];
-      
-      if (packageInfo) {
-        // Calculate drinks (2 included + add-ons)
-        const includedCocktails = packageInfo.drinks.quantity * guestCount;
-        const addonCocktails = addOnGuests
-          .filter(addon => addon.item_details?.toLowerCase().includes('house cocktail'))
-          .reduce((total, addon) => total + (addon.total_quantity || 0), 0);
-        const totalCocktails = includedCocktails + addonCocktails;
-        
-        orderItems.push(`${totalCocktails} House Cocktail${totalCocktails > 1 ? 's' : ''}`);
-        
-        // Calculate pizza
-        if (packageInfo.pizza) {
-          const quantity = packageInfo.calculationMethod === 'per-person' 
-            ? packageInfo.pizza.quantity * guestCount 
-            : packageInfo.pizza.quantity;
-          if (quantity > 0) {
-            orderItems.push(`${quantity} Pizza${quantity > 1 ? 's' : ''}`);
-          }
-        }
-        
-        // Calculate fries
-        if (packageInfo.fries) {
-          const quantity = packageInfo.calculationMethod === 'per-person' 
-            ? packageInfo.fries.quantity * guestCount 
-            : packageInfo.fries.quantity;
-          if (quantity > 0) {
-            const friesType = packageInfo.fries.type === 'loaded' ? 'Loaded Fries' : 'Fries';
-            orderItems.push(`${quantity} ${friesType}`);
-          }
-        }
-        
-        return orderItems.join(', ');
-      }
-    }
-
-    // Step 5: Check if guest has explicit ticket mappings FIRST
+    // Step 4: Check if guest has explicit ticket mappings FIRST
     const tickets = getAllTicketTypes(guest);
     const hasExplicitMapping = tickets.some(ticket => TICKET_TYPE_MAPPING[ticket.type]);
     
