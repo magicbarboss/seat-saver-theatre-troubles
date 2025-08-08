@@ -2316,6 +2316,7 @@ const CheckInSystem = ({
               handlePagerRelease(guestIndex)
             }
             showTime={showFilter}
+            friendshipGroups={friendshipGroups}
           />
         </TabsContent>
 

@@ -27,13 +27,15 @@ interface SeatingManagementProps {
   onGuestTableAssign: (guestIndex: number, tableId: string) => void;
   onGuestTableRemove: (guestIndex: number) => void;
   showTime: string;
+  friendshipGroups: Map<string, number[]>;
 }
 
 export const SeatingManagement: React.FC<SeatingManagementProps> = ({
   checkedInGuests,
   onGuestTableAssign,
   onGuestTableRemove,
-  showTime
+  showTime,
+  friendshipGroups
 }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [activeTab, setActiveTab] = useState('seating');
@@ -287,6 +289,7 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
             onTableAssign={handleTableAssign}
             onGuestMove={handleGuestMove}
             onTableClear={handleTableClear}
+            friendshipGroups={friendshipGroups}
           />
         </TabsContent>
 

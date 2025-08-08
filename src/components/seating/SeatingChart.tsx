@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Users, Clock, MapPin, AlertCircle } from 'lucide-react';
 import { CheckedInGuest } from '../checkin/types';
+import { FriendshipGroup } from './FriendshipGroup';
 
 interface Table {
   id: string;
@@ -27,6 +28,7 @@ interface SeatingChartProps {
   onTableAssign: (tableId: string, guest: CheckedInGuest) => void;
   onGuestMove: (guest: CheckedInGuest, fromTableId: string, toTableId: string) => void;
   onTableClear: (tableId: string) => void;
+  friendshipGroups: Map<string, number[]>;
 }
 
 export const SeatingChart: React.FC<SeatingChartProps> = ({
@@ -34,7 +36,8 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   checkedInGuests,
   onTableAssign,
   onGuestMove,
-  onTableClear
+  onTableClear,
+  friendshipGroups
 }) => {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -59,8 +62,8 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
     };
   }, [tables]);
 
-  // Get unassigned guests
-  const unassignedGuests = useMemo(() => {
+  // Get unassigned guests and group them by friendship
+  const { friendshipGroupsData, individualGuests } = useMemo(() => {
     const assignedGuestIds = new Set();
     tables.forEach(table => {
       table.assignedGuests?.forEach(guest => {
@@ -68,8 +71,48 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
       });
     });
     
-    return checkedInGuests.filter(guest => !assignedGuestIds.has(guest.originalIndex));
-  }, [tables, checkedInGuests]);
+    const unassignedGuests = checkedInGuests.filter(guest => !assignedGuestIds.has(guest.originalIndex));
+    const groupedGuests = new Map<string, CheckedInGuest[]>();
+    const individualGuestsSet = new Set<CheckedInGuest>();
+    
+    // Build guest lookup by original index
+    const guestLookup = new Map();
+    unassignedGuests.forEach(guest => {
+      guestLookup.set(guest.originalIndex, guest);
+    });
+    
+    // Process friendship groups
+    friendshipGroups.forEach((memberIndices, groupId) => {
+      const groupMembers = memberIndices
+        .map(index => guestLookup.get(index))
+        .filter(guest => guest !== undefined);
+      
+      if (groupMembers.length > 1) {
+        groupedGuests.set(groupId, groupMembers);
+        // Remove grouped guests from individual list
+        groupMembers.forEach(guest => individualGuestsSet.delete(guest));
+      }
+    });
+    
+    // Add ungrouped guests to individual list
+    unassignedGuests.forEach(guest => {
+      let isInGroup = false;
+      for (const memberIndices of friendshipGroups.values()) {
+        if (memberIndices.includes(guest.originalIndex)) {
+          isInGroup = true;
+          break;
+        }
+      }
+      if (!isInGroup) {
+        individualGuestsSet.add(guest);
+      }
+    });
+    
+    return {
+      friendshipGroupsData: groupedGuests,
+      individualGuests: Array.from(individualGuestsSet)
+    };
+  }, [tables, checkedInGuests, friendshipGroups]);
 
   const getTableStatusColor = (table: Table) => {
     if (table.assignedGuests && table.assignedGuests.length > 0) {
@@ -210,39 +253,59 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
         <Card className="w-80">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              Unassigned Guests
-              <Badge variant="secondary">{unassignedGuests.length}</Badge>
+              Guests awaiting allocation
+              <Badge variant="secondary">
+                {Array.from(friendshipGroupsData.values()).reduce((sum, members) => sum + members.length, 0) + individualGuests.length}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-2">
-                {unassignedGuests.map(guest => (
-                  <div
-                    key={guest.originalIndex}
-                    className="p-3 border border-border rounded-lg bg-card hover:bg-accent cursor-pointer transition-colors"
-                    onClick={() => {
-                      if (selectedTable) {
-                        handleGuestAssign(guest);
-                      }
-                    }}
-                  >
-                    <div className="font-medium">{guest.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {guest.count} guests • {guest.showTime}
-                    </div>
-                    {guest.isWalkIn && (
-                      <Badge variant="outline" className="mt-1">Walk-in</Badge>
-                    )}
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-3">
+              {/* Friendship Groups */}
+              {Array.from(friendshipGroupsData.entries()).map(([groupId, members]) => (
+                <FriendshipGroup
+                  key={groupId}
+                  id={groupId}
+                  members={members}
+                  onGroupAssign={(groupMembers) => {
+                    if (!selectedTable) return;
+                    groupMembers.forEach(guest => {
+                      handleGuestAssign(guest);
+                    });
+                  }}
+                  isSelected={false}
+                />
+              ))}
+              
+              {/* Individual Guests */}
+              {individualGuests.map(guest => (
+                <div
+                  key={guest.originalIndex}
+                  className="p-3 border border-border rounded-lg bg-card hover:bg-accent cursor-pointer transition-colors"
+                  onClick={() => {
+                    if (selectedTable) {
+                      handleGuestAssign(guest);
+                    }
+                  }}
+                >
+                  <div className="font-medium">{guest.name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {guest.count} guests • {guest.showTime}
                   </div>
-                ))}
-                {unassignedGuests.length === 0 && (
-                  <div className="text-center text-muted-foreground py-8">
-                    All guests have been assigned to tables
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
+                  {guest.isWalkIn && (
+                    <Badge variant="outline" className="mt-1">Walk-in</Badge>
+                  )}
+                </div>
+              ))}
+              
+              {friendshipGroupsData.size === 0 && individualGuests.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  All guests have been assigned to tables
+                </div>
+              )}
+            </div>
+          </ScrollArea>
           </CardContent>
         </Card>
       </div>
@@ -261,7 +324,27 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
             </div>
             <ScrollArea className="max-h-64">
               <div className="space-y-2">
-                {unassignedGuests.map(guest => (
+                {/* Friendship Groups in Dialog */}
+                {Array.from(friendshipGroupsData.entries()).map(([groupId, members]) => (
+                  <Button
+                    key={groupId}
+                    variant="outline"
+                    className="w-full justify-start h-auto p-3"
+                    onClick={() => {
+                      members.forEach(guest => handleGuestAssign(guest));
+                    }}
+                  >
+                    <div className="text-left">
+                      <div className="font-medium">{members[0]?.name || 'Group'} & Friends</div>
+                      <div className="text-sm text-muted-foreground">
+                        {members.reduce((sum, m) => sum + m.count, 0)} guests total • Group of {members.length}
+                      </div>
+                    </div>
+                  </Button>
+                ))}
+                
+                {/* Individual Guests in Dialog */}
+                {individualGuests.map(guest => (
                   <Button
                     key={guest.originalIndex}
                     variant="outline"
@@ -276,7 +359,8 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                     </div>
                   </Button>
                 ))}
-                {unassignedGuests.length === 0 && (
+                
+                {friendshipGroupsData.size === 0 && individualGuests.length === 0 && (
                   <div className="text-center text-muted-foreground py-4">
                     No unassigned guests available
                   </div>
