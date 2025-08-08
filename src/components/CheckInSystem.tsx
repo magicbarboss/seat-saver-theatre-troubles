@@ -2223,9 +2223,10 @@ const CheckInSystem = ({
           foodBreakdown={foodData.breakdown} 
           showTimeStats={getShowTimeStats()} 
           lastSaved={lastSaved} 
-        />;
+        />
       })()}
 
+      console.log('Debug: Before Tabs component render');
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
           <TabsTrigger 
@@ -2327,10 +2328,12 @@ const CheckInSystem = ({
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <h3 className="text-xl font-semibold mb-4">Show Statistics</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Object.entries(getShowTimeStats()).map(([time, count]) => <div key={time} className="p-4 border rounded-lg">
+              {Object.entries(getShowTimeStats()).map(([time, count]) => (
+                <div key={time} className="p-4 border rounded-lg">
                   <h4 className="font-medium text-lg">{time}</h4>
                   <p className="text-2xl font-bold text-blue-600">{count} guests</p>
-                </div>)}
+                </div>
+              ))}
             </div>
           </div>
         </TabsContent>
@@ -2367,14 +2370,16 @@ const CheckInSystem = ({
           {selectedGuestForPager !== null && <div className="space-y-4">
               <p>Select an available pager:</p>
               <div className="grid grid-cols-4 gap-2">
-                {availablePagers.filter(id => !Array.from(pagerAssignments.values()).includes(id)).map(pagerId => <Button key={pagerId} variant="outline" onClick={() => {
-              const newAssignments = new Map(pagerAssignments);
-              newAssignments.set(selectedGuestForPager, pagerId);
-              setPagerAssignments(newAssignments);
-              setSelectedGuestForPager(null);
-            }} className="h-12 text-lg font-bold">
-                      #{pagerId}
-                    </Button>)}
+                {availablePagers.filter(id => !Array.from(pagerAssignments.values()).includes(id)).map(pagerId => (
+                  <Button key={pagerId} variant="outline" onClick={() => {
+                    const newAssignments = new Map(pagerAssignments);
+                    newAssignments.set(selectedGuestForPager, pagerId);
+                    setPagerAssignments(newAssignments);
+                    setSelectedGuestForPager(null);
+                  }} className="h-12 text-lg font-bold">
+                    #{pagerId}
+                  </Button>
+                ))}
               </div>
             </div>}
         </DialogContent>
