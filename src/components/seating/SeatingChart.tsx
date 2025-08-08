@@ -64,6 +64,12 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
 
   // Get unassigned guests and group them by friendship
   const { friendshipGroupsData, individualGuests } = useMemo(() => {
+    console.log('🔍 SEATING CHART - Friendship groups received:', {
+      friendshipGroupsSize: friendshipGroups.size,
+      friendshipGroupsData: Array.from(friendshipGroups.entries()),
+      checkedInGuestsCount: checkedInGuests.length,
+      checkedInGuestNames: checkedInGuests.map(g => `${g.name} (${g.originalIndex})`).slice(0, 10)
+    });
     const assignedGuestIds = new Set();
     tables.forEach(table => {
       table.assignedGuests?.forEach(guest => {

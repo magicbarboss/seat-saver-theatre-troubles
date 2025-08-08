@@ -1437,6 +1437,11 @@ const CheckInSystem = ({
       return new Map<string, number[]>();
     }
     
+    console.log('🔍 DEBUGGING FRIENDSHIP GROUPS - Raw guest data:');
+    guests.forEach((guest, index) => {
+      console.log(`Guest ${index}: ${guest?.booker_name} - Friends field:`, guest?.ticket_data?.Friends || 'none');
+    });
+    
     console.log('🔍 FRIENDSHIP PROCESSING STARTED for', guests.length, 'guests');
     console.log('Guest names with normalization:');
     guests.forEach((g, i) => {
