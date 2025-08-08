@@ -128,7 +128,7 @@ export const GuestTable = ({
               isAllocated={allocatedGuests.has(group.originalIndex)}
               pagerNumber={pagerAssignments.get(group.originalIndex)}
               tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
-              orderSummary={getOrderSummary(currentGuest, currentGuest.total_quantity + group.addOns.reduce((sum, addon) => sum + (addon.total_quantity || 0), 0), group.addOns)}
+              orderSummary={getOrderSummary(currentGuest, currentGuest.total_quantity, group.addOns)}
               packageDetails={getPackageDetails(currentGuest)}
               comment={bookingComments.get(group.originalIndex)}
               notes={guestNotes.get(group.originalIndex) || ''}

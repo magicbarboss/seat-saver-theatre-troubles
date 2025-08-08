@@ -813,6 +813,18 @@ const CheckInSystem = ({
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
+    // Debug logging for Norman specifically
+    if (guest.booker_name?.toLowerCase().includes('norman')) {
+      console.log(`🔍 Norman Guest Count Debug:`, {
+        bookerName: guest.booker_name,
+        bookingCode: guest.booking_code,
+        totalGuestCountParam: totalGuestCount,
+        guestTotalQuantity: guest.total_quantity,
+        finalGuestCount: guestCount,
+        itemDetails: guest.item_details
+      });
+    }
+    
     // Check for addon orders from booking group - we'll add these at the end
     const addonItems = extractAddonOrders(guest, addOnGuests);
     
@@ -1055,6 +1067,22 @@ const CheckInSystem = ({
       const cocktailQuantity = guestCount;
       const pizzaQuantity = Math.floor(guestCount / 2);
       const loadedFriesQuantity = Math.floor(guestCount / 2);
+      
+      // Debug logging for Norman specifically
+      if (guest.booker_name?.toLowerCase().includes('norman')) {
+        console.log(`🍸 Norman Cocktail Package Debug:`, {
+          bookerName: guest.booker_name,
+          bookingCode: guest.booking_code,
+          totalQuantity: guest.total_quantity,
+          guestCount: guestCount,
+          cocktailQuantity: cocktailQuantity,
+          pizzaQuantity: pizzaQuantity,
+          loadedFriesQuantity: loadedFriesQuantity,
+          itemDetails: guest.item_details,
+          isGrouponCocktail,
+          isWowcherCocktail
+        });
+      }
       
       orderItems.push(`${cocktailQuantity} House Cocktail${cocktailQuantity > 1 ? 's' : ''}`);
       if (pizzaQuantity > 0) orderItems.push(`${pizzaQuantity} Pizza${pizzaQuantity > 1 ? 's' : ''}`);
@@ -1491,16 +1519,9 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
-  // Group bookings by booking code - preserve original order with duplicate detection
+  // Group bookings by booking code - preserve original order
   const groupedBookings = useMemo(() => {
     if (!guests || guests.length === 0) return [];
-    
-    console.log('👥 Total guests loaded:', guests.length);
-    console.log('🔍 Looking for Jill:', guests.filter(g => g?.booker_name?.toLowerCase().includes('jill')).map(g => ({
-      name: g.booker_name,
-      item_details: g.item_details,
-      booking_code: g.booking_code
-    })));
     
     const bookingGroups: BookingGroup[] = [];
     const processedIndices = new Set<number>();
@@ -1520,32 +1541,16 @@ const CheckInSystem = ({
       }) => !processedIndices.has(i) && g && g.booking_code === bookingCode && g.booker_name === bookerName);
       
       if (relatedBookings.length > 0) {
-        // Deduplicate entries by item_details to handle database duplicates
-        const uniqueBookings = new Map<string, { guest: typeof guest, index: number }>();
-        
-        relatedBookings.forEach(booking => {
-          const key = `${booking.guest.item_details || 'no-details'}-${booking.guest.total_quantity || 0}`;
-          if (!uniqueBookings.has(key)) {
-            uniqueBookings.set(key, booking);
-          } else {
-            // Log duplicate detection for debugging
-            console.log(`🔍 Duplicate detected for ${bookerName}: ${booking.guest.item_details}`);
-          }
-        });
-        
-        const deduplicatedBookings = Array.from(uniqueBookings.values());
-        
         // Separate main booking from add-ons based on item type patterns
-        let mainBooking: typeof relatedBookings[0] | null = null;
-        const addOns: typeof relatedBookings = [];
-        
-        // Look for main booking patterns (packages, not standalone items)
         const packagePatterns = [
           'package', 'wowcher', 'groupon', 'viator', 'gyg', 'experience'
         ];
         
-        // First, try to find a main booking (package-type item)
-        for (const booking of deduplicatedBookings) {
+        let mainBooking: typeof relatedBookings[0] | null = null;
+        const addOns: typeof relatedBookings = [];
+        
+        // Find main booking (package-type item) and separate add-ons
+        relatedBookings.forEach(booking => {
           const itemDetails = (booking.guest.item_details || '').toLowerCase();
           const isPackageItem = packagePatterns.some(pattern => itemDetails.includes(pattern));
           
@@ -1554,24 +1559,12 @@ const CheckInSystem = ({
           } else {
             addOns.push(booking);
           }
-        }
+        });
         
         // If no package found, use the first item as main booking
-        if (!mainBooking && deduplicatedBookings.length > 0) {
-          mainBooking = deduplicatedBookings[0];
-          addOns.push(...deduplicatedBookings.slice(1));
-        }
-        
-        // Debug logging for specific bookings
-        if (bookerName?.toLowerCase().includes('jill') || bookerName?.toLowerCase().includes('norman')) {
-          console.log(`🎯 Processed ${bookerName} booking group:`, {
-            bookingCode,
-            originalCount: relatedBookings.length,
-            deduplicatedCount: deduplicatedBookings.length,
-            mainBooking: mainBooking?.guest.item_details,
-            addOns: addOns.map(ao => ao.guest.item_details),
-            duplicatesRemoved: relatedBookings.length - deduplicatedBookings.length
-          });
+        if (!mainBooking && relatedBookings.length > 0) {
+          mainBooking = relatedBookings[0];
+          addOns.push(...relatedBookings.slice(1));
         }
         
         if (mainBooking) {
@@ -1582,7 +1575,6 @@ const CheckInSystem = ({
             addOnIndices: addOns.map(rb => rb.index)
           });
           
-          // Mark all related bookings as processed (including duplicates)
           relatedBookings.forEach(({ index }) => processedIndices.add(index));
         }
       }
