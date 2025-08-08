@@ -1403,6 +1403,7 @@ const CheckInSystem = ({
     if (!guests || guests.length === 0) return new Map<string, number[]>();
     
     console.log('🔍 Processing friendship groups for', guests.length, 'guests');
+    console.log('Guest names:', guests.map((g, i) => `${i}: ${g?.booker_name}`));
     
     const connections = new Map<number, Set<number>>();
     
@@ -1426,12 +1427,17 @@ const CheckInSystem = ({
               const guestName = guest.booker_name.toLowerCase().trim();
               const searchName = friendName.toLowerCase().trim();
               
+              console.log(`    Comparing "${searchName}" with "${guestName}"`);
+              
               // Only exact name match or exact first/last name combinations
               const guestNameParts = guestName.split(/\s+/);
               const searchNameParts = searchName.split(/\s+/);
               
               // Exact full name match
-              if (guestName === searchName) return true;
+              if (guestName === searchName) {
+                console.log(`    ✅ EXACT MATCH: "${searchName}" === "${guestName}"`);
+                return true;
+              }
               
               // Check if friend name matches any combination of guest's first/last names
               if (searchNameParts.length === 1) {
