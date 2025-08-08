@@ -1398,6 +1398,39 @@ const CheckInSystem = ({
     updateGuestsWithDietMagic();
   }, [guests, guestListId]); // Also trigger when guest list changes
 
+  // Enhanced name normalization function
+  const normalizeNameForMatching = (name: string): string => {
+    if (!name) return '';
+    
+    return name
+      .toLowerCase()
+      .trim()
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      // Remove common punctuation
+      .replace(/[.,;:'"!?-]/g, '')
+      // Remove any non-alphanumeric characters except spaces
+      .replace(/[^\w\s]/g, '')
+      .trim();
+  };
+
+  // Fuzzy matching helper for similar names
+  const isFuzzyMatch = (name1: string, name2: string, threshold: number = 0.8): boolean => {
+    if (name1 === name2) return true;
+    
+    // Simple Levenshtein-based similarity
+    const longer = name1.length > name2.length ? name1 : name2;
+    const shorter = name1.length > name2.length ? name2 : name1;
+    
+    if (longer.length === 0) return true;
+    if (shorter.length === 0) return false;
+    
+    // Check if shorter name is contained in longer name
+    if (longer.includes(shorter)) return true;
+    
+    return false;
+  };
+
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
     if (!guests || guests.length === 0) {
@@ -1406,7 +1439,14 @@ const CheckInSystem = ({
     }
     
     console.log('🔍 FRIENDSHIP PROCESSING STARTED for', guests.length, 'guests');
-    console.log('Guest names:', guests.map((g, i) => `${i}: ${g?.booker_name}`));
+    console.log('Guest names with normalization:');
+    guests.forEach((g, i) => {
+      if (g?.booker_name) {
+        const original = g.booker_name;
+        const normalized = normalizeNameForMatching(original);
+        console.log(`  ${i}: "${original}" → "${normalized}" [${original.split('').map(c => c.charCodeAt(0)).join(',')}]`);
+      }
+    });
     
     const connections = new Map<number, Set<number>>();
     
@@ -1423,40 +1463,63 @@ const CheckInSystem = ({
         
         friendNames.forEach(friendName => {
           console.log(`  🔎 Looking for friend: "${friendName}"`);
-          // Find matching guests by exact name matching only
+          const normalizedFriendName = normalizeNameForMatching(friendName);
+          console.log(`     Normalized friend name: "${normalizedFriendName}" [${friendName.split('').map(c => c.charCodeAt(0)).join(',')}]`);
+          
+          // Find matching guests by enhanced name matching
           const matchingGuestIndices = guests.map((g, i) => ({ guest: g, index: i }))
             .filter(({ guest }) => {
               if (!guest?.booker_name) return false;
-              const guestName = guest.booker_name.toLowerCase().trim();
-              const searchName = friendName.toLowerCase().trim();
               
-              console.log(`    Comparing "${searchName}" with "${guestName}"`);
+              const originalGuestName = guest.booker_name;
+              const normalizedGuestName = normalizeNameForMatching(originalGuestName);
               
-              // Only exact name match or exact first/last name combinations
-              const guestNameParts = guestName.split(/\s+/);
-              const searchNameParts = searchName.split(/\s+/);
+              console.log(`    Comparing friend "${normalizedFriendName}" with guest "${normalizedGuestName}"`);
+              console.log(`      Original: "${friendName}" vs "${originalGuestName}"`);
               
-              // Exact full name match
-              if (guestName === searchName) {
-                console.log(`    ✅ EXACT MATCH: "${searchName}" === "${guestName}"`);
+              // Enhanced matching logic
+              const guestNameParts = normalizedGuestName.split(/\s+/).filter(part => part.length > 0);
+              const searchNameParts = normalizedFriendName.split(/\s+/).filter(part => part.length > 0);
+              
+              // Exact full name match (normalized)
+              if (normalizedGuestName === normalizedFriendName) {
+                console.log(`    ✅ EXACT NORMALIZED MATCH: "${normalizedFriendName}" === "${normalizedGuestName}"`);
+                return true;
+              }
+              
+              // Fuzzy match for similar names
+              if (isFuzzyMatch(normalizedGuestName, normalizedFriendName)) {
+                console.log(`    ✅ FUZZY MATCH: "${normalizedFriendName}" ≈ "${normalizedGuestName}"`);
                 return true;
               }
               
               // Check if friend name matches any combination of guest's first/last names
               if (searchNameParts.length === 1) {
                 // Single word friend name should match first or last name exactly
-                return guestNameParts.includes(searchName);
+                const matches = guestNameParts.includes(normalizedFriendName);
+                if (matches) {
+                  console.log(`    ✅ PARTIAL MATCH: "${normalizedFriendName}" found in "${normalizedGuestName}"`);
+                }
+                return matches;
               } else if (searchNameParts.length === 2 && guestNameParts.length >= 2) {
                 // Two word friend name should match first+last exactly
-                return (guestNameParts[0] === searchNameParts[0] && 
-                        guestNameParts[guestNameParts.length - 1] === searchNameParts[1]) ||
-                       (guestNameParts[0] === searchNameParts[1] && 
-                        guestNameParts[guestNameParts.length - 1] === searchNameParts[0]);
+                const firstLastMatch = (guestNameParts[0] === searchNameParts[0] && 
+                        guestNameParts[guestNameParts.length - 1] === searchNameParts[1]);
+                const lastFirstMatch = (guestNameParts[0] === searchNameParts[1] && 
+                         guestNameParts[guestNameParts.length - 1] === searchNameParts[0]);
+                
+                if (firstLastMatch || lastFirstMatch) {
+                  console.log(`    ✅ NAME PARTS MATCH: "${normalizedFriendName}" matches parts of "${normalizedGuestName}"`);
+                  return true;
+                }
               }
               
+              console.log(`    ❌ No match found`);
               return false;
             })
             .map(({ index: i }) => i);
+          
+          console.log(`  🎯 Found ${matchingGuestIndices.length} matches for "${friendName}":`, matchingGuestIndices.map(i => `${guests[i]?.booker_name} (${i})`));
           
           // Create bidirectional connections
           matchingGuestIndices.forEach(matchedIndex => {
