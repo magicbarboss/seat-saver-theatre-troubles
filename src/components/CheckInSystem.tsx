@@ -1560,6 +1560,7 @@ const CheckInSystem = ({
         // Store the originalIndex values directly (not array indices)
         groups.set(`Friends: ${memberNames}`, Array.from(groupMembers).sort());
       }
+    });
     
     return groups;
   }, [guests]);
@@ -2226,7 +2227,6 @@ const CheckInSystem = ({
         />
       })()}
 
-      console.log('Debug: Before Tabs component render');
       <Tabs defaultValue="checkin" className="w-full">
         <TabsList className="grid w-full grid-cols-3 bg-gradient-to-r from-primary/5 to-accent/5 backdrop-blur-sm border border-primary/20 shadow-lg rounded-xl p-1 h-auto">
           <TabsTrigger 
