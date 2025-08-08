@@ -1491,7 +1491,7 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
-  // Group bookings by booking code - preserve original order
+  // Group bookings by booking code - preserve original order with duplicate detection
   const groupedBookings = useMemo(() => {
     if (!guests || guests.length === 0) return [];
     
@@ -1519,42 +1519,72 @@ const CheckInSystem = ({
         index: i
       }) => !processedIndices.has(i) && g && g.booking_code === bookingCode && g.booker_name === bookerName);
       
-      // Debug logging for Jill's booking group
-      if (bookerName?.toLowerCase().includes('jill')) {
-        console.log('🔍 Jill Booking Group Debug:', {
-          bookingCode,
-          bookerName,
-          relatedBookingsCount: relatedBookings.length,
-          relatedBookings: relatedBookings.map(rb => ({
-            index: rb.index,
-            item_details: rb.guest.item_details,
-            total_quantity: rb.guest.total_quantity
-          }))
-        });
-      }
-      
       if (relatedBookings.length > 0) {
-        const mainBooking = relatedBookings[0];
-        const addOns = relatedBookings.slice(1);
+        // Deduplicate entries by item_details to handle database duplicates
+        const uniqueBookings = new Map<string, { guest: typeof guest, index: number }>();
         
-        // Debug for Jill specifically
-        if (bookerName?.toLowerCase().includes('jill')) {
-          console.log('🎯 Found Jill booking group:', {
-            mainBooking: mainBooking.guest.item_details,
+        relatedBookings.forEach(booking => {
+          const key = `${booking.guest.item_details || 'no-details'}-${booking.guest.total_quantity || 0}`;
+          if (!uniqueBookings.has(key)) {
+            uniqueBookings.set(key, booking);
+          } else {
+            // Log duplicate detection for debugging
+            console.log(`🔍 Duplicate detected for ${bookerName}: ${booking.guest.item_details}`);
+          }
+        });
+        
+        const deduplicatedBookings = Array.from(uniqueBookings.values());
+        
+        // Separate main booking from add-ons based on item type patterns
+        let mainBooking: typeof relatedBookings[0] | null = null;
+        const addOns: typeof relatedBookings = [];
+        
+        // Look for main booking patterns (packages, not standalone items)
+        const packagePatterns = [
+          'package', 'wowcher', 'groupon', 'viator', 'gyg', 'experience'
+        ];
+        
+        // First, try to find a main booking (package-type item)
+        for (const booking of deduplicatedBookings) {
+          const itemDetails = (booking.guest.item_details || '').toLowerCase();
+          const isPackageItem = packagePatterns.some(pattern => itemDetails.includes(pattern));
+          
+          if (isPackageItem && !mainBooking) {
+            mainBooking = booking;
+          } else {
+            addOns.push(booking);
+          }
+        }
+        
+        // If no package found, use the first item as main booking
+        if (!mainBooking && deduplicatedBookings.length > 0) {
+          mainBooking = deduplicatedBookings[0];
+          addOns.push(...deduplicatedBookings.slice(1));
+        }
+        
+        // Debug logging for specific bookings
+        if (bookerName?.toLowerCase().includes('jill') || bookerName?.toLowerCase().includes('norman')) {
+          console.log(`🎯 Processed ${bookerName} booking group:`, {
+            bookingCode,
+            originalCount: relatedBookings.length,
+            deduplicatedCount: deduplicatedBookings.length,
+            mainBooking: mainBooking?.guest.item_details,
             addOns: addOns.map(ao => ao.guest.item_details),
-            totalRelated: relatedBookings.length
+            duplicatesRemoved: relatedBookings.length - deduplicatedBookings.length
           });
         }
         
-        bookingGroups.push({
-          mainBooking: mainBooking.guest,
-          addOns: addOns.map(rb => rb.guest),
-          originalIndex: mainBooking.index,
-          addOnIndices: addOns.map(rb => rb.index)
-        });
-        relatedBookings.forEach(({
-          index
-        }) => processedIndices.add(index));
+        if (mainBooking) {
+          bookingGroups.push({
+            mainBooking: mainBooking.guest,
+            addOns: addOns.map(rb => rb.guest),
+            originalIndex: mainBooking.index,
+            addOnIndices: addOns.map(rb => rb.index)
+          });
+          
+          // Mark all related bookings as processed (including duplicates)
+          relatedBookings.forEach(({ index }) => processedIndices.add(index));
+        }
       }
     });
     
