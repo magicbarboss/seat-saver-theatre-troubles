@@ -1400,9 +1400,12 @@ const CheckInSystem = ({
 
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
-    if (!guests || guests.length === 0) return new Map<string, number[]>();
+    if (!guests || guests.length === 0) {
+      console.log('❌ No guests available for friendship processing');
+      return new Map<string, number[]>();
+    }
     
-    console.log('🔍 Processing friendship groups for', guests.length, 'guests');
+    console.log('🔍 FRIENDSHIP PROCESSING STARTED for', guests.length, 'guests');
     console.log('Guest names:', guests.map((g, i) => `${i}: ${g?.booker_name}`));
     
     const connections = new Map<number, Set<number>>();
@@ -1514,6 +1517,10 @@ const CheckInSystem = ({
         console.log(`Friendship group created: "${memberNames}" with ${groupMembers.size} members:`, Array.from(groupMembers));
       }
     });
+    
+    console.log('🎯 FRIENDSHIP PROCESSING COMPLETE:');
+    console.log('  - Total groups found:', groups.size);
+    console.log('  - Groups:', Array.from(groups.entries()));
     
     return groups;
   }, [guests]);
