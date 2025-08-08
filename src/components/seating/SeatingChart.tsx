@@ -76,7 +76,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
     const individualGuestsSet = new Set<CheckedInGuest>();
     
     // Build guest lookup by original index
-    const guestLookup = new Map();
+    const guestLookup = new Map<number, CheckedInGuest>();
     unassignedGuests.forEach(guest => {
       guestLookup.set(guest.originalIndex, guest);
     });
@@ -85,7 +85,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
     friendshipGroups.forEach((memberIndices, groupId) => {
       const groupMembers = memberIndices
         .map(index => guestLookup.get(index))
-        .filter(guest => guest !== undefined);
+        .filter(guest => guest !== undefined) as CheckedInGuest[];
       
       if (groupMembers.length > 1) {
         groupedGuests.set(groupId, groupMembers);

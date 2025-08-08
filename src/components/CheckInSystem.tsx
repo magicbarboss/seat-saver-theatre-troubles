@@ -1434,7 +1434,6 @@ const CheckInSystem = ({
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
     if (!guests || guests.length === 0) {
-      console.log('❌ No guests available for friendship processing');
       return new Map<string, number[]>();
     }
     
@@ -1592,6 +1591,9 @@ const CheckInSystem = ({
   useEffect(() => {
     if (processFriendshipGroups.size > 0) {
       setFriendshipGroups(processFriendshipGroups);
+    } else {
+      // Clear existing friendship groups if there are none
+      setFriendshipGroups(new Map());
     }
   }, [processFriendshipGroups]);
 
