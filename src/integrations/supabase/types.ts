@@ -103,6 +103,7 @@ export type Database = {
       }
       guests: {
         Row: {
+          arriving_late: boolean
           booker_name: string | null
           booking_code: string | null
           booking_comments: string | null
@@ -131,6 +132,7 @@ export type Database = {
           total_quantity: number | null
         }
         Insert: {
+          arriving_late?: boolean
           booker_name?: string | null
           booking_code?: string | null
           booking_comments?: string | null
@@ -159,6 +161,7 @@ export type Database = {
           total_quantity?: number | null
         }
         Update: {
+          arriving_late?: boolean
           booker_name?: string | null
           booking_code?: string | null
           booking_comments?: string | null

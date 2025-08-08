@@ -4,7 +4,10 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit } from 'lucide-react';
+import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit, Clock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Guest {
   [key: string]: any;
@@ -20,7 +23,10 @@ interface Guest {
   diet_info?: string;
   magic_info?: string;
   ticket_data?: any;
+  show_time?: string;
+  arriving_late?: boolean;
 }
+
 
 interface GuestRowProps {
   guest: Guest;
@@ -105,6 +111,27 @@ export const GuestRow = ({
   const guestCount = guest.total_quantity || 1;
   const showTime = guest.show_time || guest['Show time'] || 'N/A';
 
+  // Late arrival state and persistence
+  const [arrivingLate, setArrivingLate] = React.useState<boolean>(!!guest.arriving_late);
+  React.useEffect(() => {
+    setArrivingLate(!!guest.arriving_late);
+  }, [guest.arriving_late]);
+
+  const handleToggleLate = async (value: boolean) => {
+    setArrivingLate(value);
+    const { error } = await supabase
+      .from('guests')
+      .update({ arriving_late: value })
+      .eq('id', guest.id);
+
+    if (error) {
+      setArrivingLate(!value);
+      toast({ title: 'Update failed', description: 'Could not update late status.', variant: 'destructive' });
+    } else {
+      toast({ title: value ? 'Marked arriving late' : 'Late status cleared' });
+    }
+  };
+
   // Format add-on items for display
   const formatAddOns = (addOns: Guest[]) => {
     const addOnItems: string[] = [];
@@ -153,7 +180,7 @@ export const GuestRow = ({
   };
 
   return (
-    <TableRow className={`${isCheckedIn ? 'bg-green-50 dark:bg-green-950/20' : ''} ${isWalkIn ? 'bg-blue-50 dark:bg-blue-950/20' : ''}`}>
+    <TableRow className={`${isCheckedIn ? 'bg-green-50 dark:bg-green-950/20' : ''} ${isWalkIn ? 'bg-blue-50 dark:bg-blue-950/20' : ''} ${partyInfo?.isInParty ? 'bg-accent/10' : ''}`} >
       <TableCell className="font-medium">
         <div className="flex items-center gap-2">
           {isWalkIn && <Badge variant="secondary">Walk-in</Badge>}
@@ -167,8 +194,15 @@ export const GuestRow = ({
             {guestName}
           </span>
           {partyInfo?.isInParty && (
-            <Badge variant="outline" className="text-xs">
-              Party of {partyInfo.partySize}
+            <>
+              <Badge variant="outline" className="text-xs">Linked</Badge>
+              <Badge variant="outline" className="text-xs">Party of {partyInfo.partySize}</Badge>
+            </>
+          )}
+          {arrivingLate && (
+            <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
+              <Clock className="h-3 w-3 mr-1" />
+              Late
             </Badge>
           )}
         </div>
@@ -280,15 +314,21 @@ export const GuestRow = ({
       </TableCell>
 
       <TableCell>
-        <Button
-          variant={isCheckedIn ? "default" : "outline"}
-          size="sm"
-          onClick={() => onCheckIn(index)}
-          className={isCheckedIn ? "bg-green-600 hover:bg-green-700" : ""}
-        >
-          <CheckCircle className="h-4 w-4 mr-1" />
-          {isCheckedIn ? "Checked In" : "Check In"}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            variant={isCheckedIn ? "default" : "outline"}
+            size="sm"
+            onClick={() => onCheckIn(index)}
+            className={isCheckedIn ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            {isCheckedIn ? "Checked In" : "Check In"}
+          </Button>
+          <div className="flex items-center gap-2">
+            <Switch checked={arrivingLate} onCheckedChange={handleToggleLate} id={`late-${guest.id}`} />
+            <label htmlFor={`late-${guest.id}`} className="text-xs text-muted-foreground">Arriving late</label>
+          </div>
+        </div>
       </TableCell>
 
       <TableCell>

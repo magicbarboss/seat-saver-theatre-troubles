@@ -12,7 +12,9 @@ export interface Guest {
   diet_info?: string;
   magic_info?: string;
   manual_override?: boolean;
+  arriving_late?: boolean;
 }
+
 
 export interface CheckInSystemProps {
   guests: Guest[];
