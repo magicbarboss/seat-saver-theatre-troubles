@@ -1568,11 +1568,23 @@ const CheckInSystem = ({
         }
         
         if (mainBooking) {
+          // Deduplicate identical add-ons (same item_details and quantity)
+          const deduplicatedAddOns: typeof addOns = [];
+          const seenItems = new Map<string, typeof addOns[0]>();
+          
+          addOns.forEach(addon => {
+            const key = `${addon.guest.item_details || ''}-${addon.guest.total_quantity || 1}`;
+            if (!seenItems.has(key)) {
+              seenItems.set(key, addon);
+              deduplicatedAddOns.push(addon);
+            }
+          });
+          
           bookingGroups.push({
             mainBooking: mainBooking.guest,
-            addOns: addOns.map(rb => rb.guest),
+            addOns: deduplicatedAddOns.map(rb => rb.guest),
             originalIndex: mainBooking.index,
-            addOnIndices: addOns.map(rb => rb.index)
+            addOnIndices: deduplicatedAddOns.map(rb => rb.index)
           });
           
           relatedBookings.forEach(({ index }) => processedIndices.add(index));
