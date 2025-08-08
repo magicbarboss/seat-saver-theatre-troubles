@@ -184,6 +184,7 @@ const TableAllocation = ({
   const [currentSectionId, setCurrentSectionId] = useState<string>('');
   const [selectedTableIds, setSelectedTableIds] = useState<number[]>([]);
   const [showManualMoveDialog, setShowManualMoveDialog] = useState(false);
+  const [preSelectedGuestForMove, setPreSelectedGuestForMove] = useState<any>(null);
   const [showWalkInDialog, setShowWalkInDialog] = useState(false);
   const [walkInForm, setWalkInForm] = useState({
     name: '',
@@ -2304,16 +2305,28 @@ const TableAllocation = ({
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Seat
               </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {/* Move functionality replaced by Manual Move */}}
-                  className="flex-1 text-xs py-1"
-                  disabled
-                >
-                  <ArrowRightLeft className="h-3 w-3 mr-1" />
-                  Use Manual Move
-                </Button>
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   onClick={() => {
+                     if (section.allocatedGuest) {
+                       const table = tables.find(t => t.sections.some(s => s.id === section.id));
+                       setPreSelectedGuestForMove({
+                         guest: section.allocatedGuest,
+                         sectionId: section.id,
+                         tableName: table?.name || 'Unknown',
+                         sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
+                         isSeated: section.status === 'OCCUPIED',
+                         pagerNumber: section.allocatedGuest.pagerNumber
+                       });
+                       setShowManualMoveDialog(true);
+                     }
+                   }}
+                   className="flex-1 text-xs py-1"
+                 >
+                   <ArrowRightLeft className="h-3 w-3 mr-1" />
+                   Use Manual Move
+                 </Button>
             </div>
           </div>
         )}
@@ -2335,16 +2348,28 @@ const TableAllocation = ({
               Free
             </Button>
             {section.allocatedGuest && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {/* Move functionality replaced by Manual Move */}}
-                  className="flex-1 text-xs py-1"
-                  disabled
-                >
-                  <ArrowRightLeft className="h-3 w-3 mr-1" />
-                  Use Manual Move
-                </Button>
+                 <Button
+                   size="sm"
+                   variant="outline"
+                   onClick={() => {
+                     if (section.allocatedGuest) {
+                       const table = tables.find(t => t.sections.some(s => s.id === section.id));
+                       setPreSelectedGuestForMove({
+                         guest: section.allocatedGuest,
+                         sectionId: section.id,
+                         tableName: table?.name || 'Unknown',
+                         sectionName: section.section === 'whole' ? 'Whole Table' : section.section,
+                         isSeated: section.status === 'OCCUPIED',
+                         pagerNumber: section.allocatedGuest.pagerNumber
+                       });
+                       setShowManualMoveDialog(true);
+                     }
+                   }}
+                   className="flex-1 text-xs py-1"
+                 >
+                   <ArrowRightLeft className="h-3 w-3 mr-1" />
+                   Use Manual Move
+                 </Button>
             )}
           </div>
         )}
@@ -3190,9 +3215,15 @@ const TableAllocation = ({
       {/* Manual Move Dialog */}
       <ManualMoveDialog
         open={showManualMoveDialog}
-        onOpenChange={setShowManualMoveDialog}
+        onOpenChange={(open) => {
+          setShowManualMoveDialog(open);
+          if (!open) {
+            setPreSelectedGuestForMove(null);
+          }
+        }}
         tables={tables}
         onMove={handleManualMove}
+        preSelectedGuest={preSelectedGuestForMove}
       />
     </div>
   );

@@ -43,6 +43,7 @@ interface ManualMoveDialogProps {
   onOpenChange: (open: boolean) => void;
   tables: Table[];
   onMove: (guestToMove: CheckedInGuest, fromSectionId: string, toSectionId: string) => void;
+  preSelectedGuest?: AllocatedGuest;
 }
 
 interface AllocatedGuest {
@@ -58,10 +59,22 @@ export const ManualMoveDialog: React.FC<ManualMoveDialogProps> = ({
   open,
   onOpenChange,
   tables,
-  onMove
+  onMove,
+  preSelectedGuest
 }) => {
   const [selectedGuest, setSelectedGuest] = useState<AllocatedGuest | null>(null);
   const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
+
+  // Auto-select guest if preSelectedGuest is provided
+  React.useEffect(() => {
+    if (open && preSelectedGuest) {
+      setSelectedGuest(preSelectedGuest);
+    } else if (!open) {
+      // Reset when dialog closes
+      setSelectedGuest(null);
+      setSelectedDestination(null);
+    }
+  }, [open, preSelectedGuest]);
 
   // Get all currently allocated guests
   const getAllocatedGuests = (): AllocatedGuest[] => {
