@@ -1433,58 +1433,35 @@ const CheckInSystem = ({
 
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
-    console.log('🎬 FRIENDSHIP PROCESSING START - checking guests array:', !!guests, guests?.length);
-    
     if (!guests || guests.length === 0) {
-      console.log('❌ No guests available for friendship processing');
       return new Map<string, number[]>();
     }
     
-    console.log('🔍 DEBUGGING FRIENDSHIP GROUPS - Raw guest data with Friends fields:');
-    guests.forEach((guest, index) => {
-      if (guest?.ticket_data?.Friends) {
-        console.log(`Guest ${index}: ${guest?.booker_name} - Friends: "${guest.ticket_data.Friends}"`);
-      }
-    });
-    
-    console.log('🔍 FRIENDSHIP PROCESSING STARTED for', guests.length, 'guests');
-    console.log('Guest names with normalization:');
-    guests.forEach((g, i) => {
-      if (g?.booker_name) {
-        const original = g.booker_name;
-        const normalized = normalizeNameForMatching(original);
-        console.log(`  ${i}: "${original}" → "${normalized}" [${original.split('').map(c => c.charCodeAt(0)).join(',')}]`);
-      }
-    });
-    
+    // Use originalIndex instead of array indices for consistent mapping
     const connections = new Map<number, Set<number>>();
     
-    // First pass: Find all friend connections
+    // First pass: Find all friend connections using originalIndex
     guests.forEach((guest, index) => {
-      if (!guest || !guest.ticket_data) return;
+      if (!guest || !guest.ticket_data || !guest.originalIndex) return;
+      
+      const guestOriginalIndex = guest.originalIndex;
       
       // Extract friends data from ticket_data
       const friendsData = guest.ticket_data.Friends || guest.ticket_data.friends;
       
       if (friendsData && typeof friendsData === 'string' && friendsData.trim() !== '') {
-        console.log(`📝 Guest ${guest.booker_name} (${index}) has friends: "${friendsData}"`);
         const friendNames = friendsData.split(/[,;&]/).map(name => name.trim()).filter(name => name.length > 0);
         
         friendNames.forEach(friendName => {
-          console.log(`  🔎 Looking for friend: "${friendName}"`);
           const normalizedFriendName = normalizeNameForMatching(friendName);
-          console.log(`     Normalized friend name: "${normalizedFriendName}" [${friendName.split('').map(c => c.charCodeAt(0)).join(',')}]`);
           
           // Find matching guests by enhanced name matching
-          const matchingGuestIndices = guests.map((g, i) => ({ guest: g, index: i }))
+          const matchingGuestOriginalIndices = guests.map((g, i) => ({ guest: g, index: i }))
             .filter(({ guest }) => {
               if (!guest?.booker_name) return false;
               
               const originalGuestName = guest.booker_name;
               const normalizedGuestName = normalizeNameForMatching(originalGuestName);
-              
-              console.log(`    Comparing friend "${normalizedFriendName}" with guest "${normalizedGuestName}"`);
-              console.log(`      Original: "${friendName}" vs "${originalGuestName}"`);
               
               // Enhanced matching logic
               const guestNameParts = normalizedGuestName.split(/\s+/).filter(part => part.length > 0);
@@ -1492,24 +1469,18 @@ const CheckInSystem = ({
               
               // Exact full name match (normalized)
               if (normalizedGuestName === normalizedFriendName) {
-                console.log(`    ✅ EXACT NORMALIZED MATCH: "${normalizedFriendName}" === "${normalizedGuestName}"`);
                 return true;
               }
               
               // Fuzzy match for similar names
               if (isFuzzyMatch(normalizedGuestName, normalizedFriendName)) {
-                console.log(`    ✅ FUZZY MATCH: "${normalizedFriendName}" ≈ "${normalizedGuestName}"`);
                 return true;
               }
               
               // Check if friend name matches any combination of guest's first/last names
               if (searchNameParts.length === 1) {
                 // Single word friend name should match first or last name exactly
-                const matches = guestNameParts.includes(normalizedFriendName);
-                if (matches) {
-                  console.log(`    ✅ PARTIAL MATCH: "${normalizedFriendName}" found in "${normalizedGuestName}"`);
-                }
-                return matches;
+                return guestNameParts.includes(normalizedFriendName);
               } else if (searchNameParts.length === 2 && guestNameParts.length >= 2) {
                 // Two word friend name should match first+last exactly
                 const firstLastMatch = (guestNameParts[0] === searchNameParts[0] && 
@@ -1517,35 +1488,28 @@ const CheckInSystem = ({
                 const lastFirstMatch = (guestNameParts[0] === searchNameParts[1] && 
                          guestNameParts[guestNameParts.length - 1] === searchNameParts[0]);
                 
-                if (firstLastMatch || lastFirstMatch) {
-                  console.log(`    ✅ NAME PARTS MATCH: "${normalizedFriendName}" matches parts of "${normalizedGuestName}"`);
-                  return true;
-                }
+                return firstLastMatch || lastFirstMatch;
               }
               
-              console.log(`    ❌ No match found`);
               return false;
             })
-            .map(({ index: i }) => i);
+            .map(({ guest }) => guest.originalIndex)
+            .filter(originalIndex => originalIndex !== undefined);
           
-          console.log(`  🎯 Found ${matchingGuestIndices.length} matches for "${friendName}":`, matchingGuestIndices.map(i => `${guests[i]?.booker_name} (${i})`));
-          
-          // Create bidirectional connections
-          matchingGuestIndices.forEach(matchedIndex => {
-            if (matchedIndex !== index) {
+          // Create bidirectional connections using originalIndex
+          matchingGuestOriginalIndices.forEach(matchedOriginalIndex => {
+            if (matchedOriginalIndex !== guestOriginalIndex) {
               // Add connection from current guest to matched guest
-              if (!connections.has(index)) {
-                connections.set(index, new Set());
+              if (!connections.has(guestOriginalIndex)) {
+                connections.set(guestOriginalIndex, new Set());
               }
-              connections.get(index)!.add(matchedIndex);
+              connections.get(guestOriginalIndex)!.add(matchedOriginalIndex);
               
               // Add reverse connection
-              if (!connections.has(matchedIndex)) {
-                connections.set(matchedIndex, new Set());
+              if (!connections.has(matchedOriginalIndex)) {
+                connections.set(matchedOriginalIndex, new Set());
               }
-              connections.get(matchedIndex)!.add(index);
-              
-              console.log(`Created friendship connection: ${guest.booker_name} (${index}) ↔ ${guests[matchedIndex]?.booker_name} (${matchedIndex})`);
+              connections.get(matchedOriginalIndex)!.add(guestOriginalIndex);
             }
           });
         });
@@ -1556,10 +1520,18 @@ const CheckInSystem = ({
     const groups = new Map<string, number[]>();
     const processedIndices = new Set<number>();
     
+    // Create lookup map: originalIndex -> guest
+    const guestByOriginalIndex = new Map<number, typeof guests[0]>();
+    guests.forEach(guest => {
+      if (guest?.originalIndex !== undefined) {
+        guestByOriginalIndex.set(guest.originalIndex, guest);
+      }
+    });
+    
     connections.forEach((connectedIndices, startIndex) => {
       if (processedIndices.has(startIndex)) return;
       
-      // Use BFS to find all connected guests
+      // Use BFS to find all connected guests (using originalIndex)
       const groupMembers = new Set<number>([startIndex]);
       const queue = [startIndex];
       
@@ -1580,23 +1552,14 @@ const CheckInSystem = ({
       
       if (groupMembers.size > 1) {
         const memberNames = Array.from(groupMembers)
-          .map(i => guests[i]?.booker_name)
+          .map(originalIndex => guestByOriginalIndex.get(originalIndex)?.booker_name)
           .filter(name => name)
           .sort()
           .join(' & ');
         
+        // Store the originalIndex values directly (not array indices)
         groups.set(`Friends: ${memberNames}`, Array.from(groupMembers).sort());
-        console.log(`Friendship group created: "${memberNames}" with ${groupMembers.size} members:`, Array.from(groupMembers));
       }
-    });
-    
-    console.log('🎯 FRIENDSHIP PROCESSING COMPLETE:');
-    console.log('  - Total groups found:', groups.size);
-    console.log('  - Groups with details:', Array.from(groups.entries()).map(([name, indices]) => ({
-      groupName: name,
-      indices: indices,
-      guestNames: indices.map(i => guests[i]?.booker_name)
-    })));
     
     return groups;
   }, [guests]);
@@ -2229,15 +2192,8 @@ const CheckInSystem = ({
     setCommentText('');
   };
 
-  // Debug friendship groups before component render
-  console.log('🎯 CheckInSystem RENDER - Current friendship groups state:', {
-    friendshipGroupsSize: friendshipGroups.size,
-    friendshipGroupsData: Array.from(friendshipGroups.entries()).slice(0, 3),
-    checkedInGuestsCount: checkedInGuestsArray.length,
-    timestamp: new Date().toISOString()
-  });
-
-  return <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+  return (
+    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <h2 className="text-3xl font-bold text-gray-800">🎭 Smoke & Mirrors Theatre Check-In</h2>
         <p className="text-gray-600 mt-1">Simple guest management with pager assignment</p>
@@ -2431,6 +2387,7 @@ const CheckInSystem = ({
         guest={selectedGuestForEdit}
         onSave={handleSaveManualEdit}
       />
-    </div>;
+    </div>
+  );
 };
 export default CheckInSystem;
