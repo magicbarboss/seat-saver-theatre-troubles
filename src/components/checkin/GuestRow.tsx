@@ -113,14 +113,30 @@ export const GuestRow = ({
       const quantity = addon.total_quantity || 1;
       
       // Prioritize actual item/product fields over guest name
-      const itemName = addon.item_details ||
-                      addon.ticket_data?.Item ||
-                      addon.ticket_data?.Package ||
-                      addon.ticket_data?.Description ||
-                      addon.ticket_data?.Product ||
-                      addon.staff_updated_order ||
-                      addon.notes ||
-                      'Add-on Item';
+      let itemName = addon.item_details ||
+                     addon.ticket_data?.Item ||
+                     addon.ticket_data?.Package ||
+                     addon.ticket_data?.Description ||
+                     addon.ticket_data?.Product ||
+                     addon.staff_updated_order ||
+                     addon.notes ||
+                     'Add-on Item';
+      
+      // Filter out main package items that shouldn't be add-ons
+      const mainPackagePatterns = ['magic show', 'comedy', 'show ['];
+      const isMainPackage = mainPackagePatterns.some(pattern => 
+        itemName.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      if (isMainPackage) {
+        return; // Skip main package items from add-ons display
+      }
+      
+      // Clean up item name - remove show times and extra details
+      itemName = itemName
+        .replace(/\[.*?\]/g, '') // Remove anything in square brackets like [7:00pm]
+        .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
+        .trim();                 // Remove leading/trailing whitespace
       
       addOnItems.push(`x${quantity} ${itemName}`);
     });

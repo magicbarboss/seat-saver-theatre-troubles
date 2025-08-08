@@ -1543,7 +1543,7 @@ const CheckInSystem = ({
       if (relatedBookings.length > 0) {
         // Separate main booking from add-ons based on item type patterns
         const packagePatterns = [
-          'package', 'wowcher', 'groupon', 'viator', 'gyg', 'experience'
+          'package', 'wowcher', 'groupon', 'viator', 'gyg', 'experience', 'magic show', 'comedy', 'show'
         ];
         
         let mainBooking: typeof relatedBookings[0] | null = null;
