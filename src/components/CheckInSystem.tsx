@@ -1568,12 +1568,13 @@ const CheckInSystem = ({
         }
         
         if (mainBooking) {
-          // Deduplicate identical add-ons (same item_details and quantity)
+          // Deduplicate truly identical add-ons by comparing full ticket_data
           const deduplicatedAddOns: typeof addOns = [];
           const seenItems = new Map<string, typeof addOns[0]>();
           
           addOns.forEach(addon => {
-            const key = `${addon.guest.item_details || ''}-${addon.guest.total_quantity || 1}`;
+            // Use comprehensive comparison to detect true duplicates
+            const key = JSON.stringify(addon.guest.ticket_data || {});
             if (!seenItems.has(key)) {
               seenItems.set(key, addon);
               deduplicatedAddOns.push(addon);
