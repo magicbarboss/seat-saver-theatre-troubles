@@ -108,6 +108,7 @@ export const GuestRow = ({
   // Format add-on items for display
   const formatAddOns = (addOns: Guest[]) => {
     const addOnItems: string[] = [];
+    const itemCounts = new Map<string, number>(); // Track quantities by item name
     
     addOns.forEach((addon) => {
       const quantity = addon.total_quantity || 1;
@@ -138,7 +139,14 @@ export const GuestRow = ({
         .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
         .trim();                 // Remove leading/trailing whitespace
       
-      addOnItems.push(`x${quantity} ${itemName}`);
+      // Accumulate quantities for the same item name
+      const existingCount = itemCounts.get(itemName) || 0;
+      itemCounts.set(itemName, existingCount + quantity);
+    });
+    
+    // Convert map back to array format
+    itemCounts.forEach((totalQuantity, itemName) => {
+      addOnItems.push(`x${totalQuantity} ${itemName}`);
     });
     
     return addOnItems;
