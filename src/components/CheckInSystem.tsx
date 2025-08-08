@@ -1433,13 +1433,18 @@ const CheckInSystem = ({
 
   // Extract and process friendship groups from guest data
   const processFriendshipGroups = useMemo(() => {
+    console.log('🎬 FRIENDSHIP PROCESSING START - checking guests array:', !!guests, guests?.length);
+    
     if (!guests || guests.length === 0) {
+      console.log('❌ No guests available for friendship processing');
       return new Map<string, number[]>();
     }
     
-    console.log('🔍 DEBUGGING FRIENDSHIP GROUPS - Raw guest data:');
+    console.log('🔍 DEBUGGING FRIENDSHIP GROUPS - Raw guest data with Friends fields:');
     guests.forEach((guest, index) => {
-      console.log(`Guest ${index}: ${guest?.booker_name} - Friends field:`, guest?.ticket_data?.Friends || 'none');
+      if (guest?.ticket_data?.Friends) {
+        console.log(`Guest ${index}: ${guest?.booker_name} - Friends: "${guest.ticket_data.Friends}"`);
+      }
     });
     
     console.log('🔍 FRIENDSHIP PROCESSING STARTED for', guests.length, 'guests');
@@ -1587,7 +1592,11 @@ const CheckInSystem = ({
     
     console.log('🎯 FRIENDSHIP PROCESSING COMPLETE:');
     console.log('  - Total groups found:', groups.size);
-    console.log('  - Groups:', Array.from(groups.entries()));
+    console.log('  - Groups with details:', Array.from(groups.entries()).map(([name, indices]) => ({
+      groupName: name,
+      indices: indices,
+      guestNames: indices.map(i => guests[i]?.booker_name)
+    })));
     
     return groups;
   }, [guests]);
@@ -2219,6 +2228,15 @@ const CheckInSystem = ({
     setSelectedGuestForComment(null);
     setCommentText('');
   };
+
+  // Debug friendship groups before component render
+  console.log('🎯 CheckInSystem RENDER - Current friendship groups state:', {
+    friendshipGroupsSize: friendshipGroups.size,
+    friendshipGroupsData: Array.from(friendshipGroups.entries()).slice(0, 3),
+    checkedInGuestsCount: checkedInGuestsArray.length,
+    timestamp: new Date().toISOString()
+  });
+
   return <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border">
         <h2 className="text-3xl font-bold text-gray-800">🎭 Smoke & Mirrors Theatre Check-In</h2>
