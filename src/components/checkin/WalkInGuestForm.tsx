@@ -21,7 +21,7 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
   const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [walkInCount, setWalkInCount] = useState<number | ''>('');
-  const [walkInShowTime, setWalkInShowTime] = useState(showTimes[0] || '');
+  const [walkInShowTime, setWalkInShowTime] = useState(showTimes?.[0] || '');
   const [walkInNotes, setWalkInNotes] = useState('');
 
   const handleAddWalkIn = () => {
@@ -37,7 +37,7 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
     // Reset form
     setWalkInName('');
     setWalkInCount('');
-    setWalkInShowTime(showTimes[0] || '');
+    setWalkInShowTime(showTimes?.[0] || '');
     setWalkInNotes('');
     setWalkInDialogOpen(false);
   };
@@ -90,12 +90,16 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
 
           <div>
             <Label htmlFor="walkInShowTime">Show Time</Label>
-            <Select value={walkInShowTime} onValueChange={setWalkInShowTime}>
+            <Select 
+              value={walkInShowTime} 
+              onValueChange={setWalkInShowTime}
+              disabled={!showTimes?.length}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select show time" />
+                <SelectValue placeholder={showTimes?.length ? "Select show time" : "No show times available"} />
               </SelectTrigger>
-              <SelectContent>
-                {showTimes.map((time) => (
+              <SelectContent className="z-50 bg-background">
+                {showTimes?.map((time) => (
                   <SelectItem key={time} value={time}>
                     {time}
                   </SelectItem>
