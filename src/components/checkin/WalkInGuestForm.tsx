@@ -72,7 +72,15 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
               type="number"
               min="1"
               value={walkInCount}
-              onChange={(e) => setWalkInCount(parseInt(e.target.value) || 1)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setWalkInCount(1);
+                } else {
+                  const num = parseInt(value);
+                  setWalkInCount(isNaN(num) || num < 1 ? 1 : num);
+                }
+              }}
             />
           </div>
 
