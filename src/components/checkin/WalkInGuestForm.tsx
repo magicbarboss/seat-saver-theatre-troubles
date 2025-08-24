@@ -20,7 +20,7 @@ interface WalkInGuestFormProps {
 export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps) => {
   const [walkInDialogOpen, setWalkInDialogOpen] = useState(false);
   const [walkInName, setWalkInName] = useState('');
-  const [walkInCount, setWalkInCount] = useState(1);
+  const [walkInCount, setWalkInCount] = useState<number | ''>('');
   const [walkInShowTime, setWalkInShowTime] = useState(showTimes[0] || '');
   const [walkInNotes, setWalkInNotes] = useState('');
 
@@ -29,14 +29,14 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
 
     onAddWalkIn({
       name: walkInName.trim(),
-      count: walkInCount,
+      count: typeof walkInCount === 'number' ? walkInCount : 1,
       showTime: walkInShowTime,
       notes: walkInNotes.trim() || undefined,
     });
 
     // Reset form
     setWalkInName('');
-    setWalkInCount(1);
+    setWalkInCount('');
     setWalkInShowTime(showTimes[0] || '');
     setWalkInNotes('');
     setWalkInDialogOpen(false);
@@ -76,18 +76,15 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === '') {
-                  return; // Allow empty field temporarily
-                } 
-                const num = parseInt(value, 10);
-                if (!isNaN(num) && num >= 1) {
-                  setWalkInCount(num);
+                  setWalkInCount('');
+                } else {
+                  const num = parseInt(value, 10);
+                  if (!isNaN(num) && num >= 1) {
+                    setWalkInCount(num);
+                  }
                 }
               }}
-              onBlur={(e) => {
-                if (e.target.value === '' || parseInt(e.target.value, 10) < 1) {
-                  setWalkInCount(1);
-                }
-              }}
+              placeholder="Enter number of guests"
             />
           </div>
 
@@ -122,7 +119,7 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
             <Button variant="outline" onClick={() => setWalkInDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddWalkIn} disabled={!walkInName.trim()}>
+            <Button onClick={handleAddWalkIn} disabled={!walkInName.trim() || !walkInCount || walkInCount < 1}>
               <UserPlus className="h-4 w-4 mr-2" />
               Add Guest
             </Button>
