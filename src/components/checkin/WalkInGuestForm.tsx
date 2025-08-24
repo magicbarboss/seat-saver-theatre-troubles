@@ -94,9 +94,9 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
               <SelectTrigger>
                 <SelectValue placeholder="Select show time" />
               </SelectTrigger>
-              <SelectContent className="z-50 bg-background">
+              <SelectContent className="z-50 bg-popover border shadow-md min-w-[200px] max-h-[300px]">
                 {showTimes.map((time) => (
-                  <SelectItem key={time} value={time}>
+                  <SelectItem key={time} value={time} className="cursor-pointer">
                     {time}
                   </SelectItem>
                 ))}
