@@ -71,14 +71,21 @@ export const WalkInGuestForm = ({ showTimes, onAddWalkIn }: WalkInGuestFormProps
               id="walkInCount"
               type="number"
               min="1"
+              step="1"
               value={walkInCount}
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === '') {
+                  return; // Allow empty field temporarily
+                } 
+                const num = parseInt(value, 10);
+                if (!isNaN(num) && num >= 1) {
+                  setWalkInCount(num);
+                }
+              }}
+              onBlur={(e) => {
+                if (e.target.value === '' || parseInt(e.target.value, 10) < 1) {
                   setWalkInCount(1);
-                } else {
-                  const num = parseInt(value);
-                  setWalkInCount(isNaN(num) || num < 1 ? 1 : num);
                 }
               }}
             />
