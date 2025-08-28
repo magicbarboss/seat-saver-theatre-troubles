@@ -50,6 +50,66 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
       } catch (error) {
         console.error('Failed to load saved layout:', error);
       }
+    } else {
+      // Default layout with some example tables including a 2-seat back row table
+      const defaultTables: Table[] = [
+        {
+          id: 'table-front-1',
+          x: 100,
+          y: 150,
+          width: 120,
+          height: 80,
+          seats: 4,
+          shape: 'rectangle',
+          label: 'Table 1',
+          status: 'available'
+        },
+        {
+          id: 'table-front-2',
+          x: 250,
+          y: 150,
+          width: 120,
+          height: 80,
+          seats: 4,
+          shape: 'rectangle',
+          label: 'Table 2',
+          status: 'available'
+        },
+        {
+          id: 'table-middle-1',
+          x: 100,
+          y: 270,
+          width: 120,
+          height: 80,
+          seats: 6,
+          shape: 'rectangle',
+          label: 'Table 3',
+          status: 'available'
+        },
+        {
+          id: 'table-middle-2',
+          x: 250,
+          y: 270,
+          width: 120,
+          height: 80,
+          seats: 6,
+          shape: 'rectangle',
+          label: 'Table 4',
+          status: 'available'
+        },
+        {
+          id: 'table-back-row',
+          x: 175,
+          y: 390,
+          width: 100,
+          height: 60,
+          seats: 2,
+          shape: 'rectangle',
+          label: 'Back Row',
+          status: 'available'
+        }
+      ];
+      setTables(defaultTables);
     }
   }, [showTime]);
 
