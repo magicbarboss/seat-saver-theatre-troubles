@@ -175,6 +175,13 @@ const TableAllocation = ({
       hasSections: false,
       sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
     },
+    { 
+      id: 14, 
+      name: 'T14',
+      totalCapacity: 2,
+      hasSections: false,
+      sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+    },
   ]);
 
   const [selectedGuest, setSelectedGuest] = useState<CheckedInGuest | null>(null);
