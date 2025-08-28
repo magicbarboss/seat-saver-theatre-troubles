@@ -130,6 +130,39 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
     }
   };
 
+  // Reset to default layout with 14 tables
+  const resetToDefault = () => {
+    localStorage.removeItem(`seating-layout-${showTime}`);
+    const defaultTables: Table[] = [
+      // Front row - 4 tables
+      { id: 'T1', x: 50, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T1', status: 'available' },
+      { id: 'T2', x: 150, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T2', status: 'available' },
+      { id: 'T3', x: 250, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T3', status: 'available' },
+      
+      // Row 2 - 3 larger tables  
+      { id: 'T4', x: 50, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T4', status: 'available' },
+      { id: 'T5', x: 170, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T5', status: 'available' },
+      { id: 'T6', x: 290, y: 180, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T6', status: 'available' },
+      
+      // Row 3 - 3 larger tables
+      { id: 'T7', x: 50, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T7', status: 'available' },
+      { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
+      { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
+      
+      // Back row - 5 tables (including the new T14)
+      { id: 'T10', x: 30, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+      { id: 'T11', x: 120, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+      { id: 'T12', x: 210, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+      { id: 'T13', x: 300, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+      { id: 'T14', x: 390, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
+    ];
+    setTables(defaultTables);
+    toast({
+      title: "Layout Reset",
+      description: "Reset to default layout with 14 tables"
+    });
+  };
+
   // Export layout as JSON
   const exportLayout = () => {
     const dataStr = JSON.stringify(tables, null, 2);
@@ -322,6 +355,9 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
             <Button variant="outline" size="sm" onClick={saveLayout}>
               <Save className="w-4 h-4 mr-2" />
               Save Layout
+            </Button>
+            <Button variant="outline" size="sm" onClick={resetToDefault}>
+              Reset to 14 Tables
             </Button>
             <Button variant="outline" size="sm" onClick={exportLayout}>
               <Download className="w-4 h-4 mr-2" />
