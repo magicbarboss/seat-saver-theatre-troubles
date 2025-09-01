@@ -2049,9 +2049,10 @@ const TableAllocation = ({
     const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
     const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
     const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
-    const row4 = tables.filter(t => [10, 11, 12, 13].includes(t.id));
+    const row4 = tables.filter(t => [14].includes(t.id)); // Single table T14
+    const row5 = tables.filter(t => [10, 11, 12, 13].includes(t.id)); // Back row
 
-    return { row1, row2, row3, row4 };
+    return { row1, row2, row3, row4, row5 };
   };
 
   const renderTableOption = (table: Table) => {
@@ -2124,7 +2125,7 @@ const TableAllocation = ({
   };
 
   const renderAssignmentLayout = () => {
-    const { row1, row2, row3, row4 } = organizeTablesByRows();
+    const { row1, row2, row3, row4, row5 } = organizeTablesByRows();
     
     return (
       <div className="space-y-6">
@@ -2204,9 +2205,17 @@ const TableAllocation = ({
 
         {/* Row 4 */}
         <div className="space-y-2">
-          <h4 className="text-xs font-medium text-gray-600">Row 4 (Back) - 2-seat tables</h4>
-          <div className="grid grid-cols-4 gap-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 4 - 2-seat table</h4>
+          <div className="grid grid-cols-1 gap-2 max-w-xs">
             {row4.map(table => renderTableOption(table))}
+          </div>
+        </div>
+
+        {/* Row 5 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 5 (Back) - 2-seat tables</h4>
+          <div className="grid grid-cols-4 gap-2">
+            {row5.map(table => renderTableOption(table))}
           </div>
         </div>
 
@@ -2396,7 +2405,7 @@ const TableAllocation = ({
   };
 
   const renderMainTableLayout = () => {
-    const { row1, row2, row3, row4 } = organizeTablesByRows();
+    const { row1, row2, row3, row4, row5 } = organizeTablesByRows();
     
     return (
       <div className="space-y-6">
@@ -2542,9 +2551,54 @@ const TableAllocation = ({
 
         {/* Row 4 */}
         <div className="space-y-2">
-          <h4 className="text-xs font-medium text-gray-600">Row 4 (Back) - 2-seat tables</h4>
-          <div className="grid grid-cols-4 gap-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 4 - 2-seat table</h4>
+          <div className="grid grid-cols-1 gap-2 max-w-xs">
              {row4.map(table => {
+               const isSelected = selectedTablesForJoining.includes(table.id);
+               const isJoined = isTableJoined(table.id);
+               const joinedData = getJoinedTableData(table.id);
+               
+               return (
+                 <div 
+                   key={table.id} 
+                   className={`border-2 rounded-lg p-2 ${
+                     isJoinTablesMode ? 'cursor-pointer' : ''
+                   } ${
+                     isSelected ? 'border-blue-500 bg-blue-50' : 
+                     isJoined ? 'border-green-500 bg-green-50' : 
+                     'border-gray-300'
+                   } ${isJoinTablesMode ? 'hover:border-blue-300' : ''}`}
+                   onClick={() => isJoinTablesMode && handleTableClick(table.id)}
+                 >
+                   <h3 className="font-bold text-center mb-2 text-sm">
+                     {isJoined ? getTableDisplayName(table.id) : table.name} 
+                     ({isJoined ? joinedData?.capacity : table.totalCapacity} seats)
+                     {isJoined && (
+                       <Button
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           splitJoinedTable(joinedData!.joinedId);
+                         }}
+                         size="sm"
+                         variant="outline"
+                         className="ml-2 h-5 text-xs"
+                       >
+                         Split
+                       </Button>
+                     )}
+                   </h3>
+                 {table.sections.map(section => renderSection(section, table))}
+               </div>
+               );
+             })}
+          </div>
+        </div>
+
+        {/* Row 5 */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-600">Row 5 (Back) - 2-seat tables</h4>
+          <div className="grid grid-cols-4 gap-2">
+             {row5.map(table => {
                const isSelected = selectedTablesForJoining.includes(table.id);
                const isJoined = isTableJoined(table.id);
                const joinedData = getJoinedTableData(table.id);
