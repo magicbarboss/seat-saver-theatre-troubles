@@ -2561,7 +2561,7 @@ const TableAllocation = ({
                return (
                  <div 
                    key={table.id} 
-                   className={`border-2 rounded-lg p-2 ${
+                   className={`border-2 rounded-lg p-2 min-h-[80px] ${
                      isJoinTablesMode ? 'cursor-pointer' : ''
                    } ${
                      isSelected ? 'border-blue-500 bg-blue-50' : 
@@ -2587,8 +2587,10 @@ const TableAllocation = ({
                        </Button>
                      )}
                    </h3>
-                 {table.sections.map(section => renderSection(section, table))}
-               </div>
+                   <div className="flex-1">
+                     {table.sections.map(section => renderSection(section, table))}
+                   </div>
+                 </div>
                );
              })}
           </div>
