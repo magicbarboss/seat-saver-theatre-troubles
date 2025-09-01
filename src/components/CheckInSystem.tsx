@@ -2284,6 +2284,12 @@ const CheckInSystem = ({
           >
             📊 Show Statistics
           </TabsTrigger>
+          <TabsTrigger 
+            value="seating" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-lg py-3 px-6 font-semibold transition-all duration-300 hover:bg-white/50"
+          >
+            🪑 Seating Management
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="checkin" className="space-y-6">

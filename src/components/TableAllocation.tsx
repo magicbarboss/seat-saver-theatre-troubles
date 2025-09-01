@@ -146,7 +146,23 @@ const TableAllocation = ({
         { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
       ]
     },
-    // Row 4 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
+        // Row 4 (New) - T15 - 2 seat table
+        { 
+          id: 15, 
+          name: 'T15',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+    },
+    // Row 4 (New) - T15 - 2 seat table
+    { 
+      id: 15, 
+      name: 'T15',
+      totalCapacity: 2,
+      hasSections: false,
+      sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+    },
+    // Row 5 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
     { 
       id: 10, 
       name: 'T10',
@@ -346,7 +362,15 @@ const TableAllocation = ({
             { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
-        // Row 4 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
+        // Row 4 (New) - T15 - 2 seat table
+        { 
+          id: 15, 
+          name: 'T15',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        // Row 5 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
         { 
           id: 10, 
           name: 'T10',
@@ -496,7 +520,9 @@ const TableAllocation = ({
       7: [4, 8, 10], // T7 adjacent to T8 (horizontal), T4 (vertical up), T10 (vertical down)
       8: [5, 7, 9, 11], // T8 adjacent to T7, T9 (horizontal), T5 (vertical up), T11 (vertical down)
       9: [6, 8, 12], // T9 adjacent to T8 (horizontal), T6 (vertical up), T12 (vertical down)
-      // Row 4 (Back): T10, T11, T12, T13, T14
+      // Row 4 (New): T15
+      15: [9], // T15 adjacent to T9 (vertical up)
+      // Row 5 (Back): T10, T11, T12, T13, T14
       10: [7, 11], // T10 adjacent to T11 (horizontal) and T7 (vertical up)
       11: [8, 10, 12], // T11 adjacent to T10, T12 (horizontal) and T8 (vertical up)
       12: [9, 11, 13], // T12 adjacent to T11, T13 (horizontal) and T9 (vertical up)
