@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Clock, MapPin, AlertCircle } from 'lucide-react';
+import { Users, Clock, MapPin, AlertCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { CheckedInGuest } from '../checkin/types';
 import { FriendshipGroup } from './FriendshipGroup';
 
@@ -41,6 +41,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
 }) => {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [showGuestPanel, setShowGuestPanel] = useState(true);
 
   // Calculate table statistics
   const tableStats = useMemo(() => {
@@ -156,66 +157,33 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   const selectedTableData = tables.find(t => t.id === selectedTable);
 
   return (
-    <div className="space-y-6">
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <MapPin className="w-4 h-4 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Total Tables</p>
-                <p className="text-2xl font-bold">{tableStats.totalTables}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 text-success" />
-              <div>
-                <p className="text-sm font-medium">Available</p>
-                <p className="text-2xl font-bold text-success">{tableStats.availableTables}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-warning" />
-              <div>
-                <p className="text-sm font-medium">Occupied</p>
-                <p className="text-2xl font-bold text-warning">{tableStats.occupiedTables}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-info" />
-              <div>
-                <p className="text-sm font-medium">Occupancy</p>
-                <p className="text-2xl font-bold text-info">{tableStats.occupancyRate}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Seating Chart */}
-      <div className="flex gap-6">
+    <div className="space-y-4">
+      {/* Seating Chart with Toggle */}
+      <div className="flex gap-4">
         <Card className="flex-1">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Seating Chart</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowGuestPanel(!showGuestPanel)}
+              className="ml-auto"
+            >
+              {showGuestPanel ? (
+                <>
+                  <ChevronRight className="w-4 h-4 mr-2" />
+                  Hide Guests
+                </>
+              ) : (
+                <>
+                  <ChevronLeft className="w-4 h-4 mr-2" />
+                  Show Guests ({Array.from(friendshipGroupsData.values()).reduce((sum, members) => sum + members.length, 0) + individualGuests.length})
+                </>
+              )}
+            </Button>
           </CardHeader>
           <CardContent>
-            <div className="relative border border-border rounded-lg bg-background min-h-[400px] overflow-hidden">
+            <div className="relative border border-border rounded-lg bg-background min-h-[500px] overflow-hidden">
               {tables.map(table => {
                 const guestCount = table.assignedGuests?.reduce((sum, g) => sum + g.count, 0) || 0;
                 
@@ -255,65 +223,67 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
           </CardContent>
         </Card>
 
-        {/* Unassigned Guests Panel */}
-        <Card className="w-80">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              Guests awaiting allocation
-              <Badge variant="secondary">
-                {Array.from(friendshipGroupsData.values()).reduce((sum, members) => sum + members.length, 0) + individualGuests.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-3">
-              {/* Friendship Groups */}
-              {Array.from(friendshipGroupsData.entries()).map(([groupId, members]) => (
-                <FriendshipGroup
-                  key={groupId}
-                  id={groupId}
-                  members={members}
-                  onGroupAssign={(groupMembers) => {
-                    if (!selectedTable) return;
-                    groupMembers.forEach(guest => {
-                      handleGuestAssign(guest);
-                    });
-                  }}
-                  isSelected={false}
-                />
-              ))}
-              
-              {/* Individual Guests */}
-              {individualGuests.map(guest => (
-                <div
-                  key={guest.originalIndex}
-                  className="p-3 border border-border rounded-lg bg-card hover:bg-accent cursor-pointer transition-colors"
-                  onClick={() => {
-                    if (selectedTable) {
-                      handleGuestAssign(guest);
-                    }
-                  }}
-                >
-                  <div className="font-medium">{guest.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {guest.count} guests • {guest.showTime}
-                  </div>
-                  {guest.isWalkIn && (
-                    <Badge variant="outline" className="mt-1">Walk-in</Badge>
+        {/* Collapsible Unassigned Guests Panel */}
+        {showGuestPanel && (
+          <Card className="w-80 animate-slide-in-right">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Guests awaiting allocation
+                <Badge variant="secondary">
+                  {Array.from(friendshipGroupsData.values()).reduce((sum, members) => sum + members.length, 0) + individualGuests.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-3">
+                  {/* Friendship Groups */}
+                  {Array.from(friendshipGroupsData.entries()).map(([groupId, members]) => (
+                    <FriendshipGroup
+                      key={groupId}
+                      id={groupId}
+                      members={members}
+                      onGroupAssign={(groupMembers) => {
+                        if (!selectedTable) return;
+                        groupMembers.forEach(guest => {
+                          handleGuestAssign(guest);
+                        });
+                      }}
+                      isSelected={false}
+                    />
+                  ))}
+                  
+                  {/* Individual Guests */}
+                  {individualGuests.map(guest => (
+                    <div
+                      key={guest.originalIndex}
+                      className="p-3 border border-border rounded-lg bg-card hover:bg-accent cursor-pointer transition-colors"
+                      onClick={() => {
+                        if (selectedTable) {
+                          handleGuestAssign(guest);
+                        }
+                      }}
+                    >
+                      <div className="font-medium">{guest.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {guest.count} guests • {guest.showTime}
+                      </div>
+                      {guest.isWalkIn && (
+                        <Badge variant="outline" className="mt-1">Walk-in</Badge>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {friendshipGroupsData.size === 0 && individualGuests.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                      All guests have been assigned to tables
+                    </div>
                   )}
                 </div>
-              ))}
-              
-              {friendshipGroupsData.size === 0 && individualGuests.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  All guests have been assigned to tables
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-          </CardContent>
-        </Card>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Table Assignment Dialog */}

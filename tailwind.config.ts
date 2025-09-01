@@ -121,6 +121,16 @@ export default {
 						opacity: '1'
 					}
 				},
+				'slide-in-right': {
+					'0%': {
+						transform: 'translateX(100%)',
+						opacity: '0'
+					},
+					'100%': {
+						transform: 'translateX(0)',
+						opacity: '1'
+					}
+				},
 				'border-pulse': {
 					'0%, 100%': {
 						'box-shadow': '0 0 0 0 hsl(var(--accent))',
@@ -145,6 +155,7 @@ export default {
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.3s ease-out',
 				'scale-in': 'scale-in 0.2s ease-out',
+				'slide-in-right': 'slide-in-right 0.3s ease-out',
 				'border-pulse': 'border-pulse 2s infinite ease-in-out',
 				'shimmer': 'shimmer 2s infinite linear'
 			}
