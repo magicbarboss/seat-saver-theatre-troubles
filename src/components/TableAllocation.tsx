@@ -2702,13 +2702,13 @@ const TableAllocation = ({
       { id: 7, name: 'T7', totalCapacity: 5, hasSections: true, sections: [{ id: '7-front', tableId: 7, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
       { id: 8, name: 'T8', totalCapacity: 5, hasSections: true, sections: [{ id: '8-front', tableId: 8, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
       { id: 9, name: 'T9', totalCapacity: 4, hasSections: true, sections: [{ id: '9-front', tableId: 9, section: 'front', capacity: 2, status: 'AVAILABLE' }, { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
-      // Row 4 - T14 (NEW)
-      { id: 14, name: 'T14', totalCapacity: 2, hasSections: false, sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
-      // Row 5 - T10, T11, T12, T13
+      // Row 4 - T10 (single table)
       { id: 10, name: 'T10', totalCapacity: 2, hasSections: false, sections: [{ id: '10-whole', tableId: 10, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      // Row 5 - T11, T12, T13, T14
       { id: 11, name: 'T11', totalCapacity: 2, hasSections: false, sections: [{ id: '11-whole', tableId: 11, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
       { id: 12, name: 'T12', totalCapacity: 2, hasSections: false, sections: [{ id: '12-whole', tableId: 12, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
       { id: 13, name: 'T13', totalCapacity: 2, hasSections: false, sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 14, name: 'T14', totalCapacity: 2, hasSections: false, sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
     ] as Table[];
     
     setTables(newTables);
