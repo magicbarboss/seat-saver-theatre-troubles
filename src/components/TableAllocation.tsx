@@ -146,23 +146,15 @@ const TableAllocation = ({
         { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
       ]
     },
-        // Row 4 (New) - T15 - 2 seat table
-        { 
-          id: 15, 
-          name: 'T15',
-          totalCapacity: 2,
-          hasSections: false,
-          sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
-    },
-    // Row 4 (New) - T15 - 2 seat table
+    // Row 4 (New) - T14 - 2 seat table  
     { 
-      id: 15, 
-      name: 'T15',
+      id: 14, 
+      name: 'T14',
       totalCapacity: 2,
       hasSections: false,
-      sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+      sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
     },
-    // Row 5 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
+    // Row 5 (Back) - T10, T11, T12, T13 - 2 seats each (whole tables)
     { 
       id: 10, 
       name: 'T10',
@@ -185,18 +177,11 @@ const TableAllocation = ({
       sections: [{ id: '12-whole', tableId: 12, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
     },
     {
-      id: 13,
+      id: 13, 
       name: 'T13',
       totalCapacity: 2,
       hasSections: false,
       sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
-    },
-    {
-      id: 14,
-      name: 'T14',
-      totalCapacity: 2,
-      hasSections: false,
-      sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
     },
   ]);
 
@@ -362,15 +347,15 @@ const TableAllocation = ({
             { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
-        // Row 4 (New) - T15 - 2 seat table
+        // Row 4 (New) - T14 - 2 seat table
         { 
-          id: 15, 
-          name: 'T15',
+          id: 14, 
+          name: 'T14',
           totalCapacity: 2,
           hasSections: false,
-          sections: [{ id: '15-whole', tableId: 15, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+          sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
         },
-        // Row 5 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
+        // Row 5 (Back) - T10, T11, T12, T13 - 2 seats each (whole tables)
         { 
           id: 10, 
           name: 'T10',
@@ -398,13 +383,6 @@ const TableAllocation = ({
           totalCapacity: 2,
           hasSections: false,
           sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
-        },
-        { 
-          id: 14, 
-          name: 'T14',
-          totalCapacity: 2,
-          hasSections: false,
-          sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
         },
       ]);
     }
@@ -520,14 +498,13 @@ const TableAllocation = ({
       7: [4, 8, 10], // T7 adjacent to T8 (horizontal), T4 (vertical up), T10 (vertical down)
       8: [5, 7, 9, 11], // T8 adjacent to T7, T9 (horizontal), T5 (vertical up), T11 (vertical down)
       9: [6, 8, 12], // T9 adjacent to T8 (horizontal), T6 (vertical up), T12 (vertical down)
-      // Row 4 (New): T15
-      15: [9], // T15 adjacent to T9 (vertical up)
-      // Row 5 (Back): T10, T11, T12, T13, T14
+      // Row 4 (New): T14  
+      14: [9], // T14 adjacent to T9 (vertical up)
+      // Row 5 (Back): T10, T11, T12, T13
       10: [7, 11], // T10 adjacent to T11 (horizontal) and T7 (vertical up)
       11: [8, 10, 12], // T11 adjacent to T10, T12 (horizontal) and T8 (vertical up)
       12: [9, 11, 13], // T12 adjacent to T11, T13 (horizontal) and T9 (vertical up)
-      13: [12, 14], // T13 adjacent to T12, T14 (horizontal)
-      14: [13], // T14 adjacent to T13 (horizontal)
+      13: [12], // T13 adjacent to T12 (horizontal)
     };
     return adjacencyMap[tableId] || [];
   };
@@ -2647,6 +2624,45 @@ const TableAllocation = ({
     }
   };
 
+  const resetTo14Tables = () => {
+    // Clear localStorage for current show
+    const storageKey = currentShowTime === 'all' 
+      ? 'table-allocation-state-v3' 
+      : `table-allocation-state-v3-${currentShowTime}`;
+    
+    localStorage.removeItem(storageKey);
+    
+    // Set the new 14-table layout
+    const newTables = [
+      // Row 1 - T1, T2, T3
+      { id: 1, name: 'T1', totalCapacity: 2, hasSections: false, sections: [{ id: '1-whole', tableId: 1, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 2, name: 'T2', totalCapacity: 2, hasSections: false, sections: [{ id: '2-whole', tableId: 2, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 3, name: 'T3', totalCapacity: 2, hasSections: false, sections: [{ id: '3-whole', tableId: 3, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      // Row 2 - T4, T5, T6
+      { id: 4, name: 'T4', totalCapacity: 5, hasSections: true, sections: [{ id: '4-front', tableId: 4, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '4-back', tableId: 4, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 5, name: 'T5', totalCapacity: 5, hasSections: true, sections: [{ id: '5-front', tableId: 5, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '5-back', tableId: 5, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 6, name: 'T6', totalCapacity: 4, hasSections: true, sections: [{ id: '6-front', tableId: 6, section: 'front', capacity: 2, status: 'AVAILABLE' }, { id: '6-back', tableId: 6, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      // Row 3 - T7, T8, T9
+      { id: 7, name: 'T7', totalCapacity: 5, hasSections: true, sections: [{ id: '7-front', tableId: 7, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '7-back', tableId: 7, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 8, name: 'T8', totalCapacity: 5, hasSections: true, sections: [{ id: '8-front', tableId: 8, section: 'front', capacity: 3, status: 'AVAILABLE' }, { id: '8-back', tableId: 8, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 9, name: 'T9', totalCapacity: 4, hasSections: true, sections: [{ id: '9-front', tableId: 9, section: 'front', capacity: 2, status: 'AVAILABLE' }, { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }] },
+      // Row 4 - T14 (NEW)
+      { id: 14, name: 'T14', totalCapacity: 2, hasSections: false, sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      // Row 5 - T10, T11, T12, T13
+      { id: 10, name: 'T10', totalCapacity: 2, hasSections: false, sections: [{ id: '10-whole', tableId: 10, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 11, name: 'T11', totalCapacity: 2, hasSections: false, sections: [{ id: '11-whole', tableId: 11, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 12, name: 'T12', totalCapacity: 2, hasSections: false, sections: [{ id: '12-whole', tableId: 12, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+      { id: 13, name: 'T13', totalCapacity: 2, hasSections: false, sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }] },
+    ] as Table[];
+    
+    setTables(newTables);
+    
+    toast({
+      title: "Layout Updated",
+      description: "Updated to 14-table layout with Row 4 (T14) and Row 5 (T10-T13)"
+    });
+  };
+
   const handleAddWalkIn = () => {
     if (!walkInForm.name.trim()) {
       toast({
@@ -2895,6 +2911,13 @@ const TableAllocation = ({
               <span>Guests Awaiting Table Allocation ({availableForAllocation.length})</span>
             </div>
             <div className="flex space-x-2">
+              <Button
+                onClick={resetTo14Tables}
+                variant="outline" 
+                size="sm"
+              >
+                🔄 Refresh to 14 Tables
+              </Button>
               <Button
                 onClick={() => setIsJoinTablesMode(!isJoinTablesMode)}
                 variant={isJoinTablesMode ? "default" : "outline"}
