@@ -28,6 +28,8 @@ interface SeatingManagementProps {
   onGuestTableRemove: (guestIndex: number) => void;
   showTime: string;
   friendshipGroups: Map<string, number[]>;
+  onAddWalkIn?: (walkInData: { name: string; count: number; showTime: string; notes?: string }) => void;
+  showTimes: string[];
 }
 
 export const SeatingManagement: React.FC<SeatingManagementProps> = ({
@@ -35,14 +37,16 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
   onGuestTableAssign,
   onGuestTableRemove,
   showTime,
-  friendshipGroups
+  friendshipGroups,
+  onAddWalkIn,
+  showTimes
 }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [activeTab, setActiveTab] = useState('seating');
 
-  // Load saved table layout
+  // Load saved table layout - synchronized with TableAllocation
   useEffect(() => {
-    const savedLayout = localStorage.getItem(`seating-layout-${showTime}`);
+    const savedLayout = localStorage.getItem(`table-allocation-state-v3-${showTime}`);
     if (savedLayout) {
       try {
         const parsedLayout = JSON.parse(savedLayout);
@@ -51,72 +55,38 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
         console.error('Failed to load saved layout:', error);
       }
     } else {
-      // Default layout with some example tables including a 2-seat back row table
+      // Default layout with 14 tables matching TableAllocation
       const defaultTables: Table[] = [
-        {
-          id: 'table-front-1',
-          x: 100,
-          y: 150,
-          width: 120,
-          height: 80,
-          seats: 4,
-          shape: 'rectangle',
-          label: 'Table 1',
-          status: 'available'
-        },
-        {
-          id: 'table-front-2',
-          x: 250,
-          y: 150,
-          width: 120,
-          height: 80,
-          seats: 4,
-          shape: 'rectangle',
-          label: 'Table 2',
-          status: 'available'
-        },
-        {
-          id: 'table-middle-1',
-          x: 100,
-          y: 270,
-          width: 120,
-          height: 80,
-          seats: 6,
-          shape: 'rectangle',
-          label: 'Table 3',
-          status: 'available'
-        },
-        {
-          id: 'table-middle-2',
-          x: 250,
-          y: 270,
-          width: 120,
-          height: 80,
-          seats: 6,
-          shape: 'rectangle',
-          label: 'Table 4',
-          status: 'available'
-        },
-        {
-          id: 'table-back-row',
-          x: 175,
-          y: 390,
-          width: 100,
-          height: 60,
-          seats: 2,
-          shape: 'rectangle',
-          label: 'Back Row',
-          status: 'available'
-        }
+        // Front row - 3 tables (T1-T3)
+        { id: 'T1', x: 50, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T1', status: 'available' },
+        { id: 'T2', x: 150, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T2', status: 'available' },
+        { id: 'T3', x: 250, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T3', status: 'available' },
+        
+        // Row 2 - 3 larger tables (T4-T6)
+        { id: 'T4', x: 50, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T4', status: 'available' },
+        { id: 'T5', x: 170, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T5', status: 'available' },
+        { id: 'T6', x: 290, y: 180, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T6', status: 'available' },
+        
+        // Row 3 - 3 larger tables (T7-T9)
+        { id: 'T7', x: 50, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T7', status: 'available' },
+        { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
+        { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
+        
+        // Back row - 5 tables (T10-T14)
+        { id: 'T10', x: 30, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+        { id: 'T11', x: 120, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+        { id: 'T12', x: 210, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+        { id: 'T13', x: 300, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+        { id: 'T14', x: 390, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
       ];
       setTables(defaultTables);
     }
   }, [showTime]);
 
-  // Save table layout
+  // Save table layout - synchronized with TableAllocation
   const saveLayout = () => {
     try {
-      localStorage.setItem(`seating-layout-${showTime}`, JSON.stringify(tables));
+      localStorage.setItem(`table-allocation-state-v3-${showTime}`, JSON.stringify(tables));
       toast({
         title: "Layout Saved",
         description: "Table layout has been saved successfully"
@@ -132,24 +102,24 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
 
   // Reset to default layout with 14 tables
   const resetToDefault = () => {
-    localStorage.removeItem(`seating-layout-${showTime}`);
+    localStorage.removeItem(`table-allocation-state-v3-${showTime}`);
     const defaultTables: Table[] = [
-      // Front row - 4 tables
+      // Front row - 3 tables (T1-T3)
       { id: 'T1', x: 50, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T1', status: 'available' },
       { id: 'T2', x: 150, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T2', status: 'available' },
       { id: 'T3', x: 250, y: 100, width: 80, height: 60, seats: 2, shape: 'rectangle', label: 'T3', status: 'available' },
       
-      // Row 2 - 3 larger tables  
+      // Row 2 - 3 larger tables (T4-T6)
       { id: 'T4', x: 50, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T4', status: 'available' },
       { id: 'T5', x: 170, y: 180, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T5', status: 'available' },
       { id: 'T6', x: 290, y: 180, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T6', status: 'available' },
       
-      // Row 3 - 3 larger tables
+      // Row 3 - 3 larger tables (T7-T9)
       { id: 'T7', x: 50, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T7', status: 'available' },
       { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
       { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
       
-      // Back row - 5 tables (including the new T14)
+      // Back row - 5 tables (T10-T14)
       { id: 'T10', x: 30, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
       { id: 'T11', x: 120, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
       { id: 'T12', x: 210, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
@@ -386,6 +356,8 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
             onGuestMove={handleGuestMove}
             onTableClear={handleTableClear}
             friendshipGroups={friendshipGroups}
+            onAddWalkIn={onAddWalkIn}
+            showTimes={showTimes}
           />
         </TabsContent>
 

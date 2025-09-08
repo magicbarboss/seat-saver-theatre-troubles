@@ -2342,6 +2342,8 @@ const CheckInSystem = ({
             }
             showTime={showFilter}
             friendshipGroups={friendshipGroups}
+            onAddWalkIn={handleAddWalkIn}
+            showTimes={showTimes}
           />
         </TabsContent>
 

@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Users, Clock, MapPin, AlertCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { CheckedInGuest } from '../checkin/types';
-import { FriendshipGroup } from './FriendshipGroup';
+import { WalkInGuestForm } from '../checkin/WalkInGuestForm';
+import { Users, UserMinus, Eye, EyeOff, ChevronDown, Link, UserPlus } from 'lucide-react';
 
 interface Table {
   id: string;
@@ -29,6 +29,8 @@ interface SeatingChartProps {
   onGuestMove: (guest: CheckedInGuest, fromTableId: string, toTableId: string) => void;
   onTableClear: (tableId: string) => void;
   friendshipGroups: Map<string, number[]>;
+  onAddWalkIn?: (walkInData: { name: string; count: number; showTime: string; notes?: string }) => void;
+  showTimes: string[];
 }
 
 export const SeatingChart: React.FC<SeatingChartProps> = ({
@@ -37,29 +39,28 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   onTableAssign,
   onGuestMove,
   onTableClear,
-  friendshipGroups
+  friendshipGroups,
+  onAddWalkIn,
+  showTimes = []
 }) => {
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [showGuestPanel, setShowGuestPanel] = useState(true);
+  const [isJoinTablesMode, setIsJoinTablesMode] = useState(false);
+  const [selectedTablesForJoining, setSelectedTablesForJoining] = useState<string[]>([]);
 
   // Calculate table statistics
   const tableStats = useMemo(() => {
     const totalTables = tables.length;
-    const occupiedTables = tables.filter(t => t.status === 'occupied').length;
-    const availableTables = tables.filter(t => t.status === 'available').length;
+    const occupied = tables.filter(t => t.assignedGuests && t.assignedGuests.length > 0).length;
+    const available = tables.filter(t => !t.assignedGuests || t.assignedGuests.length === 0).length;
     const totalSeats = tables.reduce((sum, t) => sum + t.seats, 0);
-    const occupiedSeats = tables.reduce((sum, t) => 
-      sum + (t.assignedGuests?.reduce((guestSum, g) => guestSum + g.count, 0) || 0), 0
-    );
-
+    
     return {
       totalTables,
-      occupiedTables,
-      availableTables,
-      totalSeats,
-      occupiedSeats,
-      occupancyRate: totalSeats > 0 ? Math.round((occupiedSeats / totalSeats) * 100) : 0
+      occupied,
+      available,
+      totalSeats
     };
   }, [tables]);
 
@@ -140,49 +141,121 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   };
 
   const handleTableClick = (table: Table) => {
-    setSelectedTable(table.id);
-    if (table.assignedGuests && table.assignedGuests.length === 0) {
+    if (isJoinTablesMode) {
+      // Handle table selection for joining
+      setSelectedTablesForJoining(prev => {
+        if (prev.includes(table.id)) {
+          return prev.filter(id => id !== table.id);
+        } else {
+          return [...prev, table.id];
+        }
+      });
+      return;
+    }
+
+    setSelectedTable(table);
+    if (table.assignedGuests && table.assignedGuests.length > 0) {
+      // Show table details dialog if table has guests
+      setShowAssignDialog(false);
+    } else {
+      // Show assignment dialog if table is empty
       setShowAssignDialog(true);
     }
+  };
+
+  const handleJoinSelectedTables = () => {
+    if (selectedTablesForJoining.length < 2) return;
+    
+    // Implementation for joining tables would go here
+    console.log('Joining tables:', selectedTablesForJoining);
+    
+    // Reset joining mode
+    setIsJoinTablesMode(false);
+    setSelectedTablesForJoining([]);
+  };
+
+  const cancelJoinTablesMode = () => {
+    setIsJoinTablesMode(false);
+    setSelectedTablesForJoining([]);
   };
 
   const handleGuestAssign = (guest: CheckedInGuest) => {
     if (!selectedTable) return;
     
-    onTableAssign(selectedTable, guest);
+    onTableAssign(selectedTable.id, guest);
     setShowAssignDialog(false);
     setSelectedTable(null);
   };
 
-  const selectedTableData = tables.find(t => t.id === selectedTable);
+  const selectedTableData = selectedTable;
 
   return (
     <div className="space-y-4">
-      {/* Seating Chart with Toggle */}
-      <div className="flex gap-4">
-        <Card className="flex-1">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Seating Chart</CardTitle>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-semibold">Seating Chart</h3>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">{tableStats.totalTables} tables</Badge>
+            <Badge variant={tableStats.occupied > 0 ? "default" : "secondary"}>
+              {tableStats.occupied} occupied
+            </Badge>
+            <Badge variant="outline">{tableStats.available} available</Badge>
+            <Badge variant="outline">{tableStats.totalSeats} seats</Badge>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {onAddWalkIn && showTimes.length > 0 && (
+            <WalkInGuestForm 
+              showTimes={showTimes}
+              onAddWalkIn={onAddWalkIn}
+            />
+          )}
+          
+          {isJoinTablesMode ? (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleJoinSelectedTables}
+                disabled={selectedTablesForJoining.length < 2}
+              >
+                <Link className="h-4 w-4 mr-2" />
+                Join Selected ({selectedTablesForJoining.length})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelJoinTablesMode}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowGuestPanel(!showGuestPanel)}
-              className="ml-auto"
+              onClick={() => setIsJoinTablesMode(true)}
             >
-              {showGuestPanel ? (
-                <>
-                  <ChevronRight className="w-4 h-4 mr-2" />
-                  Hide Guests
-                </>
-              ) : (
-                <>
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Show Guests ({Array.from(friendshipGroupsData.values()).reduce((sum, members) => sum + members.length, 0) + individualGuests.length})
-                </>
-              )}
+              <Link className="h-4 w-4 mr-2" />
+              Join Tables
             </Button>
-          </CardHeader>
-          <CardContent>
+          )}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGuestPanel(!showGuestPanel)}
+            className="flex items-center gap-2"
+          >
+            {showGuestPanel ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {showGuestPanel ? 'Hide' : 'Show'} Guests Panel
+          </Button>
+        </div>
+      </div>
+      <div className="flex gap-4">
+        <Card className="flex-1">
+          <CardContent className="p-6">
             <div className="relative border border-border rounded-lg bg-background min-h-[500px] overflow-hidden">
               {tables.map(table => {
                 const guestCount = table.assignedGuests?.reduce((sum, g) => sum + g.count, 0) || 0;
@@ -190,15 +263,20 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                 return (
                   <div
                     key={table.id}
-                    className={`absolute border-2 flex items-center justify-center text-sm font-medium cursor-pointer transition-all duration-200 ${
-                      getTableStatusColor(table)
-                    } ${
-                      selectedTable === table.id 
+                    className={`
+                      absolute border-2 rounded-lg cursor-pointer transition-all duration-200
+                      flex items-center justify-center text-sm font-medium
+                      hover:shadow-lg hover:scale-105 z-10
+                      ${getTableStatusColor(table)}
+                      ${isJoinTablesMode && selectedTablesForJoining.includes(table.id) 
+                        ? 'ring-4 ring-primary ring-opacity-50 border-primary' 
+                        : ''}
+                      ${isJoinTablesMode ? 'hover:ring-2 hover:ring-primary hover:ring-opacity-30' : ''}
+                      ${selectedTable?.id === table.id 
                         ? 'ring-2 ring-primary ring-offset-2 scale-105' 
-                        : 'hover:scale-102'
-                    } ${
-                      table.shape === 'circle' ? 'rounded-full' : 'rounded-lg'
-                    }`}
+                        : 'hover:scale-102'}
+                      ${table.shape === 'circle' ? 'rounded-full' : 'rounded-lg'}
+                    `}
                     style={{
                       left: table.x,
                       top: table.y,
@@ -235,22 +313,24 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[500px]">
+              <div className="h-[500px] overflow-y-auto">
                 <div className="space-y-3">
                   {/* Friendship Groups */}
                   {Array.from(friendshipGroupsData.entries()).map(([groupId, members]) => (
-                    <FriendshipGroup
+                    <div
                       key={groupId}
-                      id={groupId}
-                      members={members}
-                      onGroupAssign={(groupMembers) => {
-                        if (!selectedTable) return;
-                        groupMembers.forEach(guest => {
-                          handleGuestAssign(guest);
-                        });
+                      className="p-3 border border-border rounded-lg bg-card hover:bg-accent cursor-pointer transition-colors"
+                      onClick={() => {
+                        if (selectedTable) {
+                          members.forEach(guest => handleGuestAssign(guest));
+                        }
                       }}
-                      isSelected={false}
-                    />
+                    >
+                      <div className="font-medium">{members[0]?.name || 'Group'} & Friends</div>
+                      <div className="text-sm text-muted-foreground">
+                        {members.reduce((sum, m) => sum + m.count, 0)} guests total • Group of {members.length}
+                      </div>
+                    </div>
                   ))}
                   
                   {/* Individual Guests */}
@@ -280,7 +360,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
             </CardContent>
           </Card>
         )}
