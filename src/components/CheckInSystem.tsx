@@ -2054,6 +2054,12 @@ const CheckInSystem = ({
     showTime: string;
     notes?: string;
   }) => {
+    // Find next available pager
+    const usedPagers = Array.from(pagerAssignments.values());
+    const nextAvailablePager = availablePagers.find(pager => !usedPagers.includes(pager));
+    
+    const walkInIndex = 10000 + walkInGuests.length; // Walk-in guests start at index 10000
+    
     const newWalkIn: Guest = {
       id: `walk-in-${Date.now()}`,
       booking_code: `WALK-${Date.now()}`,
@@ -2061,16 +2067,27 @@ const CheckInSystem = ({
       total_quantity: walkInData.count,
       show_time: walkInData.showTime,
       notes: walkInData.notes,
-      is_checked_in: false,
-      pager_number: null,
+      is_checked_in: true, // Automatically check in walk-in guests
+      pager_number: nextAvailablePager || null,
       table_assignments: null,
       interval_pizza_order: false,
       interval_drinks_order: false
     };
+    
+    // Add the walk-in guest
     setWalkInGuests([...walkInGuests, newWalkIn]);
+    
+    // Check in the walk-in guest
+    setCheckedInGuests(prev => new Set([...prev, walkInIndex]));
+    
+    // Assign pager if available
+    if (nextAvailablePager) {
+      setPagerAssignments(prev => new Map([...prev, [walkInIndex, nextAvailablePager]]));
+    }
+    
     toast({
-      title: "Walk-in Guest Added",
-      description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}`
+      title: "Walk-in Guest Added & Checked In",
+      description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}${nextAvailablePager ? ` with pager #${nextAvailablePager}` : ' (no pagers available)'}`
     });
   };
   // Convert checked-in guests set to array format expected by TableAllocation
