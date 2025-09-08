@@ -74,10 +74,10 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
         
         // Back row - 5 tables (T10-T14) - evenly spaced
         { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
-        { id: 'T11', x: 110, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
-        { id: 'T12', x: 200, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
-        { id: 'T13', x: 290, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
-        { id: 'T14', x: 380, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
+        { id: 'T11', x: 100, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+        { id: 'T12', x: 180, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+        { id: 'T13', x: 260, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+        { id: 'T14', x: 340, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
       ];
       // Sort tables by ID to ensure consistent order (T1, T2, ..., T14)
       const sortedTables = defaultTables.sort((a, b) => {
@@ -127,10 +127,10 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
       
       // Back row - 5 tables (T10-T14) - evenly spaced
       { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
-      { id: 'T11', x: 110, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
-      { id: 'T12', x: 200, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
-      { id: 'T13', x: 290, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
-      { id: 'T14', x: 380, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
+      { id: 'T11', x: 100, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+      { id: 'T12', x: 180, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+      { id: 'T13', x: 260, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+      { id: 'T14', x: 340, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
     ];
     // Sort tables by ID to ensure consistent order (T1, T2, ..., T14)
     const sortedTables = defaultTables.sort((a, b) => {

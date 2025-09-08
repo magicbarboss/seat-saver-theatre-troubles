@@ -256,7 +256,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
       <div className="flex gap-4">
         <Card className="flex-1">
           <CardContent className="p-6">
-            <div className="relative border border-border rounded-lg bg-background min-h-[500px] overflow-hidden">
+            <div className="relative border border-border rounded-lg bg-background min-h-[500px] min-w-[450px] overflow-auto">
               {tables.map(table => {
                 const guestCount = table.assignedGuests?.reduce((sum, g) => sum + g.count, 0) || 0;
                 

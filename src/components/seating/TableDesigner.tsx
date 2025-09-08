@@ -175,7 +175,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({
       <div className="flex-1 border border-border rounded-lg bg-background relative overflow-hidden">
         <div 
           ref={canvasRef}
-          className="relative w-full h-full min-h-[500px] cursor-crosshair"
+          className="relative w-full h-full min-h-[500px] min-w-[450px] cursor-crosshair"
           onClick={() => setSelectedTable(null)}
         >
           {tables.map(table => (
