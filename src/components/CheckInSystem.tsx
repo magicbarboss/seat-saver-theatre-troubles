@@ -2054,10 +2054,6 @@ const CheckInSystem = ({
     showTime: string;
     notes?: string;
   }) => {
-    // Find next available pager
-    const usedPagers = Array.from(pagerAssignments.values());
-    const nextAvailablePager = availablePagers.find(pager => !usedPagers.includes(pager));
-    
     const walkInIndex = 10000 + walkInGuests.length; // Walk-in guests start at index 10000
     
     const newWalkIn: Guest = {
@@ -2068,7 +2064,7 @@ const CheckInSystem = ({
       show_time: walkInData.showTime,
       notes: walkInData.notes,
       is_checked_in: true, // Automatically check in walk-in guests
-      pager_number: nextAvailablePager || null,
+      pager_number: null, // No automatic pager assignment - use manual selection
       table_assignments: null,
       interval_pizza_order: false,
       interval_drinks_order: false
@@ -2080,14 +2076,9 @@ const CheckInSystem = ({
     // Check in the walk-in guest
     setCheckedInGuests(prev => new Set([...prev, walkInIndex]));
     
-    // Assign pager if available
-    if (nextAvailablePager) {
-      setPagerAssignments(prev => new Map([...prev, [walkInIndex, nextAvailablePager]]));
-    }
-    
     toast({
       title: "Walk-in Guest Added & Checked In",
-      description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}${nextAvailablePager ? ` with pager #${nextAvailablePager}` : ' (no pagers available)'}`
+      description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}. Use "Assign Pager" to select a pager.`
     });
   };
   // Convert checked-in guests set to array format expected by TableAllocation
