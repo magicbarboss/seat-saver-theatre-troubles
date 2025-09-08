@@ -347,7 +347,8 @@ const TableAllocation = ({
             { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
-        // Row 4 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
+        // Row 4 (Single) - T10 - 2 seat table
+        // Row 5 (Back) - T11, T12, T13, T14 - 2 seats each (whole tables)
         { 
           id: 10, 
           name: 'T10',
@@ -2048,8 +2049,8 @@ const TableAllocation = ({
     const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
     const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
     const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
-    const row4 = tables.filter(t => [10, 11, 12, 13, 14].includes(t.id)); // Back row T10-T14
-    const row5: Table[] = []; // Empty row
+    const row4 = tables.filter(t => [10].includes(t.id)); // Single table T10
+    const row5 = tables.filter(t => [11, 12, 13, 14].includes(t.id)); // Back row
 
     return { row1, row2, row3, row4, row5 };
   };
