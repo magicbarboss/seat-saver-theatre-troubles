@@ -72,8 +72,10 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
         { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
         { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
         
-        // Back row - 5 tables (T10-T14) - evenly spaced
-        { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+        // Row 4 (Single) - T10 - 2 seat table  
+        { id: 'T10', x: 20, y: 360, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+        
+        // Row 5 (Back) - T11-T14 - 2 seats each
         { id: 'T11', x: 100, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
         { id: 'T12', x: 180, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
         { id: 'T13', x: 260, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
@@ -125,8 +127,10 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
       { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
       { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
       
-      // Back row - 5 tables (T10-T14) - evenly spaced
-      { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+      // Row 4 (Single) - T10 - 2 seat table
+      { id: 'T10', x: 20, y: 360, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+      
+      // Row 5 (Back) - T11-T14 - 2 seats each
       { id: 'T11', x: 100, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
       { id: 'T12', x: 180, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
       { id: 'T13', x: 260, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
