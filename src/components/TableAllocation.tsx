@@ -347,15 +347,7 @@ const TableAllocation = ({
             { id: '9-back', tableId: 9, section: 'back', capacity: 2, status: 'AVAILABLE' }
           ]
         },
-        // Row 4 (New) - T14 - 2 seat table
-        { 
-          id: 14, 
-          name: 'T14',
-          totalCapacity: 2,
-          hasSections: false,
-          sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
-        },
-        // Row 5 (Back) - T10, T11, T12, T13 - 2 seats each (whole tables)
+        // Row 4 (Back) - T10, T11, T12, T13, T14 - 2 seats each (whole tables)
         { 
           id: 10, 
           name: 'T10',
@@ -383,6 +375,13 @@ const TableAllocation = ({
           totalCapacity: 2,
           hasSections: false,
           sections: [{ id: '13-whole', tableId: 13, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
+        },
+        { 
+          id: 14, 
+          name: 'T14',
+          totalCapacity: 2,
+          hasSections: false,
+          sections: [{ id: '14-whole', tableId: 14, section: 'whole', capacity: 2, status: 'AVAILABLE' }]
         },
       ]);
     }
@@ -2049,8 +2048,8 @@ const TableAllocation = ({
     const row1 = tables.filter(t => [1, 2, 3].includes(t.id));
     const row2 = tables.filter(t => [4, 5, 6].includes(t.id));
     const row3 = tables.filter(t => [7, 8, 9].includes(t.id));
-    const row4 = tables.filter(t => [10].includes(t.id)); // Single table T10
-    const row5 = tables.filter(t => [11, 12, 13, 14].includes(t.id)); // Back row
+    const row4 = tables.filter(t => [10, 11, 12, 13, 14].includes(t.id)); // Back row T10-T14
+    const row5: Table[] = []; // Empty row
 
     return { row1, row2, row3, row4, row5 };
   };
