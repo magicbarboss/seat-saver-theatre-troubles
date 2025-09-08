@@ -72,14 +72,20 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
         { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
         { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
         
-        // Back row - 5 tables (T10-T14)
-        { id: 'T10', x: 30, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
-        { id: 'T11', x: 120, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
-        { id: 'T12', x: 210, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
-        { id: 'T13', x: 300, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
-        { id: 'T14', x: 390, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
+        // Back row - 5 tables (T10-T14) - evenly spaced
+        { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+        { id: 'T11', x: 110, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+        { id: 'T12', x: 200, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+        { id: 'T13', x: 290, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+        { id: 'T14', x: 380, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
       ];
-      setTables(defaultTables);
+      // Sort tables by ID to ensure consistent order (T1, T2, ..., T14)
+      const sortedTables = defaultTables.sort((a, b) => {
+        const aNum = parseInt(a.id.replace('T', ''));
+        const bNum = parseInt(b.id.replace('T', ''));
+        return aNum - bNum;
+      });
+      setTables(sortedTables);
     }
   }, [showTime]);
 
@@ -119,14 +125,20 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
       { id: 'T8', x: 170, y: 280, width: 100, height: 80, seats: 5, shape: 'rectangle', label: 'T8', status: 'available' },
       { id: 'T9', x: 290, y: 280, width: 90, height: 80, seats: 4, shape: 'rectangle', label: 'T9', status: 'available' },
       
-      // Back row - 5 tables (T10-T14)
-      { id: 'T10', x: 30, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
-      { id: 'T11', x: 120, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
-      { id: 'T12', x: 210, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
-      { id: 'T13', x: 300, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
-      { id: 'T14', x: 390, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
+      // Back row - 5 tables (T10-T14) - evenly spaced
+      { id: 'T10', x: 20, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T10', status: 'available' },
+      { id: 'T11', x: 110, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T11', status: 'available' },
+      { id: 'T12', x: 200, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T12', status: 'available' },
+      { id: 'T13', x: 290, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T13', status: 'available' },
+      { id: 'T14', x: 380, y: 380, width: 70, height: 50, seats: 2, shape: 'rectangle', label: 'T14', status: 'available' }
     ];
-    setTables(defaultTables);
+    // Sort tables by ID to ensure consistent order (T1, T2, ..., T14)
+    const sortedTables = defaultTables.sort((a, b) => {
+      const aNum = parseInt(a.id.replace('T', ''));
+      const bNum = parseInt(b.id.replace('T', ''));
+      return aNum - bNum;
+    });
+    setTables(sortedTables);
     toast({
       title: "Layout Reset",
       description: "Reset to default layout with 14 tables"
