@@ -2,8 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { RotateCcw, Trash2, AlertTriangle, Link } from 'lucide-react';
-import { ManualLinkDialog } from './ManualLinkDialog';
+import { RotateCcw, Trash2, AlertTriangle } from 'lucide-react';
 import { BookingGroup } from './types';
 
 interface CheckInActionsProps {
@@ -13,11 +12,8 @@ interface CheckInActionsProps {
   setShowClearDialog: (show: boolean) => void;
   bookingGroups: BookingGroup[];
   checkedInGuests: Set<number>;
-  manualLinks: Map<string, number[]>;
   friendshipGroups: Map<string, number[]>;
-  onCreateManualLink: (guestIndices: number[]) => void;
-  onRemoveManualLink: (linkId: string) => void;
-  extractGuestName: (name: string, ticketData?: any) => string;
+  extractGuestName: (bookerName: string, ticketData?: any) => any;
 }
 
 export const CheckInActions = ({
@@ -27,10 +23,7 @@ export const CheckInActions = ({
   setShowClearDialog,
   bookingGroups,
   checkedInGuests,
-  manualLinks,
   friendshipGroups,
-  onCreateManualLink,
-  onRemoveManualLink,
   extractGuestName
 }: CheckInActionsProps) => {
   return (
@@ -44,16 +37,6 @@ export const CheckInActions = ({
         <RotateCcw className="h-4 w-4" />
         Refresh Status
       </Button>
-
-      <ManualLinkDialog
-        bookingGroups={bookingGroups}
-        checkedInGuests={checkedInGuests}
-        manualLinks={manualLinks}
-        friendshipGroups={friendshipGroups}
-        onCreateLink={onCreateManualLink}
-        onRemoveLink={onRemoveManualLink}
-        extractGuestName={extractGuestName}
-      />
 
       <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <DialogTrigger asChild>
@@ -83,7 +66,6 @@ export const CheckInActions = ({
               <li>Pager assignments</li>
               <li>Seating information</li>
               <li>Party connections</li>
-              <li>Manual guest links</li>
               <li>Walk-in guests</li>
               <li>Comments</li>
             </ul>

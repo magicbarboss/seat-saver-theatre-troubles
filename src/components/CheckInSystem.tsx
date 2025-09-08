@@ -55,9 +55,6 @@ const CheckInSystem = ({
   const [selectedGuestForEdit, setSelectedGuestForEdit] = useState<Guest | null>(null);
   const [commentText, setCommentText] = useState('');
   const [guestNotes, setGuestNotes] = useState<Map<number, string>>(new Map());
-  
-  // Add manual links state
-  const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
 
   // Sync local guests state with prop
   useEffect(() => {
@@ -71,29 +68,6 @@ const CheckInSystem = ({
     }
   }, [showTimes, showFilter]);
 
-  // Manual link handlers
-  const handleCreateManualLink = (guestIndices: number[]) => {
-    const linkId = `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newLinks = new Map(manualLinks);
-    newLinks.set(linkId, guestIndices);
-    setManualLinks(newLinks);
-
-    toast({
-      title: "✨ Guests Linked",
-      description: `Created manual link for ${guestIndices.length} guests`
-    });
-  };
-
-  const handleRemoveManualLink = (linkId: string) => {
-    const newLinks = new Map(manualLinks);
-    newLinks.delete(linkId);
-    setManualLinks(newLinks);
-
-    toast({
-      title: "🔗 Link Removed",
-      description: "Manual guest link has been removed"
-    });
-  };
 
   // Clear all data function - updated to include manual links
   const clearAllData = async () => {
@@ -109,7 +83,6 @@ const CheckInSystem = ({
       setPartyGroups(new Map());
       setFriendshipGroups(new Map());
       setBookingComments(new Map());
-      setManualLinks(new Map()); // Clear manual links
       setWalkInGuests([]);
       setSessionDate(new Date().toDateString());
       setShowClearDialog(false);
@@ -257,9 +230,6 @@ const CheckInSystem = ({
           setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
           setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
           
-          // Load manual links
-          const manualLinksData = (currentSession as any).manual_links || {};
-          setManualLinks(new Map(Object.entries(manualLinksData).map(([k, v]) => [k, v as number[]])));
           
           // Load guest notes
           const guestNotesData = (currentSession as any).guest_notes || {};
@@ -331,7 +301,6 @@ const CheckInSystem = ({
           booking_comments: Object.fromEntries(bookingComments) as any,
           guest_notes: Object.fromEntries(guestNotes) as any,
           walk_in_guests: walkInGuests as any,
-          manual_links: Object.fromEntries(manualLinks) as any,
         };
         const { error } = await supabase
           .from('checkin_sessions')
@@ -348,7 +317,7 @@ const CheckInSystem = ({
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, walkInGuests, manualLinks]); // Add guestNotes and manualLinks to dependency
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, walkInGuests]);
 
   // Extract guest name utility from ticket data or booker_name
   const extractGuestName = (bookerName: string, ticketData?: any) => {
@@ -1595,11 +1564,8 @@ const CheckInSystem = ({
     // From automatic friendships
     processFriendshipGroups.forEach((indices, label) => addGroup(label, indices));
 
-    // From manual links
-    manualLinks.forEach((indices, linkId) => addGroup(linkId, indices));
-
     setPartyGroups(newPartyGroups);
-  }, [processFriendshipGroups, manualLinks, guests]);
+  }, [processFriendshipGroups, guests]);
 
   // Group bookings by booking code - preserve original order
   const groupedBookings = useMemo(() => {
@@ -1904,16 +1870,6 @@ const CheckInSystem = ({
         }
       }
 
-      // Merge in manual links
-      if (manualLinks.size > 0) {
-        for (const [, indices] of manualLinks.entries()) {
-          if (indices.includes(guestIndex)) {
-            const additional = indices.filter(i => i !== guestIndex && !checkedInGuests.has(i));
-            linkedGuests = Array.from(new Set([...(linkedGuests || []), ...additional]));
-            break;
-          }
-        }
-      }
       
       if (linkedGuests.length > 0) {
         const guest = guests[guestIndex];
@@ -2252,10 +2208,7 @@ const CheckInSystem = ({
         setShowClearDialog={setShowClearDialog}
         bookingGroups={groupedBookings}
         checkedInGuests={checkedInGuests}
-        manualLinks={manualLinks}
         friendshipGroups={friendshipGroups}
-        onCreateManualLink={handleCreateManualLink}
-        onRemoveManualLink={handleRemoveManualLink}
         extractGuestName={extractGuestName}
       />
 
