@@ -17,6 +17,7 @@ import { WalkInGuestForm } from './checkin/WalkInGuestForm';
 import { GuestTable } from './checkin/GuestTable';
 import { SeatingManagement } from './seating/SeatingManagement';
 import { ManualEditDialog } from './checkin/ManualEditDialog';
+import { ManualLinkDialog } from './checkin/ManualLinkDialog';
 
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
 
@@ -55,6 +56,7 @@ const CheckInSystem = ({
   const [selectedGuestForEdit, setSelectedGuestForEdit] = useState<Guest | null>(null);
   const [commentText, setCommentText] = useState('');
   const [guestNotes, setGuestNotes] = useState<Map<number, string>>(new Map());
+  const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
 
   // Sync local guests state with prop
   useEffect(() => {
@@ -83,6 +85,7 @@ const CheckInSystem = ({
       setPartyGroups(new Map());
       setFriendshipGroups(new Map());
       setBookingComments(new Map());
+      setManualLinks(new Map());
       setWalkInGuests([]);
       setSessionDate(new Date().toDateString());
       setShowClearDialog(false);
@@ -184,6 +187,7 @@ const CheckInSystem = ({
       setSeatedSections(new Set());
       setPartyGroups(new Map());
       setFriendshipGroups(new Map());
+      setManualLinks(new Map());
       setWalkInGuests([]);
       setSessionDate(new Date().toISOString().split('T')[0]);
       console.log(`Migrated data for ${migratedCheckedIn.size} checked-in guests, ${migratedSeated.size} seated guests`);
@@ -228,6 +232,7 @@ const CheckInSystem = ({
           setPartyGroups(new Map(Object.entries(currentSession.party_groups || {}) as [string, PartyGroup][]));
           setFriendshipGroups(new Map(Object.entries((currentSession as any).friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
           setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
+          setManualLinks(new Map(Object.entries((currentSession as any).manual_links || {}).map(([k, v]) => [k, v as number[]])));
           setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
           
           
@@ -300,6 +305,7 @@ const CheckInSystem = ({
           friendship_groups: Object.fromEntries(friendshipGroups) as any,
           booking_comments: Object.fromEntries(bookingComments) as any,
           guest_notes: Object.fromEntries(guestNotes) as any,
+          manual_links: Object.fromEntries(manualLinks) as any,
           walk_in_guests: walkInGuests as any,
         };
         const { error } = await supabase
@@ -317,7 +323,7 @@ const CheckInSystem = ({
       clearInterval(interval);
       saveState();
     };
-  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, walkInGuests]);
+  }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, manualLinks, walkInGuests]);
 
   // Extract guest name utility from ticket data or booker_name
   const extractGuestName = (bookerName: string, ticketData?: any) => {
@@ -1870,6 +1876,16 @@ const CheckInSystem = ({
         }
       }
 
+      // From manual links (if no friendship group found)
+      if (linkedGuests.length === 0) {
+        for (const [, groupMembers] of manualLinks.entries()) {
+          if (groupMembers.includes(guestIndex)) {
+            linkedGuests = groupMembers.filter(i => i !== guestIndex && !checkedInGuests.has(i));
+            break;
+          }
+        }
+      }
+
       
       if (linkedGuests.length > 0) {
         const guest = guests[guestIndex];
@@ -2035,6 +2051,31 @@ const CheckInSystem = ({
     toast({
       title: "Walk-in Guest Added & Checked In",
       description: `${walkInData.name} (${walkInData.count} guests) added for ${walkInData.showTime}. Use "Assign Pager" to select a pager.`
+    });
+  };
+
+  // Manual link handlers
+  const handleCreateManualLink = (guestIndices: number[]) => {
+    const linkId = `manual-${Date.now()}`;
+    const newManualLinks = new Map(manualLinks);
+    newManualLinks.set(linkId, guestIndices);
+    setManualLinks(newManualLinks);
+    
+    const guestNames = guestIndices.map(i => extractGuestName(guests[i].booker_name, guests[i].ticket_data)).join(', ');
+    toast({
+      title: "Manual Link Created",
+      description: `Linked guests: ${guestNames}`
+    });
+  };
+
+  const handleRemoveManualLink = (linkId: string) => {
+    const newManualLinks = new Map(manualLinks);
+    newManualLinks.delete(linkId);
+    setManualLinks(newManualLinks);
+    
+    toast({
+      title: "Manual Link Removed",
+      description: "Guest link has been removed"
     });
   };
   // Convert checked-in guests set to array format expected by TableAllocation
@@ -2210,6 +2251,16 @@ const CheckInSystem = ({
         checkedInGuests={checkedInGuests}
         friendshipGroups={friendshipGroups}
         extractGuestName={extractGuestName}
+      />
+
+      <ManualLinkDialog
+        bookingGroups={groupedBookings}
+        checkedInGuests={checkedInGuests}
+        manualLinks={manualLinks}
+        friendshipGroups={friendshipGroups}
+        extractGuestName={extractGuestName}
+        onCreateLink={handleCreateManualLink}
+        onRemoveLink={handleRemoveManualLink}
       />
 
       {(() => {
