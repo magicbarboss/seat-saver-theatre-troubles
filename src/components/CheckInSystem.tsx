@@ -1881,13 +1881,49 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
+  // Helper function to calculate actual guest count (excluding add-ons like prosecco)
+  const calculateActualGuestCount = (guest: Guest): number => {
+    // Helper: detect pure add-on items (not main packages)
+    const isPureAddon = (name: string) => {
+      const n = name.trim().toLowerCase();
+      return /^(house\s*cocktails?|cocktails?|house\s*pints?|pints?|beer|beers|wine|wines|prosecco)$/.test(n);
+    };
+
+    const tickets = getAllTicketTypes(guest);
+    const actualGuestTickets = tickets.filter(t => !isPureAddon(t.type));
+    
+    // If we have explicit ticket mappings, use those
+    let totalActualGuests = 0;
+    
+    for (const ticket of actualGuestTickets) {
+      const mapping = TICKET_TYPE_MAPPING[ticket.type];
+      if (mapping) {
+        // Use the ticket mapping to determine guest count
+        // Most ticket types represent 1 guest per ticket unless specified otherwise
+        totalActualGuests += ticket.quantity;
+      } else {
+        // Fallback: assume each ticket represents 1 guest
+        totalActualGuests += ticket.quantity;
+      }
+    }
+    
+    // If no valid tickets found, fall back to total_quantity but log it
+    if (totalActualGuests === 0) {
+      console.log(`⚠️ No valid guest tickets found for ${guest.booker_name}, falling back to total_quantity: ${guest.total_quantity}`);
+      return guest.total_quantity || 0;
+    }
+    
+    console.log(`👥 ${guest.booker_name} (${guest.booking_code}): actual guests = ${totalActualGuests}, total_quantity = ${guest.total_quantity}`);
+    return totalActualGuests;
+  };
+
   // Build Party Groups from friendshipGroups and manualLinks so UI can show "Linked"
   useEffect(() => {
     const newPartyGroups = new Map<string, PartyGroup>();
 
     const addGroup = (id: string, indices: number[]) => {
       const unique = Array.from(new Set(indices)).sort((a, b) => a - b);
-      const totalGuests = unique.reduce((sum, idx) => sum + (guests[idx]?.total_quantity || 0), 0);
+      const totalGuests = unique.reduce((sum, idx) => sum + calculateActualGuestCount(guests[idx] || {} as Guest), 0);
       const guestNames = unique.map(idx => extractGuestName(guests[idx]?.booker_name || '', guests[idx]?.ticket_data));
       newPartyGroups.set(id, {
         id,
