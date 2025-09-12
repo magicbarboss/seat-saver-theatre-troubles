@@ -772,22 +772,17 @@ const CheckInSystem = ({
       }
     }
     
-    // Match pizza orders including "Stone Baked Garlic Pizza" from item_details
-    if (combinedText.toLowerCase().includes('pizza')) {
-      if (combinedText.toLowerCase().includes('stone baked garlic')) {
-        addons.push('1x Stone Baked Garlic Pizza');
-      } else if (combinedText.toLowerCase().includes('garlic')) {
-        addons.push('Garlic Pizza');
-      } else {
-        const match = combinedText.match(/(\d+)\s*.*?pizza/i);
-        if (match) {
-          const quantity = parseInt(match[1]);
-          addons.push(`${quantity} Pizza${quantity > 1 ? 's' : ''}`);
-        } else {
-          addons.push('Pizza');
-        }
+      // Match specific pizza add-ons only (avoid generic 'Pizza' to prevent double-counting)
+      const pizzaText = combinedText.toLowerCase();
+      if (pizzaText.includes('stone baked garlic')) {
+        const qtyMatch = combinedText.match(/(\d+)\s*(?:x\s*)?stone\s*baked\s*garlic\s*pizza/i);
+        const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+        addons.push(`${qty} Stone Baked Garlic Pizza${qty > 1 ? 's' : ''}`);
+      } else if (pizzaText.includes('garlic pizza')) {
+        const qtyMatch = combinedText.match(/(\d+)\s*(?:x\s*)?garlic\s*pizza/i);
+        const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+        addons.push(`${qty} Garlic Pizza${qty > 1 ? 's' : ''}`);
       }
-    }
     
     // Match House Cocktail add-ons from item_details
     if (combinedText.toLowerCase().includes('house cocktail')) {
@@ -804,6 +799,10 @@ const CheckInSystem = ({
       }
     }
     
+    const dbgCodes = ['NJGQ-280825','JBCC-030925'];
+    if (dbgCodes.includes(mainGuest.booking_code)) {
+      console.log(`🧩 Add-on parse for ${mainGuest.booking_code} (${mainGuest.booker_name}):`, { addons, combinedText });
+    }
     return addons;
   };
 
@@ -1408,7 +1407,42 @@ const CheckInSystem = ({
       });
     }
 
-    // Third try: scan item_details and ticket_data.Item for known ticket types if no extracted tickets found
+    // Third try: parse numeric ticket_data fields first (prioritize structured data)
+    if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
+      Object.entries(guest.ticket_data).forEach(([key, value]) => {
+        // Skip non-ticket fields - including Friends, DIET, Magic that contain names/text
+        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'Guests', 'TERMS', 'Friends', 'DIET', 'Magic'].includes(key)) {
+          return;
+        }
+
+        // Parse quantity - handle various formats
+        let quantity = 0;
+        if (typeof value === 'number' && value > 0) {
+          quantity = value;
+        } else if (typeof value === 'string' && value.trim() !== '') {
+          // Check if the string contains friend names (multiple words with &)
+          if (value.includes('&') || value.split(' ').length > 3) {
+            console.log(`🚫 Skipping '${key}' with value '${value}' - appears to contain names`);
+            return;
+          }
+          const parsed = parseInt(value);
+          if (!isNaN(parsed) && parsed > 0) {
+            quantity = parsed;
+          }
+        }
+
+        // Only add if we found a valid numeric quantity OR it's a known ticket type
+        if (quantity > 0 || Object.keys(TICKET_TYPE_MAPPING).includes(key)) {
+          console.log(`✅ Adding ticket type '${key}' with quantity ${quantity || 1} for ${guest.booker_name}`);
+          tickets.push({
+            type: key,
+            quantity: quantity || 1
+          });
+        }
+      });
+    }
+
+    // Fourth try: scan item_details and ticket_data.Item for known ticket types if still nothing
     if (tickets.length === 0) {
       const itemDetails = guest.item_details || '';
       const ticketItem = guest.ticket_data?.Item || '';
@@ -1471,40 +1505,9 @@ const CheckInSystem = ({
       });
     }
 
-    // Fallback: parse all ticket_data fields with fuzzy matching
-    if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
-      Object.entries(guest.ticket_data).forEach(([key, value]) => {
-        // Skip non-ticket fields - including Friends, DIET, Magic that contain names/text
-        if (!key || ['booker_name', 'booking_code', 'notes', 'show_time', 'extracted_tickets', 'Booker', 'Booking', 'Booking Code', 'Item', 'Note', 'Status', 'Total', 'Total Quantity', 'Guests', 'TERMS', 'Friends', 'DIET', 'Magic'].includes(key)) {
-          return;
-        }
-
-        // Parse quantity - handle various formats
-        let quantity = 0;
-        if (typeof value === 'number' && value > 0) {
-          quantity = value;
-        } else if (typeof value === 'string' && value.trim() !== '') {
-          // Check if the string contains friend names (multiple words with &)
-          if (value.includes('&') || value.split(' ').length > 3) {
-            console.log(`🚫 Skipping '${key}' with value '${value}' - appears to contain names`);
-            return;
-          }
-          
-          const parsed = parseInt(value);
-          if (!isNaN(parsed) && parsed > 0) {
-            quantity = parsed;
-          }
-        }
-
-        // Only add if we found a valid numeric quantity OR it's a known ticket type
-        if (quantity > 0 || Object.keys(TICKET_TYPE_MAPPING).includes(key)) {
-          console.log(`✅ Adding ticket type '${key}' with quantity ${quantity || 1} for ${guest.booker_name}`);
-          tickets.push({
-            type: key,
-            quantity: quantity || 1
-          });
-        }
-      });
+    // Targeted debug for specific bookings
+    if (['NJGQ-280825','JBCC-030925'].includes(guest.booking_code)) {
+      console.log(`🧪 Ticket types for ${guest.booking_code} (${guest.booker_name}):`, tickets);
     }
     return tickets;
   };
