@@ -325,33 +325,87 @@ const CheckInSystem = ({
     };
   }, [isInitialized, user?.id, guestListId, checkedInGuests, pagerAssignments, seatedGuests, seatedSections, allocatedGuests, guestTableAllocations, partyGroups, friendshipGroups, bookingComments, guestNotes, manualLinks, walkInGuests]);
 
-  // Extract guest name utility from ticket data or booker_name
-  const extractGuestName = (bookerName: string, ticketData?: any) => {
+  // Enhanced guest name extraction utility with debug logging
+  const extractGuestName = (bookerName: string, ticketData?: any, debug = false) => {
+    let foundName = '';
+    let source = '';
+
     // First try to get full name from ticket data
     if (ticketData) {
       const firstName = ticketData['First Name'] || ticketData['first_name'] || '';
       const lastName = ticketData['Last Name'] || ticketData['last_name'] || '';
       
       if (firstName && lastName) {
-        return `${firstName.trim()} ${lastName.trim()}`;
+        foundName = `${firstName.trim()} ${lastName.trim()}`;
+        source = 'firstName + lastName';
       } else if (firstName) {
-        return firstName.trim();
+        foundName = firstName.trim();
+        source = 'firstName only';
       } else if (lastName) {
-        return lastName.trim();
+        foundName = lastName.trim();
+        source = 'lastName only';
       }
       
-      // Also check for Booker field in ticket data
-      if (ticketData['Booker']) {
-        return ticketData['Booker'].trim();
+      // If still no name, check additional fields
+      if (!foundName) {
+        const bookerField = ticketData['Booker'] || ticketData['booker'] || '';
+        if (bookerField) {
+          foundName = bookerField.trim();
+          source = 'Booker field';
+        }
+      }
+
+      // Check additional fields that might contain single names
+      if (!foundName) {
+        const additionalFields = [
+          'Name', 'Full Name', 'Customer Name', 'Guest Name', 
+          'Contact Name', 'Traveller', 'Via-Cust'
+        ];
+        
+        for (const field of additionalFields) {
+          const value = ticketData[field];
+          if (value && typeof value === 'string' && value.trim()) {
+            // Handle Via-Cust field specially (extract name from contact info)
+            if (field === 'Via-Cust' && value.includes('Contact:')) {
+              const contactMatch = value.match(/Contact:\s*([^:]+?):/);
+              if (contactMatch && contactMatch[1]) {
+                foundName = contactMatch[1].trim();
+                source = 'Via-Cust contact';
+                break;
+              }
+            } else {
+              foundName = value.trim();
+              source = field;
+              break;
+            }
+          }
+        }
       }
     }
     
     // Fall back to booker_name if ticket data doesn't have names
-    if (bookerName && bookerName.trim()) {
-      return bookerName.trim();
+    if (!foundName && bookerName && bookerName.trim()) {
+      foundName = bookerName.trim();
+      source = 'bookerName';
     }
     
-    return 'Unknown Guest';
+    // Final fallback
+    if (!foundName) {
+      foundName = 'Unknown Guest';
+      source = 'fallback';
+    }
+
+    // Debug logging for single names
+    if (debug || (foundName.split(' ').length === 1 && foundName !== 'Unknown Guest')) {
+      console.log(`🔍 NAME DEBUG: Found "${foundName}" from ${source}`, {
+        bookerName,
+        ticketDataKeys: ticketData ? Object.keys(ticketData) : [],
+        foundName,
+        source
+      });
+    }
+    
+    return foundName;
   };
 
   // Enhanced ticket type mapping with calculation method support
@@ -1432,42 +1486,67 @@ const CheckInSystem = ({
         friendNames.forEach(friendName => {
           const normalizedFriendName = normalizeNameForMatching(friendName);
 
-          // Find matching guests by enhanced name matching
+          // Find matching guests by enhanced name matching using full name extraction
           const matchingGuestOriginalIndices = guests
             .map((g, i) => ({ guest: g, index: i }))
             .filter(({ guest }) => {
-              if (!guest?.booker_name) return false;
+              if (!guest) return false;
 
-              const originalGuestName = guest.booker_name as string;
-              const normalizedGuestName = normalizeNameForMatching(originalGuestName);
+              // Use the enhanced extractGuestName function instead of just booker_name
+              const fullGuestName = extractGuestName(guest.booker_name, guest.ticket_data, true);
+              const normalizedGuestName = normalizeNameForMatching(fullGuestName);
 
-              // Enhanced matching logic
+              // Also check the original booker_name separately
+              const bookerName = guest.booker_name || '';
+              const normalizedBookerName = normalizeNameForMatching(bookerName);
+
               const guestNameParts = normalizedGuestName.split(/\s+/).filter(part => part.length > 0);
+              const bookerNameParts = normalizedBookerName.split(/\s+/).filter(part => part.length > 0);
               const searchNameParts = normalizedFriendName.split(/\s+/).filter(part => part.length > 0);
 
-              // Exact full name match (normalized)
-              if (normalizedGuestName === normalizedFriendName) return true;
+              // Helper function to check name matching
+              const checkNameMatch = (targetName: string, targetParts: string[]) => {
+                // Exact full name match (normalized)
+                if (targetName === normalizedFriendName) return true;
 
-              // Fuzzy match for similar names
-              if (isFuzzyMatch(normalizedGuestName, normalizedFriendName)) return true;
+                // Fuzzy match for similar names
+                if (isFuzzyMatch(targetName, normalizedFriendName)) return true;
 
-              // Check if friend name matches any combination of guest's first/last names
-              if (searchNameParts.length === 1) {
-                // Single word friend name should match first or last name exactly
-                return guestNameParts.includes(normalizedFriendName);
-              } else if (searchNameParts.length === 2 && guestNameParts.length >= 2) {
-                // Two word friend name should match first+last exactly
-                const firstLastMatch =
-                  guestNameParts[0] === searchNameParts[0] &&
-                  guestNameParts[guestNameParts.length - 1] === searchNameParts[1];
-                const lastFirstMatch =
-                  guestNameParts[0] === searchNameParts[1] &&
-                  guestNameParts[guestNameParts.length - 1] === searchNameParts[0];
+                // Check if friend name matches any combination of target's first/last names
+                if (searchNameParts.length === 1) {
+                  // Single word friend name should match any part of the target name
+                  return targetParts.includes(normalizedFriendName);
+                } else if (searchNameParts.length === 2 && targetParts.length >= 2) {
+                  // Two word friend name should match first+last exactly
+                  const firstLastMatch =
+                    targetParts[0] === searchNameParts[0] &&
+                    targetParts[targetParts.length - 1] === searchNameParts[1];
+                  const lastFirstMatch =
+                    targetParts[0] === searchNameParts[1] &&
+                    targetParts[targetParts.length - 1] === searchNameParts[0];
 
-                return firstLastMatch || lastFirstMatch;
+                  return firstLastMatch || lastFirstMatch;
+                }
+
+                return false;
+              };
+
+              // Check both the full extracted name and the booker name
+              const fullNameMatch = checkNameMatch(normalizedGuestName, guestNameParts);
+              const bookerNameMatch = bookerName && checkNameMatch(normalizedBookerName, bookerNameParts);
+
+              const isMatch = fullNameMatch || bookerNameMatch;
+              
+              // Debug logging for friendship detection
+              if (isMatch) {
+                console.log(`🤝 FRIENDSHIP MATCH: "${normalizedFriendName}" matched with guest:`, {
+                  fullGuestName,
+                  bookerName,
+                  matchType: fullNameMatch ? 'fullName' : 'bookerName'
+                });
               }
 
-              return false;
+              return isMatch;
             })
             .map(({ guest, index: i }) => ((guest as any).originalIndex ?? i))
             .filter(originalIndex => originalIndex !== undefined);

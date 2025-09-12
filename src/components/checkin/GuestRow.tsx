@@ -83,28 +83,87 @@ export const GuestRow = ({
   onNotesChange,
   onManualEdit
 }: GuestRowProps) => {
-  // Extract full name from ticket data if available
+  // Enhanced full name extraction with comprehensive field checking
   const extractFullName = (guest: Guest) => {
+    let foundName = '';
+    let source = '';
+
     if (guest.ticket_data) {
       const firstName = guest.ticket_data['First Name'] || guest.ticket_data['first_name'] || '';
       const lastName = guest.ticket_data['Last Name'] || guest.ticket_data['last_name'] || '';
       
       if (firstName && lastName) {
-        return `${firstName.trim()} ${lastName.trim()}`;
+        foundName = `${firstName.trim()} ${lastName.trim()}`;
+        source = 'firstName + lastName';
       } else if (firstName) {
-        return firstName.trim();
+        foundName = firstName.trim();
+        source = 'firstName only';
       } else if (lastName) {
-        return lastName.trim();
+        foundName = lastName.trim();
+        source = 'lastName only';
       }
       
-      // Also check for Booker field in ticket data
-      if (guest.ticket_data['Booker']) {
-        return guest.ticket_data['Booker'].trim();
+      // If still no name, check additional fields
+      if (!foundName) {
+        const bookerField = guest.ticket_data['Booker'] || guest.ticket_data['booker'] || '';
+        if (bookerField) {
+          foundName = bookerField.trim();
+          source = 'Booker field';
+        }
+      }
+
+      // Check additional fields that might contain single names
+      if (!foundName) {
+        const additionalFields = [
+          'Name', 'Full Name', 'Customer Name', 'Guest Name', 
+          'Contact Name', 'Traveller', 'Via-Cust'
+        ];
+        
+        for (const field of additionalFields) {
+          const value = guest.ticket_data[field];
+          if (value && typeof value === 'string' && value.trim()) {
+            // Handle Via-Cust field specially (extract name from contact info)
+            if (field === 'Via-Cust' && value.includes('Contact:')) {
+              const contactMatch = value.match(/Contact:\s*([^:]+?):/);
+              if (contactMatch && contactMatch[1]) {
+                foundName = contactMatch[1].trim();
+                source = 'Via-Cust contact';
+                break;
+              }
+            } else {
+              foundName = value.trim();
+              source = field;
+              break;
+            }
+          }
+        }
       }
     }
     
     // Fall back to booker_name if ticket data doesn't have names
-    return guest.booker_name || 'Unknown Guest';
+    if (!foundName && guest.booker_name) {
+      foundName = guest.booker_name.trim();
+      source = 'bookerName';
+    }
+    
+    // Final fallback
+    if (!foundName) {
+      foundName = 'Unknown Guest';
+      source = 'fallback';
+    }
+
+    // Debug logging for single names to help identify issues
+    if (foundName.split(' ').length === 1 && foundName !== 'Unknown Guest') {
+      console.log(`🔍 SINGLE NAME FOUND: "${foundName}" from ${source}`, {
+        guestId: guest.id,
+        bookerName: guest.booker_name,
+        ticketDataKeys: guest.ticket_data ? Object.keys(guest.ticket_data) : [],
+        foundName,
+        source
+      });
+    }
+    
+    return foundName;
   };
 
   const guestName = extractFullName(guest);
