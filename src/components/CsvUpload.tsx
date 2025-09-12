@@ -229,6 +229,52 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     return 0;
   }, []);
 
+  // Helper function to extract guest name from ticket data (for data hygiene)
+  const extractGuestNameFromTicketData = useCallback((ticketData: Record<string, any>): string => {
+    if (!ticketData) return '';
+    
+    // First try to get full name from ticket data
+    const firstName = ticketData['First Name'] || ticketData['first_name'] || '';
+    const lastName = ticketData['Last Name'] || ticketData['last_name'] || '';
+    
+    if (firstName && lastName) {
+      return `${firstName.trim()} ${lastName.trim()}`;
+    } else if (firstName) {
+      return firstName.trim();
+    } else if (lastName) {
+      return lastName.trim();
+    }
+    
+    // If still no name, check additional fields
+    const bookerField = ticketData['Booker'] || ticketData['booker'] || '';
+    if (bookerField) {
+      return bookerField.trim();
+    }
+
+    // Check additional fields that might contain names
+    const additionalFields = [
+      'Name', 'Full Name', 'Customer Name', 'Guest Name', 
+      'Contact Name', 'Traveller', 'Via-Cust'
+    ];
+    
+    for (const field of additionalFields) {
+      const value = ticketData[field];
+      if (value && typeof value === 'string' && value.trim()) {
+        // Handle Via-Cust field specially (extract name from contact info)
+        if (field === 'Via-Cust' && value.includes('Contact:')) {
+          const contactMatch = value.match(/Contact:\s*([^:]+?):/);
+          if (contactMatch && contactMatch[1]) {
+            return contactMatch[1].trim();
+          }
+        } else {
+          return value.trim();
+        }
+      }
+    }
+    
+    return '';
+  }, []);
+
   const processGuestShowTime = useCallback((guest: ProcessedGuest, eventDate?: Date): ProcessedGuest => {
     // If show_time is already populated and valid, keep it
     if (guest.show_time && isValidShowTime(guest.show_time)) {
@@ -333,7 +379,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     }
     
     return guest;
-  }, [calculateTotalQuantityFromTicketData, extractQuantityFromText]);
+  }, [calculateTotalQuantityFromTicketData, extractQuantityFromText, extractGuestNameFromTicketData]);
 
   const processExcelFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
@@ -451,6 +497,15 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             // Process total quantity calculation after all fields are populated
             processedGuest = processGuestTotalQuantity(processedGuest);
             
+            // Data hygiene: populate booker_name from ticket_data if missing
+            if (!processedGuest.booker_name && processedGuest.ticket_data) {
+              const extractedName = extractGuestNameFromTicketData(processedGuest.ticket_data);
+              if (extractedName && extractedName !== 'Unknown Guest') {
+                processedGuest.booker_name = extractedName;
+                console.log(`✅ Data hygiene: Populated booker_name "${extractedName}" from ticket_data for booking ${processedGuest.booking_code}`);
+              }
+            }
+            
             return processedGuest;
           }).filter(guest => 
             guest.booker_name || guest.booking_code || Object.keys(guest.ticket_data || {}).length > 0
@@ -474,7 +529,7 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       reader.onerror = () => reject(new Error('Failed to read Excel file'));
       reader.readAsArrayBuffer(file);
     });
-  }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity]);
+  }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity, extractGuestNameFromTicketData]);
 
   const processCsvFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
@@ -542,6 +597,15 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               
               // Process total quantity calculation after all fields are populated
               processedGuest = processGuestTotalQuantity(processedGuest);
+              
+              // Data hygiene: populate booker_name from ticket_data if missing
+              if (!processedGuest.booker_name && processedGuest.ticket_data) {
+                const extractedName = extractGuestNameFromTicketData(processedGuest.ticket_data);
+                if (extractedName && extractedName !== 'Unknown Guest') {
+                  processedGuest.booker_name = extractedName;
+                  console.log(`✅ Data hygiene: Populated booker_name "${extractedName}" from ticket_data for booking ${processedGuest.booking_code}`);
+                }
+              }
               
               return processedGuest;
             }).filter(guest => guest.booker_name || guest.booking_code);

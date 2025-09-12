@@ -32,7 +32,7 @@ const CheckInSystem = ({
   } = useAuth();
   const [guests, setGuests] = useState<Guest[]>(guestsProp);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFilter, setShowFilter] = useState(showTimes?.[0] || '7pm');
+  const [showFilter, setShowFilter] = useState('all');
   const [checkedInGuests, setCheckedInGuests] = useState<Set<number>>(new Set());
   const [tableAssignments, setTableAssignments] = useState<Map<number, number>>(new Map());
   const [pagerAssignments, setPagerAssignments] = useState<Map<number, number>>(new Map());
@@ -63,10 +63,10 @@ const CheckInSystem = ({
     setGuests(guestsProp);
   }, [guestsProp]);
 
-  // Initialize show filter
+  // Initialize show filter - keep "all" as default unless user has selected something specific
   useEffect(() => {
-    if (showTimes && showTimes.length > 0 && !showTimes.includes(showFilter)) {
-      setShowFilter(showTimes[0]);
+    if (showTimes && showTimes.length > 0 && showFilter !== 'all' && !showTimes.includes(showFilter)) {
+      setShowFilter('all');
     }
   }, [showTimes, showFilter]);
 
@@ -1652,7 +1652,7 @@ const CheckInSystem = ({
     setPartyGroups(newPartyGroups);
   }, [processFriendshipGroups, guests]);
 
-  // Group bookings by booking code - preserve original order
+  // Group bookings by booking code - preserve original order, derive names when missing
   const groupedBookings = useMemo(() => {
     if (!guests || guests.length === 0) return [];
     
@@ -1662,16 +1662,30 @@ const CheckInSystem = ({
     guests.forEach((guest, index) => {
       if (processedIndices.has(index) || !guest) return;
       const bookingCode = guest.booking_code;
-      const bookerName = guest.booker_name;
-      if (!bookingCode || !bookerName) return;
       
+      // Skip if no booking code at all
+      if (!bookingCode) return;
+      
+      // Get display name - use enhanced extraction if booker_name is missing
+      const displayName = guest.booker_name || extractGuestName('', guest.ticket_data);
+      
+      // Skip if we can't get any name at all
+      if (!displayName || displayName === 'Unknown Guest') return;
+      
+      // Find all guests with the same booking code
       const relatedBookings = guests.map((g, i) => ({
         guest: g,
         index: i
       })).filter(({
         guest: g,
         index: i
-      }) => !processedIndices.has(i) && g && g.booking_code === bookingCode && g.booker_name === bookerName);
+      }) => {
+        if (processedIndices.has(i) || !g || g.booking_code !== bookingCode) return false;
+        
+        // For grouping, also check if the display names match
+        const guestDisplayName = g.booker_name || extractGuestName('', g.ticket_data);
+        return guestDisplayName === displayName;
+      });
       
       if (relatedBookings.length > 0) {
         // Separate main booking from add-ons based on item type patterns
@@ -1734,12 +1748,43 @@ const CheckInSystem = ({
   const filteredBookings = useMemo(() => {
     return groupedBookings.filter(booking => {
       if (!booking?.mainBooking) return false;
-      const matchesSearch = searchTerm === '' || extractGuestName(booking.mainBooking.booker_name || '', booking.mainBooking.ticket_data).toLowerCase().includes(searchTerm.toLowerCase());
-      const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
-      // If guest has no show time and we're filtering by a specific time, include them
-      // If showFilter is 'all' or empty, include all guests
-      // If guest has show time and it matches filter, include them
-      const matchesShow = showFilter === 'all' || showFilter === '' || guestShowTime === '' || guestShowTime === showFilter;
+      
+      // Enhanced search: check main guest name and add-on names
+      let matchesSearch = false;
+      if (searchTerm === '') {
+        matchesSearch = true;
+      } else {
+        const searchLower = searchTerm.toLowerCase();
+        // Check main guest name
+        const mainGuestName = extractGuestName(booking.mainBooking.booker_name || '', booking.mainBooking.ticket_data);
+        if (mainGuestName.toLowerCase().includes(searchLower)) {
+          matchesSearch = true;
+        }
+        
+        // Check add-on guest names
+        if (!matchesSearch && booking.addOns) {
+          for (const addOn of booking.addOns) {
+            const addOnName = extractGuestName(addOn.booker_name || '', addOn.ticket_data);
+            if (addOnName.toLowerCase().includes(searchLower)) {
+              matchesSearch = true;
+              break;
+            }
+          }
+        }
+        
+        // Also check booking code
+        if (!matchesSearch && booking.mainBooking.booking_code && booking.mainBooking.booking_code.toLowerCase().includes(searchLower)) {
+          matchesSearch = true;
+        }
+      }
+      
+      // Show time filter: if user is searching, ignore show time filter for better UX
+      const matchesShow = searchTerm !== '' || showFilter === 'all' || showFilter === '' || 
+        (() => {
+          const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
+          return guestShowTime === '' || guestShowTime === showFilter;
+        })();
+        
       return matchesSearch && matchesShow;
     });
   }, [groupedBookings, searchTerm, showFilter]);
