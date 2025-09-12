@@ -871,23 +871,98 @@ const CheckInSystem = ({
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
-    // Debug logging for Norman specifically
-    if (guest.booker_name?.toLowerCase().includes('norman')) {
-      console.log(`🔍 Norman Guest Count Debug:`, {
+    // Debug logging for Jack Priestley specifically
+    if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
+      console.log(`🔍 Jack Priestley Debug:`, {
         bookerName: guest.booker_name,
         bookingCode: guest.booking_code,
         totalGuestCountParam: totalGuestCount,
         guestTotalQuantity: guest.total_quantity,
         finalGuestCount: guestCount,
-        itemDetails: guest.item_details
+        itemDetails: guest.item_details,
+        ticketDataItem: guest.ticket_data?.Item
       });
     }
     
     // Check for addon orders from booking group - we'll add these at the end
     const addonItems = extractAddonOrders(guest, addOnGuests);
     
-    // First: Detect Smoke Offer across the whole booking group (main + add-ons)
+    // PRIORITY 1: Use proper ticket type mapping system for all guests including Smoke Offer
     const allGuestsInGroup = [guest, ...addOnGuests];
+    const allTickets = getAllTicketTypes(guest);
+    
+    // Debug logging for Jack Priestley's ticket detection
+    if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
+      console.log(`🎫 Jack Priestley Tickets Detected:`, allTickets);
+    }
+    
+    if (allTickets.length > 0) {
+      let totalDrinks = 0;
+      let totalPizza = 0;
+      let totalProsecco = 0;
+      const drinkTypes: string[] = [];
+      
+      allTickets.forEach(({ type, quantity }) => {
+        const mapping = TICKET_TYPE_MAPPING[type];
+        if (mapping) {
+          if (mapping.drinks) {
+            const calculatedQuantity = mapping.calculationMethod === 'per-person' 
+              ? quantity * guestCount * mapping.drinks.quantity
+              : quantity * mapping.drinks.quantity;
+            totalDrinks += calculatedQuantity;
+            if (!drinkTypes.includes(mapping.drinks.type)) {
+              drinkTypes.push(mapping.drinks.type);
+            }
+          }
+          if (mapping.pizza) {
+            const calculatedQuantity = mapping.calculationMethod === 'per-person'
+              ? quantity * guestCount * mapping.pizza.quantity
+              : quantity * mapping.pizza.quantity;
+            totalPizza += calculatedQuantity;
+          }
+          if (mapping.prosecco) {
+            const calculatedQuantity = mapping.calculationMethod === 'per-person'
+              ? quantity * guestCount * mapping.prosecco.quantity
+              : quantity * mapping.prosecco.quantity;
+            totalProsecco += calculatedQuantity;
+          }
+          
+          // Debug for Jack Priestley
+          if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
+            console.log(`🎫 Jack Priestley Ticket Mapping: ${type}`, {
+              mapping,
+              quantity,
+              guestCount,
+              calculatedDrinks: mapping.drinks ? (mapping.calculationMethod === 'per-person' ? quantity * guestCount * mapping.drinks.quantity : quantity * mapping.drinks.quantity) : 0
+            });
+          }
+        }
+      });
+      
+      // Build order summary from calculated amounts
+      if (totalDrinks > 0) {
+        orderItems.push(`${totalDrinks} Drink${totalDrinks > 1 ? 's' : ''}`);
+      }
+      if (totalPizza > 0) {
+        orderItems.push(`${totalPizza} Pizza${totalPizza > 1 ? 's' : ''}`);
+      }
+      if (totalProsecco > 0) {
+        orderItems.push(`${totalProsecco} Prosecco${totalProsecco > 1 ? 's' : ''}`);
+      }
+      
+      // Add any additional add-ons (House Cocktails, etc.)
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
+      
+      if (orderItems.length > 0) {
+        const result = orderItems.join(', ');
+        console.log(`✅ Using ticket mapping for ${guest.booker_name}: ${result}`);
+        return result;
+      }
+    }
+    
+    // FALLBACK: Simple text-based Smoke Offer detection (only if ticket mapping failed)
     const hasSmokeOffer = allGuestsInGroup.some(g => {
       const itemDetails = g.item_details || '';
       const ticketItem = g.ticket_data?.Item || '';
@@ -899,7 +974,7 @@ const CheckInSystem = ({
       // Calculate drinks based on per-person for Smoke Offer
       const smokeOfferDrinks = guestCount;
       orderItems.push(`${smokeOfferDrinks} Drink${smokeOfferDrinks > 1 ? 's' : ''}`);
-      console.log(`🚬 Smoke Offer detected for ${guest.booker_name}: ${smokeOfferDrinks} drinks`);
+      console.log(`🚬 Fallback Smoke Offer detected for ${guest.booker_name}: ${smokeOfferDrinks} drinks`);
       
       // Add any additional add-ons (House Cocktails, etc.)
       if (addonItems.length > 0) {
@@ -1257,13 +1332,37 @@ const CheckInSystem = ({
       const ticketItem = guest.ticket_data?.Item || '';
       const allItemText = `${itemDetails} ${ticketItem}`.toLowerCase();
       
-      // Check against known ticket type mappings (case-insensitive)
+      // Debug logging for Jack Priestley specifically
+      if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
+        console.log(`🔍 Jack Priestley Ticket Type Detection:`, {
+          itemDetails,
+          ticketItem,
+          allItemText,
+          availableTicketTypes: Object.keys(TICKET_TYPE_MAPPING)
+        });
+      }
+      
+      // Check against known ticket type mappings (case-insensitive with enhanced matching)
       Object.keys(TICKET_TYPE_MAPPING).forEach(ticketType => {
         const ticketTypeLower = ticketType.toLowerCase();
-        // Handle partial matches for Smoke Offer variations
-        const isMatch = ticketTypeLower.includes('smoke offer') 
-          ? allItemText.includes('smoke offer') 
-          : allItemText.includes(ticketTypeLower);
+        
+        // Enhanced matching for Smoke Offer variations
+        let isMatch = false;
+        if (ticketTypeLower.includes('smoke offer')) {
+          // More flexible matching for Smoke Offer ticket types
+          isMatch = allItemText.includes('smoke offer') && 
+                   (allItemText.includes('drink') || allItemText.includes('drinks'));
+          
+          // If it's the exact match for the minimum x2 people version, ensure it matches specifically
+          if (ticketType === 'Smoke Offer Ticket & 1x Drink (minimum x2 people)') {
+            isMatch = allItemText.includes('smoke offer') && 
+                     allItemText.includes('drink') && 
+                     (allItemText.includes('minimum') || allItemText.includes('x2'));
+          }
+        } else {
+          // Standard case-insensitive matching for other ticket types
+          isMatch = allItemText.includes(ticketTypeLower);
+        }
         
         if (isMatch) {
           // Use guest.total_quantity for quantity when found in item text
@@ -1280,6 +1379,11 @@ const CheckInSystem = ({
               quantity
             });
             console.log(`🔍 Found ticket type "${ticketType}" in item text for ${guest.booker_name}`);
+            
+            // Debug for Jack Priestley specifically
+            if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
+              console.log(`✅ Jack Priestley Matched Ticket Type: "${ticketType}" with quantity ${quantity}`);
+            }
           }
         }
       });
