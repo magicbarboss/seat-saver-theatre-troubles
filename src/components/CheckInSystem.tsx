@@ -1094,8 +1094,8 @@ const CheckInSystem = ({
       return "Viator";
     }
 
-    // Step 4: Check if guest has explicit ticket mappings FIRST
-    const tickets = getAllTicketTypes(guest);
+    // Step 4: Check if booking group has explicit ticket mappings FIRST
+    const tickets = getAllTicketTypesFromGroup(guest, addOnGuests);
     const hasExplicitMapping = tickets.some(ticket => TICKET_TYPE_MAPPING[ticket.type]);
     
     if (hasExplicitMapping) {
@@ -1294,35 +1294,51 @@ const CheckInSystem = ({
     type: string;
     quantity: number;
   }> => {
-    // Try main guest first
-    const mainTickets = getAllTicketTypes(mainGuest);
-    if (mainTickets.length > 0) {
-      console.log(`✅ Using tickets from main booking for ${mainGuest.booker_name}`);
+    // Helper: detect pure add-on items (not main packages)
+    const isPureAddon = (name: string) => {
+      const n = name.trim().toLowerCase();
+      return /^(house\s*cocktails?|cocktails?|house\s*pints?|pints?|beer|beers|wine|wines|prosecco)$/.test(n);
+    };
+
+    // Helper: does a mapped ticket add anything beyond show-only?
+    const isNonShowPackage = (type: string) => {
+      const info = TICKET_TYPE_MAPPING[type];
+      if (!info) return false;
+      return !!(info.drinks || info.pizza || info.prosecco || info.fries || (info.extras && info.extras.length));
+    };
+
+    // Try main guest first, but ignore pure add-ons
+    const mainTicketsRaw = getAllTicketTypes(mainGuest);
+    const mainTickets = mainTicketsRaw.filter(t => !isPureAddon(t.type));
+
+    // If main has any non-show package, use it
+    const mainHasNonShow = mainTickets.some(t => isNonShowPackage(t.type));
+    if (mainHasNonShow) {
+      console.log(`✅ Using non-show package from main booking for ${mainGuest.booker_name}: ${mainTickets.map(t => t.type).join(', ')}`);
       return mainTickets;
     }
-    
-    // If no tickets on main, check add-ons but exclude pure add-on items
+
+    // Otherwise inspect add-ons, prefer any non-show packages there
+    const addOnAggregated: { type: string; quantity: number }[] = [];
     for (const addOn of addOnGuests) {
-      const addOnTickets = getAllTicketTypes(addOn);
-      const validTickets = addOnTickets.filter(ticket => {
-        // Exclude pure add-on items like House Cocktail
-        const ticketType = ticket.type.toLowerCase();
-        return !ticketType.includes('house cocktail') &&
-               !ticketType.includes('cocktail') &&
-               !ticketType.includes('wine') &&
-               !ticketType.includes('beer') &&
-               !ticketType.includes('prosecco');
-      });
-      
-      if (validTickets.length > 0) {
-        console.log(`✅ Using tickets from add-on for ${mainGuest.booker_name}: ${validTickets.map(t => t.type).join(', ')}`);
-        return validTickets;
-      }
+      const addOnTickets = getAllTicketTypes(addOn).filter(t => !isPureAddon(t.type));
+      addOnAggregated.push(...addOnTickets);
     }
-    
+
+    const addOnNonShow = addOnAggregated.filter(t => isNonShowPackage(t.type));
+    if (addOnNonShow.length > 0) {
+      console.log(`✅ Using tickets from add-on for ${mainGuest.booker_name}: ${addOnNonShow.map(t => t.type).join(', ')}`);
+      return addOnNonShow;
+    }
+
+    // If nothing better, return any remaining main tickets (might be show-only) or empty
+    if (mainTickets.length > 0) {
+      console.log(`ℹ️ Falling back to main show-only tickets for ${mainGuest.booker_name}: ${mainTickets.map(t => t.type).join(', ')}`);
+      return mainTickets;
+    }
+
     return [];
   };
-
   // Get all ticket types for a guest - improved parsing logic
   const getAllTicketTypes = (guest: Guest): Array<{
     type: string;
