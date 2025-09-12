@@ -888,8 +888,7 @@ const CheckInSystem = ({
     const addonItems = extractAddonOrders(guest, addOnGuests);
     
     // PRIORITY 1: Use proper ticket type mapping system for all guests including Smoke Offer
-    const allGuestsInGroup = [guest, ...addOnGuests];
-    const allTickets = getAllTicketTypes(guest);
+    const allTickets = getAllTicketTypesFromGroup(guest, addOnGuests);
     
     // Debug logging for Jack Priestley's ticket detection
     if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
@@ -963,6 +962,7 @@ const CheckInSystem = ({
     }
     
     // FALLBACK: Simple text-based Smoke Offer detection (only if ticket mapping failed)
+    const allGuestsInGroup = [guest, ...addOnGuests];
     const hasSmokeOffer = allGuestsInGroup.some(g => {
       const itemDetails = g.item_details || '';
       const ticketItem = g.ticket_data?.Item || '';
@@ -1287,6 +1287,40 @@ const CheckInSystem = ({
         details
       };
     });
+  };
+
+  // Get all ticket types from a booking group (main guest + add-ons)
+  const getAllTicketTypesFromGroup = (mainGuest: Guest, addOnGuests: Guest[]): Array<{
+    type: string;
+    quantity: number;
+  }> => {
+    // Try main guest first
+    const mainTickets = getAllTicketTypes(mainGuest);
+    if (mainTickets.length > 0) {
+      console.log(`✅ Using tickets from main booking for ${mainGuest.booker_name}`);
+      return mainTickets;
+    }
+    
+    // If no tickets on main, check add-ons but exclude pure add-on items
+    for (const addOn of addOnGuests) {
+      const addOnTickets = getAllTicketTypes(addOn);
+      const validTickets = addOnTickets.filter(ticket => {
+        // Exclude pure add-on items like House Cocktail
+        const ticketType = ticket.type.toLowerCase();
+        return !ticketType.includes('house cocktail') &&
+               !ticketType.includes('cocktail') &&
+               !ticketType.includes('wine') &&
+               !ticketType.includes('beer') &&
+               !ticketType.includes('prosecco');
+      });
+      
+      if (validTickets.length > 0) {
+        console.log(`✅ Using tickets from add-on for ${mainGuest.booker_name}: ${validTickets.map(t => t.type).join(', ')}`);
+        return validTickets;
+      }
+    }
+    
+    return [];
   };
 
   // Get all ticket types for a guest - improved parsing logic
