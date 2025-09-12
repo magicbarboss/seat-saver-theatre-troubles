@@ -438,6 +438,50 @@ const CheckInSystem = ({
     return '';
   };
 
+  // Helper function to consolidate duplicate order items
+  const consolidateOrderItems = (items: string[]): string => {
+    const itemCounts: Record<string, number> = {};
+    
+    items.forEach(item => {
+      // Extract quantity and item name from strings like "2 Pizzas" or "1 Pizza"
+      const match = item.match(/^(\d+)\s+(.+)$/);
+      if (match) {
+        const quantity = parseInt(match[1]);
+        let itemName = match[2];
+        
+        // Normalize plural/singular forms
+        const normalizedName = itemName.toLowerCase().replace(/s$/, '');
+        const displayName = normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
+        
+        if (itemCounts[displayName]) {
+          itemCounts[displayName] += quantity;
+        } else {
+          itemCounts[displayName] = quantity;
+        }
+      } else {
+        // Handle items without quantities
+        if (itemCounts[item]) {
+          itemCounts[item]++;
+        } else {
+          itemCounts[item] = 1;
+        }
+      }
+    });
+    
+    // Build consolidated string
+    const consolidated = Object.entries(itemCounts).map(([item, count]) => {
+      if (item.match(/^[A-Z]/)) {
+        // Items with quantities
+        return count > 1 ? `${count} ${item}s` : `${count} ${item}`;
+      } else {
+        // Items without quantities
+        return count > 1 ? `${count} ${item}` : item;
+      }
+    });
+    
+    return consolidated.join(', ');
+  };
+
   // Enhanced ticket type mapping with calculation method support
   const TICKET_TYPE_MAPPING: Record<string, {
     calculationMethod: 'per-ticket' | 'per-person';
@@ -471,7 +515,7 @@ const CheckInSystem = ({
       }
     },
     'House Magicians Show Ticket includes 2 Drinks +  1 Pizza': {
-      calculationMethod: 'per-person',
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'drinks',
         quantity: 2
@@ -487,7 +531,7 @@ const CheckInSystem = ({
       }
     },
     'House Magicians Show Ticket includes 2 Drinks + 1 Pizza': {
-      calculationMethod: 'per-person',
+      calculationMethod: 'per-ticket',
       drinks: {
         type: 'drinks',
         quantity: 2
@@ -1126,8 +1170,11 @@ const CheckInSystem = ({
         if (addonItems.length > 0) {
           orderItems.push(...addonItems);
         }
-        console.log(`✅ Explicit mapping result for ${guest.booker_name}: ${orderItems.join(', ')}`);
-        return orderItems.join(', ');
+        
+        // Consolidate duplicate items
+        const consolidated = consolidateOrderItems(orderItems);
+        console.log(`✅ Explicit mapping result for ${guest.booker_name}: ${consolidated}`);
+        return consolidated;
       }
     }
 
