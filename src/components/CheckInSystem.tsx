@@ -872,10 +872,10 @@ const CheckInSystem = ({
     return 'prosecco-package';
   };
 
-  // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
+  // Generate per-guest order summary - no group aggregation to avoid double-counting
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
     const timestamp = new Date().toISOString();
-    console.log(`🚀 [${timestamp}] getOrderSummary called for ${guest.booker_name} (${guest.booking_code}) with totalGuestCount=${totalGuestCount}, addOns=${addOnGuests.length}`);
+    console.log(`🚀 [${timestamp}] getOrderSummary called for ${guest.booker_name} (${guest.booking_code}) - SINGLE GUEST ONLY`);
     
     // Check for staff updated order first - highest priority
     console.log(`🔍 ORDER SUMMARY DEBUG for ${guest.booker_name}: staff_updated_order = "${guest.staff_updated_order}"`);
@@ -1084,8 +1084,8 @@ const CheckInSystem = ({
       return "Viator";
     }
 
-    // Step 4: Check if booking group has explicit ticket mappings FIRST
-    const tickets = getAllTicketTypesFromGroup(guest, addOnGuests);
+    // Step 4: Check if individual guest has explicit ticket mappings FIRST (no group aggregation)
+    const tickets = getAllTicketTypes(guest);
     const hasExplicitMapping = tickets.some(ticket => TICKET_TYPE_MAPPING[ticket.type]);
     
     if (hasExplicitMapping) {
@@ -1334,44 +1334,17 @@ const CheckInSystem = ({
       return Array.from(byType.entries()).map(([type, quantity]) => ({ type, quantity }));
     };
 
-    // Collect all tickets from main and add-ons, excluding pure add-ons
-    const allTickets: Array<{type: string; quantity: number}> = [];
-    
-    // Add main guest tickets (excluding pure add-ons)
-    const mainTicketsRaw = getAllTicketTypes(mainGuest);
-    const mainTickets = mainTicketsRaw.filter(t => !isPureAddon(t.type));
-    allTickets.push(...mainTickets);
-
-    // Add add-on tickets (numeric-only, no text fallback) to avoid double-counting text labels
-    for (const addOn of addOnGuests) {
-      const addOnTickets = getAllTicketTypes(addOn, { allowTextFallback: false }).filter(t => !isPureAddon(t.type));
-      allTickets.push(...addOnTickets);
-    }
-
-    // Consolidate to prevent double-counting
-    const consolidated = consolidateTickets(allTickets);
+    // Get tickets for THIS GUEST ONLY - no group aggregation
+    const guestTicketsRaw = getAllTicketTypes(mainGuest);
+    const guestTickets = guestTicketsRaw.filter(t => !isPureAddon(t.type));
 
     // Debug logging for problematic bookings
-    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825'];
+    const debugBookings = ['NJGQ-280825', 'JBCC-030925', 'SGQR-090925', 'QRLC-060925', 'ZGNF-060925'];
     if (debugBookings.includes(mainGuest.booking_code)) {
-      console.log(`🔍 ${mainGuest.booking_code} tickets before consolidation:`, allTickets);
-      console.log(`🔍 ${mainGuest.booking_code} tickets after consolidation:`, consolidated);
+      console.log(`🔍 ${mainGuest.booking_code} (${mainGuest.booker_name}) individual tickets:`, guestTickets);
     }
 
-    // Prefer non-show packages if available
-    const nonShowTickets = consolidated.filter(t => isNonShowPackage(t.type));
-    if (nonShowTickets.length > 0) {
-      console.log(`✅ Using non-show packages for ${mainGuest.booker_name}: ${nonShowTickets.map(t => t.type).join(', ')}`);
-      return nonShowTickets;
-    }
-
-    // Otherwise return all consolidated tickets (might be show-only)
-    if (consolidated.length > 0) {
-      console.log(`ℹ️ Using consolidated tickets for ${mainGuest.booker_name}: ${consolidated.map(t => t.type).join(', ')}`);
-      return consolidated;
-    }
-
-    return [];
+    return guestTickets;
   };
   // Get all ticket types for a guest - improved parsing logic
   const getAllTicketTypes = (guest: Guest, opts?: { allowTextFallback?: boolean }): Array<{
