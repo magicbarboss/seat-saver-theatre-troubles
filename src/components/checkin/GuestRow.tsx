@@ -237,13 +237,24 @@ export const GuestRow = ({
                      'Add-on Item';
       
       // Filter out main package items that shouldn't be add-ons
-      const mainPackagePatterns = ['magic show', 'comedy', 'show ['];
+      const mainPackagePatterns = [
+        'magic show',
+        'comedy',
+        'show [',
+        'show ticket',
+        'magicians show ticket',
+        'adult show ticket',
+        'includes 2 drinks',
+        '& 1 pizza',
+        '& 2 drinks'
+      ];
+      const itemNameLower = itemName.toLowerCase();
       const isMainPackage = mainPackagePatterns.some(pattern => 
-        itemName.toLowerCase().includes(pattern.toLowerCase())
+        itemNameLower.includes(pattern)
       );
       
       if (isMainPackage) {
-        return; // Skip main package items from add-ons display
+        return; // Skip package-type items from add-ons display
       }
       
       // Clean up item name - remove show times and extra details

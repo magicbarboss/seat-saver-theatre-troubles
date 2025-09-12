@@ -1342,9 +1342,9 @@ const CheckInSystem = ({
     const mainTickets = mainTicketsRaw.filter(t => !isPureAddon(t.type));
     allTickets.push(...mainTickets);
 
-    // Add add-on tickets (excluding pure add-ons)
+    // Add add-on tickets (numeric-only, no text fallback) to avoid double-counting text labels
     for (const addOn of addOnGuests) {
-      const addOnTickets = getAllTicketTypes(addOn).filter(t => !isPureAddon(t.type));
+      const addOnTickets = getAllTicketTypes(addOn, { allowTextFallback: false }).filter(t => !isPureAddon(t.type));
       allTickets.push(...addOnTickets);
     }
 
@@ -1374,7 +1374,7 @@ const CheckInSystem = ({
     return [];
   };
   // Get all ticket types for a guest - improved parsing logic
-  const getAllTicketTypes = (guest: Guest): Array<{
+  const getAllTicketTypes = (guest: Guest, opts?: { allowTextFallback?: boolean }): Array<{
     type: string;
     quantity: number;
   }> => {
@@ -1446,7 +1446,7 @@ const CheckInSystem = ({
     }
 
     // Fourth try: scan item_details and ticket_data.Item for known ticket types if still nothing
-    if (tickets.length === 0) {
+    if (tickets.length === 0 && (opts?.allowTextFallback ?? true)) {
       const itemDetails = guest.item_details || '';
       const ticketItem = guest.ticket_data?.Item || '';
       const allItemText = `${itemDetails} ${ticketItem}`.toLowerCase();
