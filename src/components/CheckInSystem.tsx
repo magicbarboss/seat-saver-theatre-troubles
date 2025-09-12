@@ -889,7 +889,7 @@ const CheckInSystem = ({
     
     // Debug logs for specific problematic bookings
     const bookingCode = guest.booking_code;
-    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825'];
     if (debugBookings.includes(bookingCode)) {
       console.log(`🔍 DEBUG ${bookingCode} (${guest.booker_name}): guestCount=${guestCount}, addonItems=${JSON.stringify(addonItems)}`);
     }
@@ -1035,7 +1035,7 @@ const CheckInSystem = ({
       console.log("✅ Using Explicit Ticket Mapping Path for", guest.booker_name);
       
       // Debug logging for problematic bookings
-      const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+      const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825'];
       if (debugBookings.includes(guest.booking_code)) {
         console.log(`🔍 ${guest.booking_code} processing tickets:`, tickets);
       }
@@ -1290,7 +1290,7 @@ const CheckInSystem = ({
     const consolidated = consolidateTickets(allTickets);
 
     // Debug logging for problematic bookings
-    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825'];
     if (debugBookings.includes(mainGuest.booking_code)) {
       console.log(`🔍 ${mainGuest.booking_code} tickets before consolidation:`, allTickets);
       console.log(`🔍 ${mainGuest.booking_code} tickets after consolidation:`, consolidated);
