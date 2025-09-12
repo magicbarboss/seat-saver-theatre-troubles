@@ -887,78 +887,11 @@ const CheckInSystem = ({
     // Check for addon orders from booking group - we'll add these at the end
     const addonItems = extractAddonOrders(guest, addOnGuests);
     
-    // PRIORITY 1: Use proper ticket type mapping system for all guests including Smoke Offer
-    const allTickets = getAllTicketTypesFromGroup(guest, addOnGuests);
-    
-    // Debug logging for Jack Priestley's ticket detection
-    if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
-      console.log(`🎫 Jack Priestley Tickets Detected:`, allTickets);
-    }
-    
-    if (allTickets.length > 0) {
-      let totalDrinks = 0;
-      let totalPizza = 0;
-      let totalProsecco = 0;
-      const drinkTypes: string[] = [];
-      
-      allTickets.forEach(({ type, quantity }) => {
-        const mapping = TICKET_TYPE_MAPPING[type];
-        if (mapping) {
-          if (mapping.drinks) {
-            const calculatedQuantity = mapping.calculationMethod === 'per-person' 
-              ? quantity * guestCount * mapping.drinks.quantity
-              : quantity * mapping.drinks.quantity;
-            totalDrinks += calculatedQuantity;
-            if (!drinkTypes.includes(mapping.drinks.type)) {
-              drinkTypes.push(mapping.drinks.type);
-            }
-          }
-          if (mapping.pizza) {
-            const calculatedQuantity = mapping.calculationMethod === 'per-person'
-              ? quantity * guestCount * mapping.pizza.quantity
-              : quantity * mapping.pizza.quantity;
-            totalPizza += calculatedQuantity;
-          }
-          if (mapping.prosecco) {
-            const calculatedQuantity = mapping.calculationMethod === 'per-person'
-              ? quantity * guestCount * mapping.prosecco.quantity
-              : quantity * mapping.prosecco.quantity;
-            totalProsecco += calculatedQuantity;
-          }
-          
-          // Debug for Jack Priestley
-          if (guest.booker_name?.toLowerCase().includes('jack') && guest.booker_name?.toLowerCase().includes('priestley')) {
-            console.log(`🎫 Jack Priestley Ticket Mapping: ${type}`, {
-              mapping,
-              quantity,
-              guestCount,
-              calculatedDrinks: mapping.drinks ? (mapping.calculationMethod === 'per-person' ? quantity * guestCount * mapping.drinks.quantity : quantity * mapping.drinks.quantity) : 0
-            });
-          }
-        }
-      });
-      
-      // Build order summary from calculated amounts
-      if (totalDrinks > 0) {
-        orderItems.push(`${totalDrinks} Drink${totalDrinks > 1 ? 's' : ''}`);
-      }
-      if (totalPizza > 0) {
-        orderItems.push(`${totalPizza} Pizza${totalPizza > 1 ? 's' : ''}`);
-      }
-      if (totalProsecco > 0) {
-        orderItems.push(`${totalProsecco} Prosecco${totalProsecco > 1 ? 's' : ''}`);
-      }
-      
-      // Add any additional add-ons (House Cocktails, etc.)
-      if (addonItems.length > 0) {
-        orderItems.push(...addonItems);
-      }
-      
-      if (orderItems.length > 0) {
-        const result = orderItems.join(', ');
-        console.log(`✅ Using ticket mapping for ${guest.booker_name}: ${result}`);
-        return result;
-      }
+    // Debug logs for specific problematic bookings
+    const bookingCode = guest.booking_code;
+    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+    if (debugBookings.includes(bookingCode)) {
+      console.log(`🔍 DEBUG ${bookingCode} (${guest.booker_name}): guestCount=${guestCount}, addonItems=${JSON.stringify(addonItems)}`);
     }
     
     // FALLBACK: Simple text-based Smoke Offer detection (only if ticket mapping failed)
@@ -1101,10 +1034,20 @@ const CheckInSystem = ({
     if (hasExplicitMapping) {
       console.log("✅ Using Explicit Ticket Mapping Path for", guest.booker_name);
       
+      // Debug logging for problematic bookings
+      const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+      if (debugBookings.includes(guest.booking_code)) {
+        console.log(`🔍 ${guest.booking_code} processing tickets:`, tickets);
+      }
+      
       // Process tickets using structured TICKET_TYPE_MAPPING with exact matching
       tickets.forEach(ticket => {
         const packageInfo = TICKET_TYPE_MAPPING[ticket.type];
         const ticketCount = ticket.quantity;
+        
+        if (debugBookings.includes(guest.booking_code)) {
+          console.log(`🔍 ${guest.booking_code} ticket ${ticket.type}: quantity=${ticketCount}, guestCount=${guestCount}, calculationMethod=${packageInfo?.calculationMethod}`);
+        }
         
         if (packageInfo) {
           // Calculate drinks
@@ -1119,6 +1062,10 @@ const CheckInSystem = ({
             if (quantity > 0) {
               const drinkName = packageInfo.drinks.type;
               orderItems.push(`${quantity} ${drinkName}${quantity > 1 && !drinkName.toLowerCase().endsWith('s') ? 's' : ''}`);
+              
+              if (debugBookings.includes(guest.booking_code)) {
+                console.log(`🔍 ${guest.booking_code} added drinks: ${quantity} ${drinkName}`);
+              }
             }
           }
           
@@ -1307,34 +1254,59 @@ const CheckInSystem = ({
       return !!(info.drinks || info.pizza || info.prosecco || info.fries || (info.extras && info.extras.length));
     };
 
-    // Try main guest first, but ignore pure add-ons
+    // Helper: consolidate tickets to prevent double-counting
+    const consolidateTickets = (tickets: Array<{type: string; quantity: number}>) => {
+      const byType = new Map<string, number>();
+      for (const t of tickets) {
+        const info = TICKET_TYPE_MAPPING[t.type];
+        if (!info) continue;
+        
+        if (info.calculationMethod === 'per-person') {
+          // For per-person packages, only keep one entry per type
+          if (!byType.has(t.type)) byType.set(t.type, 1);
+        } else {
+          // For per-ticket packages, sum quantities
+          byType.set(t.type, (byType.get(t.type) || 0) + t.quantity);
+        }
+      }
+      return Array.from(byType.entries()).map(([type, quantity]) => ({ type, quantity }));
+    };
+
+    // Collect all tickets from main and add-ons, excluding pure add-ons
+    const allTickets: Array<{type: string; quantity: number}> = [];
+    
+    // Add main guest tickets (excluding pure add-ons)
     const mainTicketsRaw = getAllTicketTypes(mainGuest);
     const mainTickets = mainTicketsRaw.filter(t => !isPureAddon(t.type));
+    allTickets.push(...mainTickets);
 
-    // If main has any non-show package, use it
-    const mainHasNonShow = mainTickets.some(t => isNonShowPackage(t.type));
-    if (mainHasNonShow) {
-      console.log(`✅ Using non-show package from main booking for ${mainGuest.booker_name}: ${mainTickets.map(t => t.type).join(', ')}`);
-      return mainTickets;
-    }
-
-    // Otherwise inspect add-ons, prefer any non-show packages there
-    const addOnAggregated: { type: string; quantity: number }[] = [];
+    // Add add-on tickets (excluding pure add-ons)
     for (const addOn of addOnGuests) {
       const addOnTickets = getAllTicketTypes(addOn).filter(t => !isPureAddon(t.type));
-      addOnAggregated.push(...addOnTickets);
+      allTickets.push(...addOnTickets);
     }
 
-    const addOnNonShow = addOnAggregated.filter(t => isNonShowPackage(t.type));
-    if (addOnNonShow.length > 0) {
-      console.log(`✅ Using tickets from add-on for ${mainGuest.booker_name}: ${addOnNonShow.map(t => t.type).join(', ')}`);
-      return addOnNonShow;
+    // Consolidate to prevent double-counting
+    const consolidated = consolidateTickets(allTickets);
+
+    // Debug logging for problematic bookings
+    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725'];
+    if (debugBookings.includes(mainGuest.booking_code)) {
+      console.log(`🔍 ${mainGuest.booking_code} tickets before consolidation:`, allTickets);
+      console.log(`🔍 ${mainGuest.booking_code} tickets after consolidation:`, consolidated);
     }
 
-    // If nothing better, return any remaining main tickets (might be show-only) or empty
-    if (mainTickets.length > 0) {
-      console.log(`ℹ️ Falling back to main show-only tickets for ${mainGuest.booker_name}: ${mainTickets.map(t => t.type).join(', ')}`);
-      return mainTickets;
+    // Prefer non-show packages if available
+    const nonShowTickets = consolidated.filter(t => isNonShowPackage(t.type));
+    if (nonShowTickets.length > 0) {
+      console.log(`✅ Using non-show packages for ${mainGuest.booker_name}: ${nonShowTickets.map(t => t.type).join(', ')}`);
+      return nonShowTickets;
+    }
+
+    // Otherwise return all consolidated tickets (might be show-only)
+    if (consolidated.length > 0) {
+      console.log(`ℹ️ Using consolidated tickets for ${mainGuest.booker_name}: ${consolidated.map(t => t.type).join(', ')}`);
+      return consolidated;
     }
 
     return [];
