@@ -1728,6 +1728,17 @@ const CheckInSystem = ({
             }
           });
           
+          // Show time inheritance: ensure add-ons inherit show time from main booking
+          const mainShowTime = mainBooking.guest.show_time;
+          if (mainShowTime) {
+            deduplicatedAddOns.forEach(addon => {
+              if (!addon.guest.show_time || addon.guest.show_time !== mainShowTime) {
+                addon.guest.show_time = mainShowTime;
+                console.log(`🔗 Inherited show time "${mainShowTime}" from main booking to add-on: ${addon.guest.item_details}`);
+              }
+            });
+          }
+          
           bookingGroups.push({
             mainBooking: mainBooking.guest,
             addOns: deduplicatedAddOns.map(rb => rb.guest),

@@ -233,43 +233,59 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
   const extractGuestNameFromTicketData = useCallback((ticketData: Record<string, any>): string => {
     if (!ticketData) return '';
     
-    // First try to get full name from ticket data
+    // Enhanced name extraction - prioritize full names over partial names
     const firstName = ticketData['First Name'] || ticketData['first_name'] || '';
     const lastName = ticketData['Last Name'] || ticketData['last_name'] || '';
     
     if (firstName && lastName) {
       return `${firstName.trim()} ${lastName.trim()}`;
-    } else if (firstName) {
-      return firstName.trim();
-    } else if (lastName) {
-      return lastName.trim();
     }
     
-    // If still no name, check additional fields
+    // Check for full name fields first (these typically contain complete names)
+    const fullNameFields = [
+      'Name', 'Full Name', 'Customer Name', 'Guest Name', 
+      'Contact Name', 'Traveller'
+    ];
+    
+    for (const field of fullNameFields) {
+      const value = ticketData[field];
+      if (value && typeof value === 'string' && value.trim()) {
+        const trimmed = value.trim();
+        // Prioritize names that contain spaces (likely full names)
+        if (trimmed.includes(' ')) {
+          console.log(`✅ Found full name "${trimmed}" in field "${field}"`);
+          return trimmed;
+        }
+      }
+    }
+    
+    // Check Via-Cust field specially (extract name from contact info)
+    const viaCustValue = ticketData['Via-Cust'];
+    if (viaCustValue && typeof viaCustValue === 'string' && viaCustValue.includes('Contact:')) {
+      const contactMatch = viaCustValue.match(/Contact:\s*([^:]+?):/);
+      if (contactMatch && contactMatch[1]) {
+        return contactMatch[1].trim();
+      }
+    }
+    
+    // Fallback to single names if no full names found
+    for (const field of fullNameFields) {
+      const value = ticketData[field];
+      if (value && typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    
+    // Final fallback - check individual name components
     const bookerField = ticketData['Booker'] || ticketData['booker'] || '';
     if (bookerField) {
       return bookerField.trim();
     }
-
-    // Check additional fields that might contain names
-    const additionalFields = [
-      'Name', 'Full Name', 'Customer Name', 'Guest Name', 
-      'Contact Name', 'Traveller', 'Via-Cust'
-    ];
     
-    for (const field of additionalFields) {
-      const value = ticketData[field];
-      if (value && typeof value === 'string' && value.trim()) {
-        // Handle Via-Cust field specially (extract name from contact info)
-        if (field === 'Via-Cust' && value.includes('Contact:')) {
-          const contactMatch = value.match(/Contact:\s*([^:]+?):/);
-          if (contactMatch && contactMatch[1]) {
-            return contactMatch[1].trim();
-          }
-        } else {
-          return value.trim();
-        }
-      }
+    if (firstName) {
+      return firstName.trim();
+    } else if (lastName) {
+      return lastName.trim();
     }
     
     return '';
@@ -511,15 +527,18 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
             guest.booker_name || guest.booking_code || Object.keys(guest.ticket_data || {}).length > 0
           );
           
-          console.log(`✅ Successfully processed ${processedGuests.length} guests from Excel`);
-          console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
-          
-          // Log summary of Viator bookings with FIXED date logic
-          const viatorGuests = processedGuests.filter(g => g.ticket_data?.Status === 'VIATOR');
-          console.log(`🎭 FIXED - Found ${viatorGuests.length} Viator bookings with correct date logic:`, 
-            viatorGuests.map(g => `${g.booker_name} (${g.booking_code}): ${g.item_details}`));
-          
-          resolve(processedGuests);
+            // Show Time Inheritance: Ensure add-ons inherit show time from main bookings
+            const processedWithInheritance = inheritShowTimesFromMainBookings(processedGuests);
+            
+            console.log(`✅ Successfully processed ${processedWithInheritance.length} guests from Excel`);
+            console.log('👥 Sample processed guests with show times and quantities:', processedWithInheritance.slice(0, 3));
+            
+            // Log summary of Viator bookings with FIXED date logic
+            const viatorGuests = processedWithInheritance.filter(g => g.ticket_data?.Status === 'VIATOR');
+            console.log(`🎭 FIXED - Found ${viatorGuests.length} Viator bookings with correct date logic:`, 
+              viatorGuests.map(g => `${g.booker_name} (${g.booking_code}): ${g.item_details}`));
+            
+            resolve(processedWithInheritance);
         } catch (error) {
           console.error('❌ Error processing Excel file:', error);
           reject(error);
@@ -530,6 +549,41 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       reader.readAsArrayBuffer(file);
     });
   }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity, extractGuestNameFromTicketData]);
+
+  // Show Time Inheritance Function - ensures add-ons get show times from main bookings
+  const inheritShowTimesFromMainBookings = useCallback((guests: ProcessedGuest[]): ProcessedGuest[] => {
+    const bookingGroups = new Map<string, ProcessedGuest[]>();
+    
+    // Group guests by booking code
+    guests.forEach(guest => {
+      if (guest.booking_code) {
+        if (!bookingGroups.has(guest.booking_code)) {
+          bookingGroups.set(guest.booking_code, []);
+        }
+        bookingGroups.get(guest.booking_code)!.push(guest);
+      }
+    });
+    
+    // Process each booking group
+    bookingGroups.forEach((groupGuests, bookingCode) => {
+      if (groupGuests.length <= 1) return; // No inheritance needed for single bookings
+      
+      // Find main booking (has show time) and add-ons (missing show time)
+      const mainBooking = groupGuests.find(g => g.show_time && isValidShowTime(g.show_time));
+      const addOns = groupGuests.filter(g => !g.show_time || !isValidShowTime(g.show_time));
+      
+      if (mainBooking && addOns.length > 0) {
+        console.log(`🔗 Show time inheritance for booking ${bookingCode}: "${mainBooking.show_time}" -> ${addOns.length} add-ons`);
+        
+        addOns.forEach(addOn => {
+          addOn.show_time = mainBooking.show_time;
+          console.log(`  ✅ Inherited show time "${mainBooking.show_time}" for add-on: ${addOn.item_details}`);
+        });
+      }
+    });
+    
+    return guests;
+  }, []);
 
   const processCsvFile = useCallback(async (file: File) => {
     return new Promise<ProcessedGuest[]>((resolve, reject) => {
@@ -610,10 +664,13 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
               return processedGuest;
             }).filter(guest => guest.booker_name || guest.booking_code);
             
-            console.log(`✅ Successfully processed ${processedGuests.length} guests from CSV`);
-            console.log('👥 Sample processed guests with show times and quantities:', processedGuests.slice(0, 3));
+            // Show Time Inheritance: Ensure add-ons inherit show time from main bookings
+            const processedWithInheritance = inheritShowTimesFromMainBookings(processedGuests);
             
-            resolve(processedGuests);
+            console.log(`✅ Successfully processed ${processedWithInheritance.length} guests from CSV`);
+            console.log('👥 Sample processed guests with show times and quantities:', processedWithInheritance.slice(0, 3));
+            
+            resolve(processedWithInheritance);
           } catch (error) {
             reject(error);
           }
