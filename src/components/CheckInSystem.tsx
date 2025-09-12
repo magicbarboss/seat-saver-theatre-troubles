@@ -924,6 +924,7 @@ const CheckInSystem = ({
     }
 
     // Use the provided total guest count for booking groups, or fallback to individual guest count
+    // For per-ticket calculations, we should NOT multiply by guest count since ticket quantities are already correct
     const guestCount = totalGuestCount || guest.total_quantity || 1;
     const orderItems: string[] = [];
     
@@ -1106,12 +1107,13 @@ const CheckInSystem = ({
         }
         
         if (packageInfo) {
-          // Calculate drinks
+          // Calculate drinks - use ticketCount for per-ticket calculations
           if (packageInfo.drinks) {
             let quantity;
             if (packageInfo.calculationMethod === 'per-person') {
               quantity = packageInfo.drinks.quantity * guestCount;
             } else {
+              // For per-ticket: use ticket quantity directly (don't multiply by guestCount)
               quantity = packageInfo.drinks.quantity * ticketCount;
             }
             
@@ -1120,7 +1122,7 @@ const CheckInSystem = ({
               orderItems.push(`${quantity} ${drinkName}${quantity > 1 && !drinkName.toLowerCase().endsWith('s') ? 's' : ''}`);
               
               if (debugBookings.includes(guest.booking_code)) {
-                console.log(`🔍 ${guest.booking_code} added drinks: ${quantity} ${drinkName}`);
+                console.log(`🔍 ${guest.booking_code} added drinks: ${quantity} ${drinkName} (method: ${packageInfo.calculationMethod}, ticketCount: ${ticketCount})`);
               }
             }
           }
@@ -1139,12 +1141,13 @@ const CheckInSystem = ({
             }
           }
           
-          // Calculate pizzas
+          // Calculate pizzas - use ticketCount for per-ticket calculations
           if (packageInfo.pizza && packageInfo.pizza.quantity > 0) {
             let quantity;
             if (packageInfo.calculationMethod === 'per-person') {
               quantity = Math.ceil(packageInfo.pizza.quantity * guestCount);
             } else {
+              // For per-ticket: use ticket quantity directly (don't multiply by guestCount)
               quantity = packageInfo.pizza.quantity * ticketCount;
             }
             
