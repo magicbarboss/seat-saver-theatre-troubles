@@ -117,19 +117,18 @@ export const GuestTable = ({
       </TableHeader>
       <TableBody>
         {bookingGroups.map((group) => {
-          const currentGuest = getCurrentGuest(group.originalIndex);
           return (
             <GuestRow
               key={group.originalIndex}
-              guest={currentGuest}
+              guest={group.mainBooking}
               index={group.originalIndex}
               isCheckedIn={checkedInGuests.has(group.originalIndex)}
               isSeated={seatedGuests.has(group.originalIndex)}
               isAllocated={allocatedGuests.has(group.originalIndex)}
               pagerNumber={pagerAssignments.get(group.originalIndex)}
               tableNumbers={guestTableAllocations.get(group.originalIndex) || []}
-              orderSummary={getOrderSummary(currentGuest, currentGuest.total_quantity, group.addOns)}
-              packageDetails={getPackageDetails(currentGuest)}
+              orderSummary={getOrderSummary(group.mainBooking, group.mainBooking.total_quantity, group.addOns)}
+              packageDetails={getPackageDetails(group.mainBooking)}
               comment={bookingComments.get(group.originalIndex)}
               notes={guestNotes.get(group.originalIndex) || ''}
               addOnGuests={group.addOns}

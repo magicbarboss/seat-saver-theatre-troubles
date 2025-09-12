@@ -20,6 +20,7 @@ import { ManualEditDialog } from './checkin/ManualEditDialog';
 import { ManualLinkDialog } from './checkin/ManualLinkDialog';
 
 import { Guest, CheckInSystemProps, BookingGroup, PartyGroup } from './checkin/types';
+import { extractShowTimeFromText, normalizeShowTime } from '@/utils/showTimeExtractor';
 
 const CheckInSystem = ({
   guests: guestsProp,
@@ -406,6 +407,35 @@ const CheckInSystem = ({
     }
     
     return foundName;
+  };
+
+  // Derive show time helper function
+  const deriveShowTime = (guest: Guest): string => {
+    // Check existing show_time first
+    if (guest.show_time && guest.show_time !== 'N/A') {
+      return guest.show_time;
+    }
+
+    // Try to extract from item_details
+    if (guest.item_details) {
+      const extracted = extractShowTimeFromText(guest.item_details);
+      if (extracted) {
+        return normalizeShowTime(extracted);
+      }
+    }
+
+    // Try to extract from ticket_data fields
+    if (guest.ticket_data) {
+      const itemField = guest.ticket_data.Item || guest.ticket_data.item || '';
+      if (itemField) {
+        const extracted = extractShowTimeFromText(itemField);
+        if (extracted) {
+          return normalizeShowTime(extracted);
+        }
+      }
+    }
+
+    return '';
   };
 
   // Enhanced ticket type mapping with calculation method support
@@ -1198,6 +1228,35 @@ const CheckInSystem = ({
       });
     }
 
+    // Third try: scan item_details and ticket_data.Item for known ticket types if no extracted tickets found
+    if (tickets.length === 0) {
+      const itemDetails = guest.item_details || '';
+      const ticketItem = guest.ticket_data?.Item || '';
+      const allItemText = `${itemDetails} ${ticketItem}`.toLowerCase();
+      
+      // Check against known ticket type mappings (case-insensitive)
+      Object.keys(TICKET_TYPE_MAPPING).forEach(ticketType => {
+        const ticketTypeLower = ticketType.toLowerCase();
+        if (allItemText.includes(ticketTypeLower)) {
+          // Use guest.total_quantity for quantity when found in item text
+          const quantity = guest.total_quantity || 1;
+          // Avoid duplicating main package items as add-ons
+          const mainPackagePatterns = ['magic show', 'comedy', 'show ['];
+          const isMainPackage = mainPackagePatterns.some(pattern => 
+            allItemText.includes(pattern.toLowerCase())
+          );
+          
+          if (!isMainPackage || ticketType.includes('Smoke Offer')) {
+            tickets.push({
+              type: ticketType,
+              quantity
+            });
+            console.log(`🔍 Found ticket type "${ticketType}" in item text for ${guest.booker_name}`);
+          }
+        }
+      });
+    }
+
     // Fallback: parse all ticket_data fields with fuzzy matching
     if (tickets.length === 0 && guest.ticket_data && typeof guest.ticket_data === 'object') {
       Object.entries(guest.ticket_data).forEach(([key, value]) => {
@@ -1715,6 +1774,15 @@ const CheckInSystem = ({
         }
         
         if (mainBooking) {
+          // Derive show time for main booking if missing
+          if (!mainBooking.guest.show_time || mainBooking.guest.show_time === 'N/A') {
+            const derivedShowTime = deriveShowTime(mainBooking.guest);
+            if (derivedShowTime) {
+              mainBooking.guest.show_time = derivedShowTime;
+              console.log(`📅 Derived show time "${derivedShowTime}" for ${mainBooking.guest.booking_code}`);
+            }
+          }
+          
           // Deduplicate truly identical add-ons by comparing full ticket_data
           const deduplicatedAddOns: typeof addOns = [];
           const seenItems = new Map<string, typeof addOns[0]>();
@@ -1789,10 +1857,14 @@ const CheckInSystem = ({
         }
       }
       
-      // Show time filter: if user is searching, ignore show time filter for better UX
-      const matchesShow = searchTerm !== '' || showFilter === 'all' || showFilter === '' || 
+      // Show time filter: apply consistently regardless of search
+      const matchesShow = showFilter === 'all' || showFilter === '' || 
         (() => {
           const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
+          // Only show guests with blank show times under "All Shows", not under specific times
+          if (showFilter !== 'all' && showFilter !== '' && (!guestShowTime || guestShowTime === '')) {
+            return false;
+          }
           return guestShowTime === '' || guestShowTime === showFilter;
         })();
         

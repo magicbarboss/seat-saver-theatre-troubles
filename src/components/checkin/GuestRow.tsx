@@ -168,7 +168,26 @@ export const GuestRow = ({
 
   const guestName = extractFullName(guest);
   const guestCount = guest.total_quantity || 1;
-  const showTime = guest.show_time || guest['Show time'] || 'N/A';
+  
+  // Fallback show time derivation if still missing
+  const getDisplayShowTime = () => {
+    if (guest.show_time && guest.show_time !== 'N/A') {
+      return guest.show_time;
+    }
+    
+    // Try to derive from item_details as fallback
+    if (guest.item_details) {
+      const timeMatch = guest.item_details.match(/\[(\d{1,2}(?::\d{2})?\s*(?:pm|am))\]/i);
+      if (timeMatch) {
+        const time = timeMatch[1].toLowerCase().replace(/\s+/g, '').replace(':00', '');
+        return time;
+      }
+    }
+    
+    return 'N/A';
+  };
+  
+  const showTime = getDisplayShowTime();
 
   // Late arrival state and persistence
   const [arrivingLate, setArrivingLate] = React.useState<boolean>(!!guest.arriving_late);
