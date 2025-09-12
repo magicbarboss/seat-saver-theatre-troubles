@@ -222,23 +222,54 @@ const CheckInSystem = ({
           setIsInitialized(true);
           return;
         }
+        
+        let sessionData = currentSession;
+        let sessionToRestore = currentSession;
+        
         if (currentSession) {
           // Session exists for this guest list, restore it
-          setCheckedInGuests(new Set(currentSession.checked_in_guests || []));
-          setPagerAssignments(new Map(Object.entries(currentSession.pager_assignments || {}).map(([k, v]) => [parseInt(k), v as number])));
-          setSeatedGuests(new Set(currentSession.seated_guests || []));
-          setSeatedSections(new Set(currentSession.seated_sections || []));
-          setAllocatedGuests(new Set(currentSession.allocated_guests || []));
-          setGuestTableAllocations(new Map(Object.entries(currentSession.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])));
-          setPartyGroups(new Map(Object.entries(currentSession.party_groups || {}) as [string, PartyGroup][]));
-          setFriendshipGroups(new Map(Object.entries((currentSession as any).friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
-          setBookingComments(new Map(Object.entries(currentSession.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
-          setManualLinks(new Map(Object.entries((currentSession as any).manual_links || {}).map(([k, v]) => [k, v as number[]])));
-          setWalkInGuests(currentSession.walk_in_guests as Guest[] || []);
+          console.log('✅ Found database session, restoring state...', currentSession);
+        } else {
+          // Try localStorage backup if database fails or is empty
+          console.log('🔍 No database session found, checking localStorage backup...');
+          const localStorageKey = `checkin-backup-${guestListId}-${today}`;
+          const backupDataStr = localStorage.getItem(localStorageKey);
+          
+          if (backupDataStr) {
+            try {
+              const backupData = JSON.parse(backupDataStr);
+              console.log('🎯 Found localStorage backup! Restoring from backup...', backupData);
+              console.log(`🕒 Backup was last updated: ${backupData.last_updated || 'unknown'}`);
+              
+              // Use backup data
+              sessionToRestore = backupData;
+              toast({
+                title: "🎯 Backup Restored!",
+                description: `Recovered ${backupData.checked_in_guests?.length || 0} checked-in guests from local backup`,
+              });
+            } catch (parseError) {
+              console.error('❌ Error parsing localStorage backup:', parseError);
+            }
+          }
+        }
+
+        if (sessionToRestore) {
+          // Session exists for this guest list, restore it
+          setCheckedInGuests(new Set(sessionToRestore.checked_in_guests || []));
+          setPagerAssignments(new Map(Object.entries(sessionToRestore.pager_assignments || {}).map(([k, v]) => [parseInt(k), v as number])));
+          setSeatedGuests(new Set(sessionToRestore.seated_guests || []));
+          setSeatedSections(new Set(sessionToRestore.seated_sections || []));
+          setAllocatedGuests(new Set(sessionToRestore.allocated_guests || []));
+          setGuestTableAllocations(new Map(Object.entries(sessionToRestore.guest_table_allocations || {}).map(([k, v]) => [parseInt(k), v as number[]])));
+          setPartyGroups(new Map(Object.entries(sessionToRestore.party_groups || {}) as [string, PartyGroup][]));
+          setFriendshipGroups(new Map(Object.entries((sessionToRestore as any).friendship_groups || {}).map(([k, v]) => [k, v as number[]])));
+          setBookingComments(new Map(Object.entries(sessionToRestore.booking_comments || {}).map(([k, v]) => [parseInt(k), v as string])));
+          setManualLinks(new Map(Object.entries((sessionToRestore as any).manual_links || {}).map(([k, v]) => [k, v as number[]])));
+          setWalkInGuests(sessionToRestore.walk_in_guests as Guest[] || []);
           
           
           // Load guest notes
-          const guestNotesData = (currentSession as any).guest_notes || {};
+          const guestNotesData = (sessionToRestore as any).guest_notes || {};
           setGuestNotes(new Map(Object.entries(guestNotesData).map(([k, v]) => [parseInt(k), v as string])));
           
           setSessionDate(today);
@@ -286,7 +317,7 @@ const CheckInSystem = ({
     };
   }, [user?.id, guestListId, guests?.length]);
 
-  // Auto-save to Supabase - updated to include manual links
+  // Auto-save to both Supabase and localStorage for backup
   useEffect(() => {
     if (!isInitialized || !user?.id) return;
     const saveState = async () => {
@@ -308,15 +339,44 @@ const CheckInSystem = ({
           guest_notes: Object.fromEntries(guestNotes) as any,
           manual_links: Object.fromEntries(manualLinks) as any,
           walk_in_guests: walkInGuests as any,
+          last_updated: new Date().toISOString()
         };
+        
+        // Save to database
         const { error } = await supabase
           .from('checkin_sessions')
           .upsert(sessionData, { onConflict: 'user_id,guest_list_id,session_date' });
+        
+        // Save to localStorage as backup (even if database fails)
+        const localStorageKey = `checkin-backup-${guestListId}-${today}`;
+        localStorage.setItem(localStorageKey, JSON.stringify(sessionData));
+        
         if (!error) {
           setLastSaved(new Date());
+          console.log(`💾 State saved to database and localStorage backup (${checkedInGuests.size} checked-in)`);
+        } else {
+          console.error('❌ Database save failed, but localStorage backup succeeded:', error);
         }
       } catch (error) {
-        console.error('Failed to save state to Supabase:', error);
+        console.error('Failed to save state:', error);
+        // Try localStorage only as fallback
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const localStorageKey = `checkin-backup-${guestListId}-${today}`;
+          const fallbackData = {
+            guest_list_id: guestListId,
+            session_date: today,
+            checked_in_guests: Array.from(checkedInGuests),
+            pager_assignments: Object.fromEntries(pagerAssignments),
+            seated_guests: Array.from(seatedGuests),
+            allocated_guests: Array.from(allocatedGuests),
+            last_updated: new Date().toISOString()
+          };
+          localStorage.setItem(localStorageKey, JSON.stringify(fallbackData));
+          console.log('💾 Fallback: Saved to localStorage only');
+        } catch (lsError) {
+          console.error('❌ Even localStorage backup failed:', lsError);
+        }
       }
     };
     const interval = setInterval(saveState, 30000);
