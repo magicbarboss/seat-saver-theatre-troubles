@@ -1,10 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -90,6 +92,38 @@ interface GuestList {
   is_active: boolean;
 }
 
+interface ExistingGuest {
+  id: string;
+  booking_code: string;
+  booker_name: string;
+  total_quantity: number;
+  show_time: string;
+  item_details: string;
+  notes: string;
+  ticket_data: any;
+  is_checked_in: boolean;
+  pager_number: number | null;
+  table_assignments: number[] | null;
+  is_seated: boolean;
+  checked_in_at: string | null;
+  seated_at: string | null;
+  interval_pizza_order: boolean;
+  interval_drinks_order: boolean;
+  manual_override: boolean;
+  arriving_late: boolean;
+}
+
+interface UpdatePreview {
+  toUpdate: number;
+  toAdd: number;
+  preserved: number;
+  details: {
+    updatedGuests: Array<{ bookingCode: string; changes: string[] }>;
+    newGuests: Array<{ bookingCode: string; name: string }>;
+    preservedGuests: Array<{ bookingCode: string; name: string; status: string }>;
+  };
+}
+
 interface CsvUploadProps {
   onGuestListCreated?: (guestList: GuestList) => void;
 }
@@ -99,7 +133,40 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [guestListName, setGuestListName] = useState('');
+  const [updateMode, setUpdateMode] = useState(false);
+  const [selectedGuestList, setSelectedGuestList] = useState<string>('');
+  const [availableGuestLists, setAvailableGuestLists] = useState<GuestList[]>([]);
+  const [updatePreview, setUpdatePreview] = useState<UpdatePreview | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const { user } = useAuth();
+
+  // Fetch available guest lists for update mode
+  useEffect(() => {
+    if (updateMode && user?.id) {
+      fetchAvailableGuestLists();
+    }
+  }, [updateMode, user?.id]);
+
+  const fetchAvailableGuestLists = async () => {
+    if (!user?.id) return;
+    
+    const { data, error } = await supabase
+      .from('guest_lists')
+      .select('*')
+      .eq('uploaded_by', user.id)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching guest lists:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load guest lists for update",
+        variant: "destructive",
+      });
+    } else {
+      setAvailableGuestLists(data || []);
+    }
+  };
 
   const detectColumns = (headers: string[]) => {
     const columnMapping: Record<string, number> = {};
@@ -680,12 +747,181 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     });
   }, [extractTicketData, processGuestShowTime, processGuestTotalQuantity]);
 
+  // Smart merge logic for updating existing guest lists
+  const generateUpdatePreview = async (newGuests: ProcessedGuest[], selectedListId: string): Promise<UpdatePreview> => {
+    // Fetch existing guests from selected list
+    const { data: existingGuests, error } = await supabase
+      .from('guests')
+      .select('*')
+      .eq('guest_list_id', selectedListId);
+
+    if (error) throw error;
+
+    const existingGuestsMap = new Map<string, ExistingGuest>();
+    (existingGuests || []).forEach(guest => {
+      if (guest.booking_code) {
+        existingGuestsMap.set(guest.booking_code, guest);
+      }
+    });
+
+    const toUpdate: Array<{ bookingCode: string; changes: string[] }> = [];
+    const toAdd: Array<{ bookingCode: string; name: string }> = [];
+    const preserved: Array<{ bookingCode: string; name: string; status: string }> = [];
+
+    newGuests.forEach(newGuest => {
+      if (!newGuest.booking_code) return;
+
+      const existing = existingGuestsMap.get(newGuest.booking_code);
+      
+      if (existing) {
+        const changes: string[] = [];
+        
+        // Check what would change (excluding protected fields)
+        if (existing.booker_name !== newGuest.booker_name) changes.push('name');
+        if (existing.total_quantity !== newGuest.total_quantity) changes.push('quantity');
+        if (existing.show_time !== newGuest.show_time) changes.push('show time');
+        if (existing.item_details !== newGuest.item_details) changes.push('items');
+        
+        if (changes.length > 0) {
+          toUpdate.push({ bookingCode: newGuest.booking_code, changes });
+        }
+
+        // Mark as preserved with status
+        let status = 'unchanged';
+        if (existing.is_checked_in) status = 'checked in';
+        if (existing.is_seated) status = 'seated';
+        if (existing.pager_number) status = 'has pager';
+        
+        preserved.push({ 
+          bookingCode: newGuest.booking_code, 
+          name: existing.booker_name, 
+          status 
+        });
+      } else {
+        toAdd.push({ 
+          bookingCode: newGuest.booking_code, 
+          name: newGuest.booker_name || 'Unknown' 
+        });
+      }
+    });
+
+    return {
+      toUpdate: toUpdate.length,
+      toAdd: toAdd.length,
+      preserved: preserved.length,
+      details: {
+        updatedGuests: toUpdate,
+        newGuests: toAdd,
+        preservedGuests: preserved
+      }
+    };
+  };
+
+  const performSmartUpdate = async (newGuests: ProcessedGuest[], selectedListId: string) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    // Fetch existing guests
+    const { data: existingGuests, error: fetchError } = await supabase
+      .from('guests')
+      .select('*')
+      .eq('guest_list_id', selectedListId);
+
+    if (fetchError) throw fetchError;
+
+    const existingGuestsMap = new Map<string, ExistingGuest>();
+    (existingGuests || []).forEach(guest => {
+      if (guest.booking_code) {
+        existingGuestsMap.set(guest.booking_code, guest);
+      }
+    });
+
+    const guestsToUpdate: any[] = [];
+    const guestsToInsert: any[] = [];
+
+    newGuests.forEach(newGuest => {
+      if (!newGuest.booking_code) return;
+
+      const existing = existingGuestsMap.get(newGuest.booking_code);
+      
+      if (existing) {
+        // Update existing guest but preserve check-in data
+        const updatedGuest = {
+          id: existing.id,
+          // Update these fields from new data
+          booker_name: newGuest.booker_name || existing.booker_name,
+          total_quantity: newGuest.total_quantity || existing.total_quantity,
+          show_time: newGuest.show_time || existing.show_time,
+          item_details: newGuest.item_details || existing.item_details,
+          notes: newGuest.notes || existing.notes,
+          ticket_data: newGuest.ticket_data || existing.ticket_data,
+          
+          // PRESERVE these critical fields
+          is_checked_in: existing.is_checked_in,
+          pager_number: existing.pager_number,
+          table_assignments: existing.table_assignments,
+          is_seated: existing.is_seated,
+          checked_in_at: existing.checked_in_at,
+          seated_at: existing.seated_at,
+          interval_pizza_order: existing.interval_pizza_order,
+          interval_drinks_order: existing.interval_drinks_order,
+          manual_override: existing.manual_override,
+          arriving_late: existing.arriving_late
+        };
+        
+        guestsToUpdate.push(updatedGuest);
+      } else {
+        // Insert new guest
+        guestsToInsert.push({
+          ...newGuest,
+          guest_list_id: selectedListId
+        });
+      }
+    });
+
+    // Perform updates
+    if (guestsToUpdate.length > 0) {
+      for (const guest of guestsToUpdate) {
+        const { error: updateError } = await supabase
+          .from('guests')
+          .update(guest)
+          .eq('id', guest.id);
+        
+        if (updateError) throw updateError;
+      }
+    }
+
+    // Perform inserts
+    if (guestsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('guests')
+        .insert(guestsToInsert);
+      
+      if (insertError) throw insertError;
+    }
+
+    // Get the updated guest list
+    const { data: guestList, error: listError } = await supabase
+      .from('guest_lists')
+      .select('*')
+      .eq('id', selectedListId)
+      .single();
+
+    if (listError) throw listError;
+
+    return guestList;
+  };
+
   const uploadGuests = async (guests: ProcessedGuest[]) => {
     if (!user?.id) {
       throw new Error('User not authenticated');
     }
 
-    // Extract event date from filename if available
+    // Handle update mode
+    if (updateMode && selectedGuestList) {
+      return await performSmartUpdate(guests, selectedGuestList);
+    }
+
+    // Original create new list logic
     const eventDate = file ? extractDateFromFilename(file.name) : null;
     const defaultName = file ? file.name.replace(/\.(csv|xlsx)$/i, '') : `Guest List ${new Date().toLocaleDateString()}`;
 
@@ -748,8 +984,47 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     }
   };
 
+  const handleGeneratePreview = async () => {
+    if (!file || !user?.id || !updateMode || !selectedGuestList) return;
+
+    setUploading(true);
+    try {
+      let guests: ProcessedGuest[];
+      
+      if (file.name.endsWith('.csv')) {
+        guests = await processCsvFile(file);
+      } else {
+        guests = await processExcelFile(file);
+      }
+
+      if (guests.length === 0) {
+        throw new Error('No valid guest data found in the file');
+      }
+
+      const preview = await generateUpdatePreview(guests, selectedGuestList);
+      setUpdatePreview(preview);
+      setShowPreview(true);
+      
+      toast({
+        title: "Preview Generated",
+        description: `Ready to update: ${preview.toUpdate} guests, add: ${preview.toAdd} new guests`
+      });
+
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast({
+        title: "Preview failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file || !user?.id) return;
+    if (updateMode && !selectedGuestList) return;
 
     setUploading(true);
     try {
@@ -768,19 +1043,27 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
       const guestList = await uploadGuests(guests);
       
       setUploadComplete(true);
+      const actionText = updateMode ? "updated" : "uploaded";
       toast({
-        title: "Upload successful",
-        description: `Successfully uploaded ${guests.length} guests`
+        title: `${actionText.charAt(0).toUpperCase() + actionText.slice(1)} successful`,
+        description: updateMode 
+          ? `Successfully updated guest list with ${guests.length} guests`
+          : `Successfully uploaded ${guests.length} guests`
       });
 
       // Call the callback if provided
       if (onGuestListCreated) {
         onGuestListCreated(guestList);
       }
+      
+      // Reset preview state
+      setShowPreview(false);
+      setUpdatePreview(null);
+      
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: "Upload failed",
+        title: updateMode ? "Update failed" : "Upload failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive"
       });
@@ -793,23 +1076,65 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5" />
-          Upload Guest List
+          {updateMode ? <RefreshCw className="h-5 w-5" /> : <FileSpreadsheet className="h-5 w-5" />}
+          {updateMode ? 'Update Guest List' : 'Upload Guest List'}
         </CardTitle>
         <CardDescription>
-          Upload a CSV or Excel file containing guest information. For Excel files, headers should be in row 4.
+          {updateMode 
+            ? 'Update an existing guest list with new data while preserving check-in status and other operational data.'
+            : 'Upload a CSV or Excel file containing guest information. For Excel files, headers should be in row 4.'
+          }
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="guest-list-name">Guest List Name (Optional)</Label>
-          <Input
-            id="guest-list-name"
-            placeholder="Enter a name for this guest list..."
-            value={guestListName}
-            onChange={(e) => setGuestListName(e.target.value)}
+        {/* Update Mode Toggle */}
+        <div className="flex items-center space-x-2 p-3 border rounded-lg">
+          <Checkbox 
+            id="update-mode"
+            checked={updateMode}
+            onCheckedChange={(checked) => {
+              setUpdateMode(checked as boolean);
+              setSelectedGuestList('');
+              setShowPreview(false);
+              setUpdatePreview(null);
+            }}
           />
+          <Label htmlFor="update-mode" className="text-sm font-medium">
+            Update existing list instead of creating new one
+          </Label>
         </div>
+
+        {/* Guest List Selection for Update Mode */}
+        {updateMode && (
+          <div className="space-y-2">
+            <Label htmlFor="guest-list-select">Select Guest List to Update</Label>
+            <Select value={selectedGuestList} onValueChange={setSelectedGuestList}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a guest list to update..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableGuestLists.map((list) => (
+                  <SelectItem key={list.id} value={list.id}>
+                    {list.name} ({new Date(list.uploaded_at).toLocaleDateString()})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Guest List Name (only for create mode) */}
+        {!updateMode && (
+          <div className="space-y-2">
+            <Label htmlFor="guest-list-name">Guest List Name (Optional)</Label>
+            <Input
+              id="guest-list-name"
+              placeholder="Enter a name for this guest list..."
+              value={guestListName}
+              onChange={(e) => setGuestListName(e.target.value)}
+            />
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="file-upload">Choose File</Label>
@@ -830,22 +1155,64 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           </div>
         )}
 
+        {/* Preview for Update Mode */}
+        {updateMode && file && selectedGuestList && !showPreview && (
+          <Button
+            onClick={handleGeneratePreview}
+            disabled={uploading}
+            variant="outline"
+            className="w-full"
+          >
+            {uploading ? "Generating Preview..." : "Preview Changes"}
+          </Button>
+        )}
+
+        {/* Update Preview Display */}
+        {showPreview && updatePreview && (
+          <div className="space-y-3 p-4 border rounded-lg bg-blue-50">
+            <h4 className="font-medium text-blue-900">Update Preview</h4>
+            <div className="grid grid-cols-3 gap-4 text-center text-sm">
+              <div>
+                <div className="text-lg font-bold text-orange-600">{updatePreview.toUpdate}</div>
+                <div className="text-muted-foreground">To Update</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-green-600">{updatePreview.toAdd}</div>
+                <div className="text-muted-foreground">To Add</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-blue-600">{updatePreview.preserved}</div>
+                <div className="text-muted-foreground">Preserved</div>
+              </div>
+            </div>
+            <div className="text-xs text-blue-800">
+              • Check-in status, pager assignments, and table allocations will be preserved
+              • Only guest details (name, quantity, show time, items) will be updated
+            </div>
+          </div>
+        )}
+
         <Button
           onClick={handleUpload}
-          disabled={!file || uploading || uploadComplete}
+          disabled={
+            !file || 
+            uploading || 
+            uploadComplete || 
+            (updateMode && (!selectedGuestList || !showPreview))
+          }
           className="w-full"
         >
           {uploading ? (
-            "Uploading..."
+            updateMode ? "Updating..." : "Uploading..."
           ) : uploadComplete ? (
             <>
               <CheckCircle className="mr-2 h-4 w-4" />
-              Upload Complete
+              {updateMode ? 'Update Complete' : 'Upload Complete'}
             </>
           ) : (
             <>
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Guest List
+              {updateMode ? <RefreshCw className="mr-2 h-4 w-4" /> : <Upload className="mr-2 h-4 w-4" />}
+              {updateMode ? 'Update Guest List' : 'Upload Guest List'}
             </>
           )}
         </Button>
@@ -854,7 +1221,11 @@ const CsvUpload: React.FC<CsvUploadProps> = ({ onGuestListCreated }) => {
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <span className="text-sm text-green-800">
-              Guest list uploaded successfully! You can now proceed to check-in guests.
+              Guest list {updateMode ? 'updated' : 'uploaded'} successfully! 
+              {updateMode 
+                ? ' All existing check-in data has been preserved.'
+                : ' You can now proceed to check-in guests.'
+              }
             </span>
           </div>
         )}
