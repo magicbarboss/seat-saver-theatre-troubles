@@ -8,6 +8,7 @@ import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles,
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { extractShowTimeFromText, normalizeShowTime } from '@/utils/showTimeExtractor';
 
 interface Guest {
   [key: string]: any;
@@ -175,12 +176,19 @@ export const GuestRow = ({
       return guest.show_time;
     }
     
-    // Try to derive from item_details as fallback
+    // Use utility function to extract from item_details as fallback
     if (guest.item_details) {
-      const timeMatch = guest.item_details.match(/\[(\d{1,2}(?::\d{2})?\s*(?:pm|am))\]/i);
-      if (timeMatch) {
-        const time = timeMatch[1].toLowerCase().replace(/\s+/g, '').replace(':00', '');
-        return time;
+      const extracted = extractShowTimeFromText(guest.item_details);
+      if (extracted) {
+        return normalizeShowTime(extracted);
+      }
+    }
+    
+    // Try ticket_data fields as final fallback
+    if (guest.ticket_data?.Item) {
+      const extracted = extractShowTimeFromText(guest.ticket_data.Item);
+      if (extracted) {
+        return normalizeShowTime(extracted);
       }
     }
     

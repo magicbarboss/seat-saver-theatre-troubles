@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import CsvUpload from './CsvUpload';
 import CheckInSystem from './CheckInSystem';
 import { LogOut, Users } from 'lucide-react';
+import { normalizeShowTime } from '@/utils/showTimeExtractor';
 
 interface GuestList {
   id: string;
@@ -249,8 +250,13 @@ const GuestManager = () => {
     const isFirstGuestDataValid = firstGuestTicketData && typeof firstGuestTicketData === 'object' && !Array.isArray(firstGuestTicketData);
     const headers = guests.length > 0 ? Object.keys(isFirstGuestDataValid ? firstGuestTicketData : {}) : [];
 
-    // Get unique show times and sort them
-    const showTimes = [...new Set(transformedGuests.map(g => g.show_time).filter(Boolean))].sort();
+    // Get unique show times, normalize them, and sort them
+    const showTimes = [...new Set(
+      transformedGuests
+        .map(g => g.show_time)
+        .filter(Boolean)
+        .map(time => normalizeShowTime(time))
+    )].sort();
 
     console.log('Transformed guests for CheckInSystem:', transformedGuests.slice(0, 2));
     console.log('Headers for CheckInSystem:', headers);

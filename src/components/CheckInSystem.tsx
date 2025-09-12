@@ -886,6 +886,29 @@ const CheckInSystem = ({
     // Check for addon orders from booking group - we'll add these at the end
     const addonItems = extractAddonOrders(guest, addOnGuests);
     
+    // First: Detect Smoke Offer across the whole booking group (main + add-ons)
+    const allGuestsInGroup = [guest, ...addOnGuests];
+    const hasSmokeOffer = allGuestsInGroup.some(g => {
+      const itemDetails = g.item_details || '';
+      const ticketItem = g.ticket_data?.Item || '';
+      const allText = `${itemDetails} ${ticketItem}`.toLowerCase();
+      return allText.includes('smoke offer');
+    });
+    
+    if (hasSmokeOffer) {
+      // Calculate drinks based on per-person for Smoke Offer
+      const smokeOfferDrinks = guestCount;
+      orderItems.push(`${smokeOfferDrinks} Drink${smokeOfferDrinks > 1 ? 's' : ''}`);
+      console.log(`🚬 Smoke Offer detected for ${guest.booker_name}: ${smokeOfferDrinks} drinks`);
+      
+      // Add any additional add-ons (House Cocktails, etc.)
+      if (addonItems.length > 0) {
+        orderItems.push(...addonItems);
+      }
+      
+      return orderItems.join(', ');
+    }
+    
     // Safe String Extractors - Check direct Status field first, then ticket_data
     const statusField = guest.Status || guest.status || guest.ticket_data?.Status;
     const statusStr = typeof statusField === 'object' && statusField?.value
@@ -1237,10 +1260,15 @@ const CheckInSystem = ({
       // Check against known ticket type mappings (case-insensitive)
       Object.keys(TICKET_TYPE_MAPPING).forEach(ticketType => {
         const ticketTypeLower = ticketType.toLowerCase();
-        if (allItemText.includes(ticketTypeLower)) {
+        // Handle partial matches for Smoke Offer variations
+        const isMatch = ticketTypeLower.includes('smoke offer') 
+          ? allItemText.includes('smoke offer') 
+          : allItemText.includes(ticketTypeLower);
+        
+        if (isMatch) {
           // Use guest.total_quantity for quantity when found in item text
           const quantity = guest.total_quantity || 1;
-          // Avoid duplicating main package items as add-ons
+          // Avoid duplicating main package items as add-ons unless it's Smoke Offer
           const mainPackagePatterns = ['magic show', 'comedy', 'show ['];
           const isMainPackage = mainPackagePatterns.some(pattern => 
             allItemText.includes(pattern.toLowerCase())
@@ -1774,15 +1802,6 @@ const CheckInSystem = ({
         }
         
         if (mainBooking) {
-          // Derive show time for main booking if missing
-          if (!mainBooking.guest.show_time || mainBooking.guest.show_time === 'N/A') {
-            const derivedShowTime = deriveShowTime(mainBooking.guest);
-            if (derivedShowTime) {
-              mainBooking.guest.show_time = derivedShowTime;
-              console.log(`📅 Derived show time "${derivedShowTime}" for ${mainBooking.guest.booking_code}`);
-            }
-          }
-          
           // Deduplicate truly identical add-ons by comparing full ticket_data
           const deduplicatedAddOns: typeof addOns = [];
           const seenItems = new Map<string, typeof addOns[0]>();
@@ -1796,11 +1815,32 @@ const CheckInSystem = ({
             }
           });
           
-          // Show time inheritance: ensure add-ons inherit show time from main booking
+          // Derive show time for main booking if missing - prevent add-ons from overwriting main
+          if (!mainBooking.guest.show_time || mainBooking.guest.show_time === 'N/A') {
+            const derivedShowTime = deriveShowTime(mainBooking.guest);
+            if (derivedShowTime) {
+              mainBooking.guest.show_time = normalizeShowTime(derivedShowTime);
+              console.log(`📅 Derived show time "${normalizeShowTime(derivedShowTime)}" for ${mainBooking.guest.booking_code}`);
+            }
+            
+            // If still empty, try scanning add-ons for bracketed times (one-way inheritance only)
+            if (!mainBooking.guest.show_time && deduplicatedAddOns.length > 0) {
+              for (const addon of deduplicatedAddOns) {
+                const addonDerivedTime = deriveShowTime(addon.guest);
+                if (addonDerivedTime) {
+                  mainBooking.guest.show_time = normalizeShowTime(addonDerivedTime);
+                  console.log(`📅 Derived show time "${normalizeShowTime(addonDerivedTime)}" for ${mainBooking.guest.booking_code} from add-on`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Show time inheritance: ensure add-ons inherit show time from main booking (one-way only)
           const mainShowTime = mainBooking.guest.show_time;
           if (mainShowTime) {
             deduplicatedAddOns.forEach(addon => {
-              if (!addon.guest.show_time || addon.guest.show_time !== mainShowTime) {
+              if (!addon.guest.show_time || normalizeShowTime(addon.guest.show_time) !== normalizeShowTime(mainShowTime)) {
                 addon.guest.show_time = mainShowTime;
                 console.log(`🔗 Inherited show time "${mainShowTime}" from main booking to add-on: ${addon.guest.item_details}`);
               }
@@ -1857,7 +1897,7 @@ const CheckInSystem = ({
         }
       }
       
-      // Show time filter: apply consistently regardless of search
+      // Show time filter: apply consistently regardless of search using normalized comparison
       const matchesShow = showFilter === 'all' || showFilter === '' || 
         (() => {
           const guestShowTime = booking.mainBooking.show_time || booking.mainBooking['Show time'] || '';
@@ -1865,7 +1905,12 @@ const CheckInSystem = ({
           if (showFilter !== 'all' && showFilter !== '' && (!guestShowTime || guestShowTime === '')) {
             return false;
           }
-          return guestShowTime === '' || guestShowTime === showFilter;
+          
+          // Normalize both times for comparison to handle "9:00pm" vs "9pm"
+          const normalizedGuestTime = normalizeShowTime(guestShowTime);
+          const normalizedFilterTime = normalizeShowTime(showFilter);
+          
+          return guestShowTime === '' || normalizedGuestTime === normalizedFilterTime;
         })();
         
       return matchesSearch && matchesShow;
