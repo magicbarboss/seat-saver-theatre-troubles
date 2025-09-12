@@ -440,9 +440,12 @@ const CheckInSystem = ({
 
   // Helper function to consolidate duplicate order items
   const consolidateOrderItems = (items: string[]): string => {
+    console.log(`🔧 Consolidating items:`, items);
+    
     const itemCounts: Record<string, number> = {};
     
     items.forEach(item => {
+      console.log(`🔧 Processing item: "${item}"`);
       // Extract quantity and item name from strings like "2 Pizzas" or "1 Pizza"
       const match = item.match(/^(\d+)\s+(.+)$/);
       if (match) {
@@ -453,12 +456,15 @@ const CheckInSystem = ({
         const normalizedName = itemName.toLowerCase().replace(/s$/, '');
         const displayName = normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
         
+        console.log(`🔧 Matched quantity: ${quantity}, normalized: ${displayName}`);
+        
         if (itemCounts[displayName]) {
           itemCounts[displayName] += quantity;
         } else {
           itemCounts[displayName] = quantity;
         }
       } else {
+        console.log(`🔧 No quantity match for: "${item}"`);
         // Handle items without quantities
         if (itemCounts[item]) {
           itemCounts[item]++;
@@ -467,6 +473,8 @@ const CheckInSystem = ({
         }
       }
     });
+    
+    console.log(`🔧 Item counts:`, itemCounts);
     
     // Build consolidated string
     const consolidated = Object.entries(itemCounts).map(([item, count]) => {
@@ -479,7 +487,9 @@ const CheckInSystem = ({
       }
     });
     
-    return consolidated.join(', ');
+    const result = consolidated.join(', ');
+    console.log(`🔧 Final consolidated result: "${result}"`);
+    return result;
   };
 
   // Enhanced ticket type mapping with calculation method support
@@ -865,6 +875,9 @@ const CheckInSystem = ({
 
   // Generate comprehensive order summary with enhanced GYG/Viator detection and new calculation logic
   const getOrderSummary = (guest: Guest, totalGuestCount?: number, addOnGuests: Guest[] = []): string => {
+    const timestamp = new Date().toISOString();
+    console.log(`🚀 [${timestamp}] getOrderSummary called for ${guest.booker_name} (${guest.booking_code}) with totalGuestCount=${totalGuestCount}, addOns=${addOnGuests.length}`);
+    
     // Check for staff updated order first - highest priority
     console.log(`🔍 ORDER SUMMARY DEBUG for ${guest.booker_name}: staff_updated_order = "${guest.staff_updated_order}"`);
     if (guest.staff_updated_order?.trim()) {
@@ -933,9 +946,9 @@ const CheckInSystem = ({
     
     // Debug logs for specific problematic bookings
     const bookingCode = guest.booking_code;
-    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825'];
+    const debugBookings = ['DXLL-070925', 'JPFT-100925', 'HVHM-080925', 'ZXKQ-170725', 'NJGQ-280825', 'JBCC-030925'];
     if (debugBookings.includes(bookingCode)) {
-      console.log(`🔍 DEBUG ${bookingCode} (${guest.booker_name}): guestCount=${guestCount}, addonItems=${JSON.stringify(addonItems)}`);
+      console.log(`🔍 [${timestamp}] DEBUG ${bookingCode} (${guest.booker_name}): guestCount=${guestCount}, addOnGuests=${addOnGuests.length}, totalGuestCount=${totalGuestCount}`);
     }
     
     // FALLBACK: Simple text-based Smoke Offer detection (only if ticket mapping failed)
