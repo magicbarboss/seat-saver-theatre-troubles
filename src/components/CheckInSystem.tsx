@@ -2262,70 +2262,38 @@ const CheckInSystem = ({
       const guest = booking.mainBooking;
       console.log(`\n${index + 1}. GUEST: ${guest.booker_name}`);
       
-      let guestFoodCounted = false;
+      let orderSummaryToCount = '';
+      let isStaffUpdate = false;
       
       // PRIORITY 1: Check staff_updated_order first
       if (guest.staff_updated_order) {
         console.log(`   ⭐ STAFF UPDATE FOUND: "${guest.staff_updated_order}"`);
-        const staffFood = parseStaffOrder(guest.staff_updated_order);
-        
-        if (staffFood.pizzas > 0 || staffFood.chips > 0 || staffFood.stoneBaked > 0) {
-          foodBreakdown.pizzas += staffFood.pizzas;
-          foodBreakdown.chips += staffFood.chips;
-          foodBreakdown.stoneBakedPizza += staffFood.stoneBaked;
-          fromStaffUpdates += staffFood.pizzas + staffFood.chips + staffFood.stoneBaked;
-          guestFoodCounted = true;
-          console.log(`   ✅ Parsed from staff: Pizzas=${staffFood.pizzas}, Chips=${staffFood.chips}, Stone=${staffFood.stoneBaked}`);
-        }
+        orderSummaryToCount = guest.staff_updated_order;
+        isStaffUpdate = true;
+      } else {
+        // PRIORITY 2: Use getOrderSummary() to calculate the order (includes all package logic)
+        const calculatedOrder = getOrderSummary(guest);
+        console.log(`   📦 CALCULATED ORDER: "${calculatedOrder}"`);
+        orderSummaryToCount = calculatedOrder;
       }
       
-      // PRIORITY 2: Check Viator manual_order_summary
-      if (!guestFoodCounted && guest.ticket_data?.manual_order_summary) {
-        console.log(`   📋 VIATOR SUMMARY FOUND: "${guest.ticket_data.manual_order_summary}"`);
-        const viatorFood = parseStaffOrder(guest.ticket_data.manual_order_summary);
+      // Parse the order summary string
+      if (orderSummaryToCount) {
+        const parsedFood = parseStaffOrder(orderSummaryToCount);
         
-        if (viatorFood.pizzas > 0 || viatorFood.chips > 0 || viatorFood.stoneBaked > 0) {
-          foodBreakdown.pizzas += viatorFood.pizzas;
-          foodBreakdown.chips += viatorFood.chips;
-          foodBreakdown.stoneBakedPizza += viatorFood.stoneBaked;
-          fromOriginal += viatorFood.pizzas + viatorFood.chips + viatorFood.stoneBaked;
-          guestFoodCounted = true;
-          console.log(`   ✅ Parsed from Viator: Pizzas=${viatorFood.pizzas}, Chips=${viatorFood.chips}, Stone=${viatorFood.stoneBaked}`);
-        }
-      }
-      
-      // PRIORITY 3: Fallback to original ticket_data logic
-      if (!guestFoodCounted) {
-        const ticketData = guest.ticket_data || {};
-        console.log('   📝 Using original ticket data, keys:', Object.keys(ticketData));
-        
-        // Look for pizza-related ticket fields
-        Object.entries(ticketData).forEach(([key, value]) => {
-          if (key.toLowerCase().includes('pizza') && value && value !== '') {
-            const numValue = parseInt(String(value)) || 1;
-            console.log(`   🍕 FOUND PIZZA TICKET: ${key} = ${value} (parsed as ${numValue})`);
-            
-            if (key.toLowerCase().includes('stone baked') || key.toLowerCase().includes('garlic')) {
-              foodBreakdown.stoneBakedPizza += numValue;
-            } else {
-              foodBreakdown.pizzas += numValue;
-            }
-            fromOriginal += numValue;
+        if (parsedFood.pizzas > 0 || parsedFood.chips > 0 || parsedFood.stoneBaked > 0) {
+          foodBreakdown.pizzas += parsedFood.pizzas;
+          foodBreakdown.chips += parsedFood.chips;
+          foodBreakdown.stoneBakedPizza += parsedFood.stoneBaked;
+          
+          const itemCount = parsedFood.pizzas + parsedFood.chips + parsedFood.stoneBaked;
+          if (isStaffUpdate) {
+            fromStaffUpdates += itemCount;
+          } else {
+            fromOriginal += itemCount;
           }
           
-          if (key.toLowerCase().includes('chips') && value && value !== '') {
-            const numValue = parseInt(String(value)) || 1;
-            console.log(`   🍟 FOUND CHIPS: ${key} = ${value} (parsed as ${numValue})`);
-            foodBreakdown.chips += numValue;
-            fromOriginal += numValue;
-          }
-        });
-        
-        // Also check interval_pizza_order flag
-        if (guest.interval_pizza_order) {
-          console.log(`   🚩 Has interval_pizza_order flag - adding 1 pizza`);
-          foodBreakdown.pizzas += 1;
-          fromOriginal += 1;
+          console.log(`   ✅ Parsed: Pizzas=${parsedFood.pizzas}, Chips=${parsedFood.chips}, Stone=${parsedFood.stoneBaked} (Source: ${isStaffUpdate ? 'Staff' : 'Calculated'})`);
         }
       }
       
