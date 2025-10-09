@@ -2215,15 +2215,45 @@ const CheckInSystem = ({
     });
     return count;
   };
+  // Helper function to parse food items from text (staff orders, Viator summaries)
+  const parseStaffOrder = (orderText: string): { pizzas: number; chips: number; stoneBaked: number } => {
+    if (!orderText) return { pizzas: 0, chips: 0, stoneBaked: 0 };
+    
+    const text = orderText.toLowerCase();
+    const result = { pizzas: 0, chips: 0, stoneBaked: 0 };
+    
+    // Match patterns like "2 pizzas", "2x pizza", "2 x Pizza", etc.
+    const pizzaMatch = text.match(/(\d+)\s*(?:x\s*)?(?:pizza|margherita|pepperoni)(?:s)?/i);
+    if (pizzaMatch) {
+      result.pizzas = parseInt(pizzaMatch[1]) || 0;
+    }
+    
+    // Match chips/fries patterns
+    const chipsMatch = text.match(/(\d+)\s*(?:x\s*)?(?:chip|chips|fry|fries)/i);
+    if (chipsMatch) {
+      result.chips = parseInt(chipsMatch[1]) || 0;
+    }
+    
+    // Match stone baked/garlic bread patterns
+    const stoneMatch = text.match(/(\d+)\s*(?:x\s*)?(?:stone\s*baked|garlic\s*bread)/i);
+    if (stoneMatch) {
+      result.stoneBaked = parseInt(stoneMatch[1]) || 0;
+    }
+    
+    return result;
+  };
+
   const getTotalFoodNeeded = () => {
     const foodBreakdown = {
       pizzas: 0,
       chips: 0,
       stoneBakedPizza: 0
-      // Removed drinks - causing confusion with ticket names
     };
     
-    console.log('\n🍕 === STARTING FOOD CALCULATION ===');
+    let fromStaffUpdates = 0;
+    let fromOriginal = 0;
+    
+    console.log('\n🍕 === STARTING SMART FOOD CALCULATION ===');
     console.log(`Processing ${groupedBookings.length} bookings for show filter: ${showFilter}`);
     
     groupedBookings.forEach((booking, index) => {
@@ -2232,43 +2262,71 @@ const CheckInSystem = ({
       const guest = booking.mainBooking;
       console.log(`\n${index + 1}. GUEST: ${guest.booker_name}`);
       
-      // Debug Alex specifically
-      if (guest.booker_name?.toLowerCase().includes('alex')) {
-        console.log(`🔍 ALEX DEBUG - magic_info:`, guest.magic_info);
-        console.log(`🔍 ALEX DEBUG - diet_info:`, guest.diet_info);
-        console.log(`🔍 ALEX DEBUG - full guest data:`, guest);
+      let guestFoodCounted = false;
+      
+      // PRIORITY 1: Check staff_updated_order first
+      if (guest.staff_updated_order) {
+        console.log(`   ⭐ STAFF UPDATE FOUND: "${guest.staff_updated_order}"`);
+        const staffFood = parseStaffOrder(guest.staff_updated_order);
+        
+        if (staffFood.pizzas > 0 || staffFood.chips > 0 || staffFood.stoneBaked > 0) {
+          foodBreakdown.pizzas += staffFood.pizzas;
+          foodBreakdown.chips += staffFood.chips;
+          foodBreakdown.stoneBakedPizza += staffFood.stoneBaked;
+          fromStaffUpdates += staffFood.pizzas + staffFood.chips + staffFood.stoneBaked;
+          guestFoodCounted = true;
+          console.log(`   ✅ Parsed from staff: Pizzas=${staffFood.pizzas}, Chips=${staffFood.chips}, Stone=${staffFood.stoneBaked}`);
+        }
       }
       
-      // Check if guest has pizza tickets in their ticket data
-      const ticketData = guest.ticket_data || {};
-      console.log('   Ticket data keys:', Object.keys(ticketData));
+      // PRIORITY 2: Check Viator manual_order_summary
+      if (!guestFoodCounted && guest.ticket_data?.manual_order_summary) {
+        console.log(`   📋 VIATOR SUMMARY FOUND: "${guest.ticket_data.manual_order_summary}"`);
+        const viatorFood = parseStaffOrder(guest.ticket_data.manual_order_summary);
+        
+        if (viatorFood.pizzas > 0 || viatorFood.chips > 0 || viatorFood.stoneBaked > 0) {
+          foodBreakdown.pizzas += viatorFood.pizzas;
+          foodBreakdown.chips += viatorFood.chips;
+          foodBreakdown.stoneBakedPizza += viatorFood.stoneBaked;
+          fromOriginal += viatorFood.pizzas + viatorFood.chips + viatorFood.stoneBaked;
+          guestFoodCounted = true;
+          console.log(`   ✅ Parsed from Viator: Pizzas=${viatorFood.pizzas}, Chips=${viatorFood.chips}, Stone=${viatorFood.stoneBaked}`);
+        }
+      }
       
-      // Look for pizza-related ticket fields
-      Object.entries(ticketData).forEach(([key, value]) => {
-        if (key.toLowerCase().includes('pizza') && value && value !== '') {
-          const numValue = parseInt(String(value)) || 1;
-          console.log(`   🍕 FOUND PIZZA TICKET: ${key} = ${value} (parsed as ${numValue})`);
-          
-          if (key.toLowerCase().includes('stone baked') || key.toLowerCase().includes('garlic')) {
-            foodBreakdown.stoneBakedPizza += numValue;
-          } else {
-            foodBreakdown.pizzas += numValue;
+      // PRIORITY 3: Fallback to original ticket_data logic
+      if (!guestFoodCounted) {
+        const ticketData = guest.ticket_data || {};
+        console.log('   📝 Using original ticket data, keys:', Object.keys(ticketData));
+        
+        // Look for pizza-related ticket fields
+        Object.entries(ticketData).forEach(([key, value]) => {
+          if (key.toLowerCase().includes('pizza') && value && value !== '') {
+            const numValue = parseInt(String(value)) || 1;
+            console.log(`   🍕 FOUND PIZZA TICKET: ${key} = ${value} (parsed as ${numValue})`);
+            
+            if (key.toLowerCase().includes('stone baked') || key.toLowerCase().includes('garlic')) {
+              foodBreakdown.stoneBakedPizza += numValue;
+            } else {
+              foodBreakdown.pizzas += numValue;
+            }
+            fromOriginal += numValue;
           }
-        }
+          
+          if (key.toLowerCase().includes('chips') && value && value !== '') {
+            const numValue = parseInt(String(value)) || 1;
+            console.log(`   🍟 FOUND CHIPS: ${key} = ${value} (parsed as ${numValue})`);
+            foodBreakdown.chips += numValue;
+            fromOriginal += numValue;
+          }
+        });
         
-        if (key.toLowerCase().includes('chips') && value && value !== '') {
-          const numValue = parseInt(String(value)) || 1;
-          console.log(`   🍟 FOUND CHIPS: ${key} = ${value} (parsed as ${numValue})`);
-          foodBreakdown.chips += numValue;
+        // Also check interval_pizza_order flag
+        if (guest.interval_pizza_order) {
+          console.log(`   🚩 Has interval_pizza_order flag - adding 1 pizza`);
+          foodBreakdown.pizzas += 1;
+          fromOriginal += 1;
         }
-        
-        // Removed drinks detection - was causing confusion with ticket names containing "drink"
-      });
-      
-      // Also check interval_pizza_order flag
-      if (guest.interval_pizza_order) {
-        console.log(`   🚩 Has interval_pizza_order flag - adding 1 pizza`);
-        foodBreakdown.pizzas += 1;
       }
       
       console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}`);
@@ -2280,6 +2338,8 @@ const CheckInSystem = ({
     console.log(`Regular Pizzas: ${foodBreakdown.pizzas}`);
     console.log(`Chips: ${foodBreakdown.chips}`);
     console.log(`Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
+    console.log(`From Staff Updates: ${fromStaffUpdates}`);
+    console.log(`From Original Bookings: ${fromOriginal}`);
     console.log(`TOTAL: ${total}`);
     console.log('================================\n');
     
