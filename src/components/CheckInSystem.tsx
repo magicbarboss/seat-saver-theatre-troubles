@@ -338,8 +338,7 @@ const CheckInSystem = ({
           booking_comments: Object.fromEntries(bookingComments) as any,
           guest_notes: Object.fromEntries(guestNotes) as any,
           manual_links: Object.fromEntries(manualLinks) as any,
-          walk_in_guests: walkInGuests as any,
-          last_updated: new Date().toISOString()
+          walk_in_guests: walkInGuests as any
         };
         
         // Save to database
@@ -369,8 +368,7 @@ const CheckInSystem = ({
             checked_in_guests: Array.from(checkedInGuests),
             pager_assignments: Object.fromEntries(pagerAssignments),
             seated_guests: Array.from(seatedGuests),
-            allocated_guests: Array.from(allocatedGuests),
-            last_updated: new Date().toISOString()
+            allocated_guests: Array.from(allocatedGuests)
           };
           localStorage.setItem(localStorageKey, JSON.stringify(fallbackData));
           console.log('💾 Fallback: Saved to localStorage only');

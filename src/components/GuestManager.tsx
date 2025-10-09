@@ -34,6 +34,10 @@ interface Guest {
   interval_drinks_order?: boolean;
   diet_info?: string;
   magic_info?: string;
+  staff_updated_order?: string;
+  manual_override?: boolean;
+  order_last_updated_at?: string;
+  order_last_updated_by?: string;
 }
 
 const GuestManager = () => {
@@ -240,6 +244,11 @@ const GuestManager = () => {
         // Preserve diet and magic info that's already extracted
         diet_info: guest.diet_info,
         magic_info: guest.magic_info,
+        // Preserve staff order updates
+        staff_updated_order: guest.staff_updated_order,
+        manual_override: guest.manual_override,
+        order_last_updated_at: guest.order_last_updated_at,
+        order_last_updated_by: guest.order_last_updated_by,
         // Pass through ticket_data for the CheckInSystem to process
         ticket_data: ticketData
       };
