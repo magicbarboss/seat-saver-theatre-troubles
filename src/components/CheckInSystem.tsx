@@ -2226,11 +2226,11 @@ const CheckInSystem = ({
     return count;
   };
   // Helper function to parse food items from text (staff orders, Viator summaries)
-  const parseStaffOrder = (orderText: string): { pizzas: number; chips: number; stoneBaked: number } => {
-    if (!orderText) return { pizzas: 0, chips: 0, stoneBaked: 0 };
+  const parseStaffOrder = (orderText: string): { pizzas: number; chips: number; loadedFries: number } => {
+    if (!orderText) return { pizzas: 0, chips: 0, loadedFries: 0 };
     
     const text = orderText.toLowerCase();
-    const result = { pizzas: 0, chips: 0, stoneBaked: 0 };
+    const result = { pizzas: 0, chips: 0, loadedFries: 0 };
     
     // Match patterns like "2 pizzas", "2x pizza", "2 x Pizza", etc.
     const pizzaMatch = text.match(/(\d+)\s*(?:x\s*)?(?:pizza|margherita|pepperoni)(?:s)?/i);
@@ -2238,16 +2238,16 @@ const CheckInSystem = ({
       result.pizzas = parseInt(pizzaMatch[1]) || 0;
     }
     
-    // Match chips/fries patterns
-    const chipsMatch = text.match(/(\d+)\s*(?:x\s*)?(?:chip|chips|fry|fries)/i);
-    if (chipsMatch) {
-      result.chips = parseInt(chipsMatch[1]) || 0;
+    // Match loaded fries FIRST (before regular fries check)
+    const loadedFriesMatch = text.match(/(\d+)\s*(?:x\s*)?loaded\s*(?:fry|fries)/i);
+    if (loadedFriesMatch) {
+      result.loadedFries = parseInt(loadedFriesMatch[1]) || 0;
     }
     
-    // Match stone baked/garlic bread patterns
-    const stoneMatch = text.match(/(\d+)\s*(?:x\s*)?(?:stone\s*baked|garlic\s*bread)/i);
-    if (stoneMatch) {
-      result.stoneBaked = parseInt(stoneMatch[1]) || 0;
+    // Match regular chips/fries patterns (exclude "loaded" from the match)
+    const chipsMatch = text.match(/(\d+)\s*(?:x\s*)?(?!loaded\s)(?:chip|chips|fry|fries)/i);
+    if (chipsMatch) {
+      result.chips = parseInt(chipsMatch[1]) || 0;
     }
     
     return result;
@@ -2257,7 +2257,7 @@ const CheckInSystem = ({
     const foodBreakdown = {
       pizzas: 0,
       chips: 0,
-      stoneBakedPizza: 0
+      loadedFries: 0
     };
     
     let fromStaffUpdates = 0;
@@ -2291,31 +2291,31 @@ const CheckInSystem = ({
       if (orderSummaryToCount) {
         const parsedFood = parseStaffOrder(orderSummaryToCount);
         
-        if (parsedFood.pizzas > 0 || parsedFood.chips > 0 || parsedFood.stoneBaked > 0) {
+        if (parsedFood.pizzas > 0 || parsedFood.chips > 0 || parsedFood.loadedFries > 0) {
           foodBreakdown.pizzas += parsedFood.pizzas;
           foodBreakdown.chips += parsedFood.chips;
-          foodBreakdown.stoneBakedPizza += parsedFood.stoneBaked;
+          foodBreakdown.loadedFries += parsedFood.loadedFries;
           
-          const itemCount = parsedFood.pizzas + parsedFood.chips + parsedFood.stoneBaked;
+          const itemCount = parsedFood.pizzas + parsedFood.chips + parsedFood.loadedFries;
           if (isStaffUpdate) {
             fromStaffUpdates += itemCount;
           } else {
             fromOriginal += itemCount;
           }
           
-          console.log(`   ✅ Parsed: Pizzas=${parsedFood.pizzas}, Chips=${parsedFood.chips}, Stone=${parsedFood.stoneBaked} (Source: ${isStaffUpdate ? 'Staff' : 'Calculated'})`);
+          console.log(`   ✅ Parsed: Pizzas=${parsedFood.pizzas}, Chips=${parsedFood.chips}, Loaded Fries=${parsedFood.loadedFries} (Source: ${isStaffUpdate ? 'Staff' : 'Calculated'})`);
         }
       }
       
-      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Stone=${foodBreakdown.stoneBakedPizza}`);
+      console.log(`   Running totals: Pizzas=${foodBreakdown.pizzas}, Chips=${foodBreakdown.chips}, Loaded Fries=${foodBreakdown.loadedFries}`);
     });
     
-    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.stoneBakedPizza;
+    const total = foodBreakdown.pizzas + foodBreakdown.chips + foodBreakdown.loadedFries;
     
     console.log('\n🍕 === FINAL FOOD TOTALS ===');
-    console.log(`Regular Pizzas: ${foodBreakdown.pizzas}`);
-    console.log(`Chips: ${foodBreakdown.chips}`);
-    console.log(`Stone Baked Pizzas: ${foodBreakdown.stoneBakedPizza}`);
+    console.log(`Pizzas: ${foodBreakdown.pizzas}`);
+    console.log(`Regular Fries/Chips: ${foodBreakdown.chips}`);
+    console.log(`Loaded Fries: ${foodBreakdown.loadedFries}`);
     console.log(`From Staff Updates: ${fromStaffUpdates}`);
     console.log(`From Original Bookings: ${fromOriginal}`);
     console.log(`TOTAL: ${total}`);

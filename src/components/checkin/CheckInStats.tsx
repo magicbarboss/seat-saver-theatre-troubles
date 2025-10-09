@@ -10,7 +10,7 @@ interface CheckInStatsProps {
   foodBreakdown?: {
     pizzas: number;
     chips: number;
-    stoneBakedPizza: number;
+    loadedFries: number;
   };
   showTimeStats: { [key: string]: number };
   lastSaved: Date;
@@ -85,17 +85,17 @@ export const CheckInStats = ({
                 )}
                 {foodBreakdown.chips > 0 && (
                   <div className="flex justify-between">
-                    <span>🍟 Chips:</span>
+                    <span>🍟 Fries:</span>
                     <span className="font-semibold text-foreground">{foodBreakdown.chips}</span>
                   </div>
                 )}
-                {foodBreakdown.stoneBakedPizza > 0 && (
+                {foodBreakdown.loadedFries > 0 && (
                   <div className="flex justify-between">
-                    <span>🥖 Stone Baked:</span>
-                    <span className="font-semibold text-foreground">{foodBreakdown.stoneBakedPizza}</span>
+                    <span>🍟🧀 Loaded Fries:</span>
+                    <span className="font-semibold text-foreground">{foodBreakdown.loadedFries}</span>
                   </div>
                 )}
-                {!foodBreakdown.pizzas && !foodBreakdown.chips && !foodBreakdown.stoneBakedPizza && (
+                {!foodBreakdown.pizzas && !foodBreakdown.chips && !foodBreakdown.loadedFries && (
                   <div className="text-xs">No food items detected</div>
                 )}
               </>
