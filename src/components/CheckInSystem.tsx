@@ -500,6 +500,9 @@ const CheckInSystem = ({
   const consolidateOrderItems = (items: string[]): string => {
     console.log(`🔧 Consolidating items:`, items);
     
+    // Words that are always plural (don't remove the 's')
+    const alwaysPlural = ['fries', 'chips'];
+    
     const itemCounts: Record<string, number> = {};
     
     items.forEach(item => {
@@ -511,8 +514,14 @@ const CheckInSystem = ({
         let itemName = match[2];
         
         // Normalize plural/singular forms
-        const normalizedName = itemName.toLowerCase().replace(/s$/, '');
-        const displayName = normalizedName.charAt(0).toUpperCase() + normalizedName.slice(1);
+        const lowerItem = itemName.toLowerCase();
+        const shouldKeepPlural = alwaysPlural.some(word => lowerItem.includes(word));
+        const normalizedName = shouldKeepPlural ? lowerItem : lowerItem.replace(/s$/, '');
+        
+        // Handle compound words (e.g., "loaded fries", "house pint")
+        const displayName = normalizedName.split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
         
         console.log(`🔧 Matched quantity: ${quantity}, normalized: ${displayName}`);
         
@@ -537,8 +546,9 @@ const CheckInSystem = ({
     // Build consolidated string
     const consolidated = Object.entries(itemCounts).map(([item, count]) => {
       if (item.match(/^[A-Z]/)) {
-        // Items with quantities
-        return count > 1 ? `${count} ${item}s` : `${count} ${item}`;
+        // Items with quantities - check if it's an always-plural word
+        const needsPlural = !alwaysPlural.some(word => item.toLowerCase().includes(word));
+        return count > 1 && needsPlural ? `${count} ${item}s` : `${count} ${item}`;
       } else {
         // Items without quantities
         return count > 1 ? `${count} ${item}` : item;
