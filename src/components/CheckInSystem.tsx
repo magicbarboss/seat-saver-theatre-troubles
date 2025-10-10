@@ -2999,6 +2999,7 @@ const CheckInSystem = ({
             friendshipGroups={friendshipGroups}
             onAddWalkIn={handleAddWalkIn}
             showTimes={showTimes}
+            guestTableAllocations={guestTableAllocations}
           />
         </TabsContent>
 

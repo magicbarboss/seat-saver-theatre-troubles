@@ -30,6 +30,7 @@ interface SeatingManagementProps {
   friendshipGroups: Map<string, number[]>;
   onAddWalkIn?: (walkInData: { name: string; count: number; showTime: string; notes?: string }) => void;
   showTimes: string[];
+  guestTableAllocations?: Map<number, number[]>;
 }
 
 export const SeatingManagement: React.FC<SeatingManagementProps> = ({
@@ -39,7 +40,8 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
   showTime,
   friendshipGroups,
   onAddWalkIn,
-  showTimes
+  showTimes,
+  guestTableAllocations = new Map()
 }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [activeTab, setActiveTab] = useState('seating');
@@ -196,12 +198,14 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
 
   // Update tables with current guest assignments
   const tablesWithGuests = tables.map(table => {
-    const assignedGuests = checkedInGuests.filter(guest => 
-      guest.hasTableAllocated && 
-      // This would need to be connected to actual table assignments
-      // For now, we'll use a placeholder logic
-      false
-    );
+    // Parse table ID (e.g., "T1" -> 1, "T15" -> 15)
+    const tableNumber = parseInt(table.id.replace(/\D/g, '')) || 0;
+    
+    // Find all guests assigned to this table
+    const assignedGuests = checkedInGuests.filter(guest => {
+      const guestTables = guestTableAllocations.get(guest.originalIndex);
+      return guestTables && guestTables.includes(tableNumber);
+    });
     
     return {
       ...table,
