@@ -40,6 +40,7 @@ export interface CheckedInGuest {
   hasBeenSeated?: boolean;
   hasTableAllocated?: boolean;
   isWalkIn?: boolean;
+  pizzaSelections?: string[];
 }
 
 export interface PartyGroup {

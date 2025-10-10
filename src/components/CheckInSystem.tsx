@@ -2720,7 +2720,8 @@ const CheckInSystem = ({
                 hasBeenSeated: seatedGuests.has(index),
                 hasTableAllocated: allocatedGuests.has(index),
                 notes: String(walkInGuest.notes || ''),
-                isWalkIn: true
+                isWalkIn: true,
+                pizzaSelections: pizzaSelections.get(index) || []
               };
             } else {
               console.warn(`Walk-in guest not found at index ${walkInIndex}`);
@@ -2740,7 +2741,8 @@ const CheckInSystem = ({
               hasBeenSeated: seatedGuests.has(index),
               hasTableAllocated: allocatedGuests.has(index),
               notes: String(booking.mainBooking.notes || ''),
-              isWalkIn: false
+              isWalkIn: false,
+              pizzaSelections: pizzaSelections.get(index) || []
             };
           } else {
             console.warn(`Booking not found for index ${index}`);
@@ -2758,7 +2760,7 @@ const CheckInSystem = ({
       console.error('Error building checkedInGuestsArray:', err);
       return [];
     }
-  }, [checkedInGuests, groupedBookings, walkInGuests, pagerAssignments, seatedGuests, allocatedGuests]);
+  }, [checkedInGuests, groupedBookings, walkInGuests, pagerAssignments, seatedGuests, allocatedGuests, pizzaSelections]);
 
   // Table allocation handlers
   const handleTableAssign = (tableId: number, guestName: string, guestCount: number, showTime: string) => {

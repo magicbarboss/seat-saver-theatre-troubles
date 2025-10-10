@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckedInGuest } from '../checkin/types';
 import { WalkInGuestForm } from '../checkin/WalkInGuestForm';
+import { formatPizzaName } from '../checkin/PizzaOrderDropdown';
 import { Users, UserMinus, Eye, EyeOff, ChevronDown, Link, UserPlus } from 'lucide-react';
 
 interface Table {
@@ -330,6 +331,19 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                       <div className="text-sm text-muted-foreground">
                         {members.reduce((sum, m) => sum + m.count, 0)} guests total • Group of {members.length}
                       </div>
+                      {(() => {
+                        const allPizzas = members.flatMap(m => m.pizzaSelections || []);
+                        const uniquePizzas = Array.from(new Set(allPizzas));
+                        return uniquePizzas.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {uniquePizzas.map(pizza => (
+                              <Badge key={pizza} variant="secondary" className="text-xs">
+                                {formatPizzaName(pizza)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                   
@@ -350,6 +364,15 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                       </div>
                       {guest.isWalkIn && (
                         <Badge variant="outline" className="mt-1">Walk-in</Badge>
+                      )}
+                      {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {guest.pizzaSelections.map(pizza => (
+                            <Badge key={pizza} variant="secondary" className="text-xs">
+                              {formatPizzaName(pizza)}
+                            </Badge>
+                          ))}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -390,11 +413,24 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                       members.forEach(guest => handleGuestAssign(guest));
                     }}
                   >
-                    <div className="text-left">
+                    <div className="text-left w-full">
                       <div className="font-medium">{members[0]?.name || 'Group'} & Friends</div>
                       <div className="text-sm text-muted-foreground">
                         {members.reduce((sum, m) => sum + m.count, 0)} guests total • Group of {members.length}
                       </div>
+                      {(() => {
+                        const allPizzas = members.flatMap(m => m.pizzaSelections || []);
+                        const uniquePizzas = Array.from(new Set(allPizzas));
+                        return uniquePizzas.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {uniquePizzas.map(pizza => (
+                              <Badge key={pizza} variant="secondary" className="text-xs">
+                                {formatPizzaName(pizza)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                   </Button>
                 ))}
@@ -404,14 +440,23 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                   <Button
                     key={guest.originalIndex}
                     variant="outline"
-                    className="w-full justify-start"
+                    className="w-full justify-start h-auto p-3"
                     onClick={() => handleGuestAssign(guest)}
                   >
-                    <div className="text-left">
+                    <div className="text-left w-full">
                       <div className="font-medium">{guest.name}</div>
                       <div className="text-sm text-muted-foreground">
                         {guest.count} guests • {guest.showTime}
                       </div>
+                      {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {guest.pizzaSelections.map(pizza => (
+                            <Badge key={pizza} variant="secondary" className="text-xs">
+                              {formatPizzaName(pizza)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </Button>
                 ))}
@@ -446,11 +491,20 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                 <h4 className="font-medium">Assigned Guests:</h4>
                 {selectedTableData.assignedGuests.map(guest => (
                   <div key={guest.originalIndex} className="flex items-center justify-between p-2 border border-border rounded">
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium">{guest.name}</div>
                       <div className="text-sm text-muted-foreground">
                         {guest.count} guests • {guest.showTime}
                       </div>
+                      {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {guest.pizzaSelections.map(pizza => (
+                            <Badge key={pizza} variant="secondary" className="text-xs">
+                              {formatPizzaName(pizza)}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <Button
                       variant="outline"
