@@ -297,7 +297,11 @@ export const GuestRow = ({
           </span>
           {partyInfo?.isInParty && (
             <>
-              <Badge variant="outline" className="text-xs">Linked</Badge>
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                Linked with {partyInfo.partyMembers
+                  .filter(name => name !== guestName)
+                  .join(', ')}
+              </Badge>
               <Badge variant="outline" className="text-xs">Party of {partyInfo.partySize}</Badge>
             </>
           )}
