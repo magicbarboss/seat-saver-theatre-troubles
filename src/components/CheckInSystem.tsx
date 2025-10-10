@@ -1951,40 +1951,14 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
-  // Helper function to calculate actual guest count (excluding add-ons like prosecco)
+  // Helper function to calculate actual guest count
   const calculateActualGuestCount = (guest: Guest): number => {
-    // Helper: detect pure add-on items (not main packages)
-    const isPureAddon = (name: string) => {
-      const n = name.trim().toLowerCase();
-      return /^(house\s*cocktails?|cocktails?|house\s*pints?|pints?|beer|beers|wine|wines|prosecco)$/.test(n);
-    };
-
-    const tickets = getAllTicketTypes(guest);
-    const actualGuestTickets = tickets.filter(t => !isPureAddon(t.type));
+    // The total_quantity field already represents the correct number of guests
+    // This is set during CSV upload and is the most reliable source
+    const count = guest.total_quantity || 0;
     
-    // If we have explicit ticket mappings, use those
-    let totalActualGuests = 0;
-    
-    for (const ticket of actualGuestTickets) {
-      const mapping = TICKET_TYPE_MAPPING[ticket.type];
-      if (mapping) {
-        // Use the ticket mapping to determine guest count
-        // Most ticket types represent 1 guest per ticket unless specified otherwise
-        totalActualGuests += ticket.quantity;
-      } else {
-        // Fallback: assume each ticket represents 1 guest
-        totalActualGuests += ticket.quantity;
-      }
-    }
-    
-    // If no valid tickets found, fall back to total_quantity but log it
-    if (totalActualGuests === 0) {
-      console.log(`⚠️ No valid guest tickets found for ${guest.booker_name}, falling back to total_quantity: ${guest.total_quantity}`);
-      return guest.total_quantity || 0;
-    }
-    
-    console.log(`👥 ${guest.booker_name} (${guest.booking_code}): actual guests = ${totalActualGuests}, total_quantity = ${guest.total_quantity}`);
-    return totalActualGuests;
+    console.log(`👥 ${guest.booker_name} (${guest.booking_code}): guests = ${count}`);
+    return count;
   };
 
   // Build Party Groups from friendshipGroups and manualLinks so UI can show "Linked"
