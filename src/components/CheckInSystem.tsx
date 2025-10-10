@@ -1951,6 +1951,55 @@ const CheckInSystem = ({
     }
   }, [processFriendshipGroups]);
 
+  // Extract same-name groups (multiple bookings by the same person)
+  const sameNameGroups = useMemo(() => {
+    if (!guests || guests.length === 0) {
+      return new Map<string, number[]>();
+    }
+
+    const groups = new Map<string, number[]>();
+    const nameToIndices = new Map<string, number[]>();
+
+    // Group guests by normalized booker name
+    guests.forEach((guest, index) => {
+      if (!guest || !guest.booker_name) return;
+      
+      const originalIndex = (guest as any).originalIndex ?? index;
+      const normalizedName = normalizeNameForMatching(guest.booker_name);
+      
+      if (!nameToIndices.has(normalizedName)) {
+        nameToIndices.set(normalizedName, []);
+      }
+      nameToIndices.get(normalizedName)!.push(originalIndex);
+    });
+
+    // Only create groups for names with multiple bookings (different booking codes)
+    nameToIndices.forEach((indices, normalizedName) => {
+      if (indices.length > 1) {
+        // Verify these are actually different bookings (different booking codes)
+        const bookingCodes = new Set(
+          indices.map(idx => {
+            const guest = guests.find(g => ((g as any).originalIndex ?? guests.indexOf(g)) === idx);
+            return guest?.booking_code;
+          }).filter(Boolean)
+        );
+
+        // Only link if there are multiple different booking codes
+        if (bookingCodes.size > 1) {
+          const guestName = guests.find(g => 
+            normalizeNameForMatching(g.booker_name || '') === normalizedName
+          )?.booker_name || normalizedName;
+          
+          groups.set(`Same Booker: ${guestName}`, indices.sort((a, b) => a - b));
+          
+          console.log(`🔗 AUTO-LINKED same booker: ${guestName} (${bookingCodes.size} separate bookings, ${indices.length} guests total)`);
+        }
+      }
+    });
+
+    return groups;
+  }, [guests]);
+
   // Helper function to calculate actual guest count
   const calculateActualGuestCount = (guest: Guest): number => {
     // The total_quantity field already represents the correct number of guests
@@ -1961,7 +2010,7 @@ const CheckInSystem = ({
     return count;
   };
 
-  // Build Party Groups from friendshipGroups and manualLinks so UI can show "Linked"
+  // Build Party Groups from friendshipGroups, manualLinks, and sameNameGroups so UI can show "Linked"
   useEffect(() => {
     const newPartyGroups = new Map<string, PartyGroup>();
 
@@ -1981,8 +2030,11 @@ const CheckInSystem = ({
     // From automatic friendships
     processFriendshipGroups.forEach((indices, label) => addGroup(label, indices));
 
+    // From same-name bookings
+    sameNameGroups.forEach((indices, label) => addGroup(label, indices));
+
     setPartyGroups(newPartyGroups);
-  }, [processFriendshipGroups, guests]);
+  }, [processFriendshipGroups, sameNameGroups, guests]);
 
   // Group bookings by booking code - preserve original order, derive names when missing
   const groupedBookings = useMemo(() => {
