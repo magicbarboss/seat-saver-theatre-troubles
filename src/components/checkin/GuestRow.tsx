@@ -4,7 +4,7 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit, Clock } from 'lucide-react';
+import { CheckCircle, User, Radio, MessageSquare, Info, AlertTriangle, Sparkles, Edit, Clock, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -365,8 +365,23 @@ export const GuestRow = ({
           {pizzaSelection && pizzaSelection.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {pizzaSelection.map(pizza => (
-                <Badge key={pizza} variant="secondary" className="text-xs">
-                  {formatPizzaName(pizza)}
+                <Badge 
+                  key={pizza} 
+                  variant="secondary" 
+                  className="text-xs flex items-center gap-1 pr-1"
+                >
+                  <span>{formatPizzaName(pizza)}</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const newSelection = pizzaSelection.filter(p => p !== pizza);
+                      await onPizzaSelectionChange(index, newSelection);
+                    }}
+                    className="ml-1 hover:text-destructive transition-colors rounded-full hover:bg-destructive/10 p-0.5"
+                    title={`Remove ${formatPizzaName(pizza)}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </Badge>
               ))}
             </div>
