@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -27,6 +27,7 @@ export type Database = {
           id: string
           pager_assignments: Json | null
           party_groups: Json | null
+          pizza_selections: Json | null
           seated_guests: number[] | null
           seated_sections: string[] | null
           session_date: string
@@ -46,6 +47,7 @@ export type Database = {
           id?: string
           pager_assignments?: Json | null
           party_groups?: Json | null
+          pizza_selections?: Json | null
           seated_guests?: number[] | null
           seated_sections?: string[] | null
           session_date?: string
@@ -65,6 +67,7 @@ export type Database = {
           id?: string
           pager_assignments?: Json | null
           party_groups?: Json | null
+          pizza_selections?: Json | null
           seated_guests?: number[] | null
           seated_sections?: string[] | null
           session_date?: string
@@ -113,6 +116,7 @@ export type Database = {
           id: string
           interval_drinks_order: boolean | null
           interval_pizza_order: boolean | null
+          interval_pizza_selection: Json | null
           is_allocated: boolean | null
           is_checked_in: boolean | null
           is_seated: boolean | null
@@ -142,6 +146,7 @@ export type Database = {
           id?: string
           interval_drinks_order?: boolean | null
           interval_pizza_order?: boolean | null
+          interval_pizza_selection?: Json | null
           is_allocated?: boolean | null
           is_checked_in?: boolean | null
           is_seated?: boolean | null
@@ -171,6 +176,7 @@ export type Database = {
           id?: string
           interval_drinks_order?: boolean | null
           interval_pizza_order?: boolean | null
+          interval_pizza_selection?: Json | null
           is_allocated?: boolean | null
           is_checked_in?: boolean | null
           is_seated?: boolean | null

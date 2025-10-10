@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { extractShowTimeFromText, normalizeShowTime } from '@/utils/showTimeExtractor';
+import { PizzaOrderDropdown, formatPizzaName } from './PizzaOrderDropdown';
 
 interface Guest {
   [key: string]: any;
@@ -59,6 +60,8 @@ interface GuestRowProps {
   onComment: (index: number) => void;
   onNotesChange: (index: number, notes: string) => void;
   onManualEdit?: (index: number) => void;
+  pizzaSelection?: string[];
+  onPizzaSelectionChange: (index: number, pizzas: string[]) => Promise<void>;
 }
 
 export const GuestRow = ({
@@ -82,7 +85,9 @@ export const GuestRow = ({
   onSeat,
   onComment,
   onNotesChange,
-  onManualEdit
+  onManualEdit,
+  pizzaSelection,
+  onPizzaSelectionChange
 }: GuestRowProps) => {
   // Enhanced full name extraction with comprehensive field checking
   const extractFullName = (guest: Guest) => {
@@ -317,32 +322,54 @@ export const GuestRow = ({
             <div className="bg-yellow-50 px-3 py-2 rounded-md border border-yellow-200 text-sm font-medium text-foreground">
               {orderSummary}
             </div>
-          {onManualEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onManualEdit(index)}
-              className="h-6 w-6 p-0"
-              title="Edit guest details"
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
+            {onManualEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onManualEdit(index)}
+                className="h-6 w-6 p-0"
+                title="Edit guest details"
+              >
+                <Edit className="h-3 w-3" />
+              </Button>
+            )}
+            
+            {/* Diet Info Badge */}
+            {guest.diet_info && (
+              <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Diet
+              </Badge>
+            )}
+            
+            {/* Magic Info Badge */}
+            {guest.magic_info && (
+              <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Magic
+              </Badge>
+            )}
+          </div>
+          
+          {/* Pizza Order Dropdown - only show if checked in */}
+          {isCheckedIn && (
+            <PizzaOrderDropdown
+              guestId={guest.id}
+              guestIndex={index}
+              currentSelection={pizzaSelection || []}
+              onSelectionChange={onPizzaSelectionChange}
+            />
           )}
           
-          {/* Diet Info Badge */}
-          {guest.diet_info && (
-            <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-50">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Diet
-            </Badge>
-          )}
-          
-          {/* Magic Info Badge */}
-          {guest.magic_info && (
-            <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">
-              <Sparkles className="h-3 w-3 mr-1" />
-              Magic
-            </Badge>
+          {/* Display selected pizzas as badges */}
+          {pizzaSelection && pizzaSelection.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {pizzaSelection.map(pizza => (
+                <Badge key={pizza} variant="secondary" className="text-xs">
+                  {formatPizzaName(pizza)}
+                </Badge>
+              ))}
+            </div>
           )}
           
           {(packageDetails.length > 0 && packageDetails.some(p => p.details.length > 0)) || guest.diet_info || guest.magic_info ? (
@@ -381,7 +408,6 @@ export const GuestRow = ({
               </PopoverContent>
             </Popover>
            ) : null}
-           </div>
            
            {/* Add-ons Section */}
            {addOnGuests && addOnGuests.length > 0 && (

@@ -58,6 +58,7 @@ const CheckInSystem = ({
   const [commentText, setCommentText] = useState('');
   const [guestNotes, setGuestNotes] = useState<Map<number, string>>(new Map());
   const [manualLinks, setManualLinks] = useState<Map<string, number[]>>(new Map());
+  const [pizzaSelections, setPizzaSelections] = useState<Map<number, string[]>>(new Map());
 
   // Sync local guests state with prop
   useEffect(() => {
@@ -88,6 +89,7 @@ const CheckInSystem = ({
       setBookingComments(new Map());
       setManualLinks(new Map());
       setWalkInGuests([]);
+      setPizzaSelections(new Map());
       setSessionDate(new Date().toDateString());
       setShowClearDialog(false);
       toast({
@@ -2627,6 +2629,43 @@ const CheckInSystem = ({
       description: "Guest link has been removed"
     });
   };
+
+  const handlePizzaSelectionChange = async (guestIndex: number, pizzas: string[]) => {
+    try {
+      const newSelections = new Map(pizzaSelections);
+      if (pizzas.length === 0) {
+        newSelections.delete(guestIndex);
+      } else {
+        newSelections.set(guestIndex, pizzas);
+      }
+      setPizzaSelections(newSelections);
+      
+      const guest = guests[guestIndex];
+      if (guest?.id) {
+        const { error } = await supabase
+          .from('guests')
+          .update({ interval_pizza_selection: pizzas })
+          .eq('id', guest.id);
+          
+        if (error) throw error;
+        
+        toast({
+          title: "✅ Pizza Order Updated",
+          description: `${pizzas.length} pizza${pizzas.length !== 1 ? 's' : ''} selected`
+        });
+      }
+      
+      // Auto-save will handle persistence
+    } catch (error) {
+      console.error('Error updating pizza selection:', error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to update pizza order",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Convert checked-in guests set to array format expected by TableAllocation
   const checkedInGuestsArray = React.useMemo(() => {
     console.log('Building checkedInGuestsArray, checkedInGuests:', checkedInGuests.size);
@@ -2882,10 +2921,12 @@ const CheckInSystem = ({
               onPagerAction={handlePagerAction} 
               onTableAllocate={handleTableAllocate} 
               onSeat={handleSeat} 
-              onComment={handleComment} 
-              onNotesChange={handleNotesChange}
-              onManualEdit={handleManualEdit} 
-            />
+                  onComment={handleComment}
+                  onNotesChange={handleNotesChange}
+                  onManualEdit={handleManualEdit}
+                  pizzaSelections={pizzaSelections}
+                  onPizzaSelectionChange={handlePizzaSelectionChange}
+                />
           </div>
         </TabsContent>
 

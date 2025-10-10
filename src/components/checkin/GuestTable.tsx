@@ -56,6 +56,8 @@ interface GuestTableProps {
   onComment: (index: number) => void;
   onNotesChange: (index: number, notes: string) => void;
   onManualEdit?: (index: number) => void;
+  pizzaSelections: Map<number, string[]>;
+  onPizzaSelectionChange: (index: number, pizzas: string[]) => Promise<void>;
 }
 
 export const GuestTable = ({
@@ -79,7 +81,9 @@ export const GuestTable = ({
   onSeat,
   onComment,
   onNotesChange,
-  onManualEdit
+  onManualEdit,
+  pizzaSelections,
+  onPizzaSelectionChange
 }: GuestTableProps) => {
   // Helper function to get party info for a guest
   const getPartyInfo = (guestIndex: number) => {
@@ -137,10 +141,12 @@ export const GuestTable = ({
               onPagerAction={onPagerAction}
               onTableAllocate={onTableAllocate}
               onSeat={onSeat}
-              onComment={onComment}
-              onNotesChange={onNotesChange}
-              onManualEdit={onManualEdit}
-            />
+                  onComment={onComment}
+                  onNotesChange={onNotesChange}
+                  onManualEdit={onManualEdit}
+                  pizzaSelection={pizzaSelections.get(group.originalIndex)}
+                  onPizzaSelectionChange={onPizzaSelectionChange}
+                />
           );
         })}
         
@@ -165,10 +171,12 @@ export const GuestTable = ({
               onPagerAction={onPagerAction}
               onTableAllocate={onTableAllocate}
               onSeat={onSeat}
-              onComment={onComment}
-              onNotesChange={onNotesChange}
-              onManualEdit={onManualEdit}
-            />
+                onComment={onComment}
+                onNotesChange={onNotesChange}
+                onManualEdit={onManualEdit}
+                pizzaSelection={pizzaSelections.get(walkInIndex)}
+                onPizzaSelectionChange={onPizzaSelectionChange}
+              />
           );
         })}
       </TableBody>
