@@ -319,9 +319,9 @@ const CheckInSystem = ({
     };
   }, [user?.id, guestListId, guests?.length]);
 
-  // Load pizza selections from guests data
+  // Load pizza selections from guests data (only on initial mount or guest list change)
   useEffect(() => {
-    if (!guests || guests.length === 0) return;
+    if (!guests || guests.length === 0 || pizzaSelections.size > 0) return;
     
     const newPizzaSelections = new Map<number, string[]>();
     guests.forEach((guest, index) => {
@@ -332,7 +332,7 @@ const CheckInSystem = ({
     
     console.log(`🍕 Loaded pizza selections for ${newPizzaSelections.size} guests from database`);
     setPizzaSelections(newPizzaSelections);
-  }, [guests]);
+  }, [guests.length]);
 
   // Auto-save to both Supabase and localStorage for backup
   useEffect(() => {
@@ -2689,6 +2689,16 @@ const CheckInSystem = ({
           .eq('id', guest.id);
           
         if (error) throw error;
+        
+        // Update the local guests array to keep it in sync
+        const updatedGuests = guests.map((g, idx) => 
+          idx === guestIndex 
+            ? { ...g, interval_pizza_selection: pizzas }
+            : g
+        );
+        setGuests(updatedGuests);
+        
+        console.log(`🍕 Pizza selection updated for guest ${guestIndex}: ${pizzas.join(', ')}`);
         
         toast({
           title: "✅ Pizza Order Updated",
