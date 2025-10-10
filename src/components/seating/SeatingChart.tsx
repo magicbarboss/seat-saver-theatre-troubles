@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckedInGuest } from '../checkin/types';
 import { WalkInGuestForm } from '../checkin/WalkInGuestForm';
 import { formatPizzaName } from '../checkin/PizzaOrderDropdown';
+import { toast } from '@/hooks/use-toast';
 import { Users, UserMinus, Eye, EyeOff, ChevronDown, Link, UserPlus } from 'lucide-react';
 
 interface Table {
@@ -49,6 +50,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   const [showGuestPanel, setShowGuestPanel] = useState(true);
   const [isJoinTablesMode, setIsJoinTablesMode] = useState(false);
   const [selectedTablesForJoining, setSelectedTablesForJoining] = useState<string[]>([]);
+  const [joinedTableGroups, setJoinedTableGroups] = useState<Map<string, string[]>>(new Map());
 
   // Calculate table statistics
   const tableStats = useMemo(() => {
@@ -165,10 +167,31 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   };
 
   const handleJoinSelectedTables = () => {
-    if (selectedTablesForJoining.length < 2) return;
+    if (selectedTablesForJoining.length < 2) {
+      toast({
+        title: "Select at least 2 tables",
+        description: "You need to select at least 2 tables to join them",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    // Implementation for joining tables would go here
-    console.log('Joining tables:', selectedTablesForJoining);
+    // Create a unique group ID for this joined table set
+    const groupId = `joined-${Date.now()}`;
+    const newJoinedGroups = new Map(joinedTableGroups);
+    newJoinedGroups.set(groupId, [...selectedTablesForJoining]);
+    setJoinedTableGroups(newJoinedGroups);
+    
+    // Calculate total capacity
+    const totalCapacity = selectedTablesForJoining.reduce((sum, tableId) => {
+      const table = tables.find(t => t.id === tableId);
+      return sum + (table?.seats || 0);
+    }, 0);
+    
+    toast({
+      title: "✅ Tables Joined",
+      description: `Tables ${selectedTablesForJoining.join(', ')} now have combined capacity of ${totalCapacity} seats`,
+    });
     
     // Reset joining mode
     setIsJoinTablesMode(false);
@@ -182,6 +205,39 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
 
   const handleGuestAssign = (guest: CheckedInGuest) => {
     if (!selectedTable) return;
+    
+    // Check if this table is part of a joined group
+    let effectiveCapacity = selectedTable.seats;
+    let joinedTableIds = [selectedTable.id];
+    
+    for (const [groupId, tableIds] of joinedTableGroups.entries()) {
+      if (tableIds.includes(selectedTable.id)) {
+        // This is a joined table group
+        effectiveCapacity = tableIds.reduce((sum, id) => {
+          const t = tables.find(t => t.id === id);
+          return sum + (t?.seats || 0);
+        }, 0);
+        joinedTableIds = tableIds;
+        break;
+      }
+    }
+    
+    // Calculate current occupancy across all joined tables
+    const currentOccupancy = joinedTableIds.reduce((sum, id) => {
+      const t = tables.find(t => t.id === id);
+      const guestCount = t?.assignedGuests?.reduce((gSum, g) => gSum + g.count, 0) || 0;
+      return sum + guestCount;
+    }, 0);
+    
+    // Check if guest party will fit
+    if (currentOccupancy + guest.count > effectiveCapacity) {
+      toast({
+        title: "❌ Not enough capacity",
+        description: `This table/group has ${effectiveCapacity} seats, currently ${currentOccupancy} occupied. Cannot fit ${guest.count} more guests.`,
+        variant: "destructive"
+      });
+      return;
+    }
     
     onTableAssign(selectedTable.id, guest);
     setShowAssignDialog(false);
@@ -261,14 +317,31 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
               {tables.map(table => {
                 const guestCount = table.assignedGuests?.reduce((sum, g) => sum + g.count, 0) || 0;
                 
+                // Check if this table is part of a joined group
+                let joinedGroupInfo = null;
+                for (const [groupId, tableIds] of joinedTableGroups.entries()) {
+                  if (tableIds.includes(table.id)) {
+                    joinedGroupInfo = {
+                      groupId,
+                      tableIds,
+                      totalCapacity: tableIds.reduce((sum, id) => {
+                        const t = tables.find(t => t.id === id);
+                        return sum + (t?.seats || 0);
+                      }, 0)
+                    };
+                    break;
+                  }
+                }
+                
                 return (
                   <div
                     key={table.id}
                     className={`
                       absolute border-2 rounded-lg cursor-pointer transition-all duration-200
-                      flex items-center justify-center text-sm font-medium
+                      flex flex-col items-center justify-center text-sm font-medium
                       hover:shadow-lg hover:scale-105 z-10
                       ${getTableStatusColor(table)}
+                      ${joinedGroupInfo ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}
                       ${isJoinTablesMode && selectedTablesForJoining.includes(table.id) 
                         ? 'ring-4 ring-primary ring-opacity-50 border-primary' 
                         : ''}
@@ -289,10 +362,18 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                     <div className="text-center">
                       <div className="font-semibold">{table.label}</div>
                       <div className="text-xs">
-                        {guestCount}/{table.seats}
+                        {joinedGroupInfo 
+                          ? `${guestCount}/${joinedGroupInfo.totalCapacity}` 
+                          : `${guestCount}/${table.seats}`
+                        }
                       </div>
-                      {guestCount > table.seats && (
+                      {guestCount > table.seats && !joinedGroupInfo && (
                         <div className="text-xs text-destructive font-bold">Overflow!</div>
+                      )}
+                      {joinedGroupInfo && (
+                        <Badge variant="outline" className="text-xs mt-1">
+                          ⛓️ {joinedGroupInfo.tableIds.join('+')}
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -530,6 +611,29 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                 >
                   Clear Table
                 </Button>
+                {(() => {
+                  for (const [groupId, tableIds] of joinedTableGroups.entries()) {
+                    if (tableIds.includes(selectedTableData.id)) {
+                      return (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const newGroups = new Map(joinedTableGroups);
+                            newGroups.delete(groupId);
+                            setJoinedTableGroups(newGroups);
+                            toast({
+                              title: "Tables unjoined",
+                              description: `Tables ${tableIds.join(', ')} are now separate`
+                            });
+                          }}
+                        >
+                          Unjoin Tables
+                        </Button>
+                      );
+                    }
+                  }
+                  return null;
+                })()}
                 <Button variant="outline" onClick={() => setSelectedTable(null)}>
                   Close
                 </Button>

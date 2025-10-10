@@ -319,6 +319,21 @@ const CheckInSystem = ({
     };
   }, [user?.id, guestListId, guests?.length]);
 
+  // Load pizza selections from guests data
+  useEffect(() => {
+    if (!guests || guests.length === 0) return;
+    
+    const newPizzaSelections = new Map<number, string[]>();
+    guests.forEach((guest, index) => {
+      if (guest.interval_pizza_selection && Array.isArray(guest.interval_pizza_selection) && guest.interval_pizza_selection.length > 0) {
+        newPizzaSelections.set(index, guest.interval_pizza_selection);
+      }
+    });
+    
+    console.log(`🍕 Loaded pizza selections for ${newPizzaSelections.size} guests from database`);
+    setPizzaSelections(newPizzaSelections);
+  }, [guests]);
+
   // Auto-save to both Supabase and localStorage for backup
   useEffect(() => {
     if (!isInitialized || !user?.id) return;
