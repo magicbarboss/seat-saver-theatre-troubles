@@ -9,6 +9,7 @@ import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus } f
 import { toast } from '@/hooks/use-toast';
 import { ManualMoveDialog } from './seating/ManualMoveDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { formatPizzaName } from './checkin/PizzaOrderDropdown';
 
 interface CheckedInGuest {
   name: string;
@@ -20,6 +21,7 @@ interface CheckedInGuest {
   hasTableAllocated?: boolean;
   notes?: string;
   isWalkIn?: boolean;
+  pizzaSelections?: string[];
 }
 
 interface TableAllocationProps {
@@ -2315,6 +2317,16 @@ const TableAllocation = ({
                 Pager #{section.allocatedGuest.pagerNumber}
               </Badge>
             )}
+            {/* Show pizza selections */}
+            {section.allocatedGuest?.pizzaSelections && section.allocatedGuest.pizzaSelections.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {section.allocatedGuest.pizzaSelections.map(p => (
+                  <Badge key={p} variant="secondary" className="text-xs">
+                    {formatPizzaName(p)}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -3040,6 +3052,15 @@ const TableAllocation = ({
                       </Badge>
                     )}
                   </div>
+                  {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {guest.pizzaSelections.map(p => (
+                        <Badge key={p} variant="secondary" className="text-xs">
+                          {formatPizzaName(p)}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   {guest.notes && (
                     <p className="text-xs text-gray-600 mt-2 italic">"{guest.notes}"</p>
                   )}
@@ -3090,6 +3111,19 @@ const TableAllocation = ({
                 )}
               </div>
               
+              {selectedGuest.pizzaSelections && selectedGuest.pizzaSelections.length > 0 && (
+                <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                  <p className="text-sm font-medium text-purple-900 mb-2">Pizza Selections:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedGuest.pizzaSelections.map(p => (
+                      <Badge key={p} variant="secondary" className="text-xs">
+                        {formatPizzaName(p)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               {selectedGuest.notes && (
                 <div className="p-3 bg-blue-50 rounded border border-blue-200">
                   <p className="text-sm text-blue-800"><strong>Notes:</strong> "{selectedGuest.notes}"</p>
@@ -3132,6 +3166,19 @@ const TableAllocation = ({
                   </Badge>
                 )}
               </div>
+
+              {guestToMove.pizzaSelections && guestToMove.pizzaSelections.length > 0 && (
+                <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                  <p className="text-sm font-medium text-purple-900 mb-2">Pizza Selections:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {guestToMove.pizzaSelections.map(p => (
+                      <Badge key={p} variant="secondary" className="text-xs">
+                        {formatPizzaName(p)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <h4 className="font-medium">Available Tables & Sections:</h4>
