@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -38,16 +37,34 @@ export const PizzaOrderDropdown = ({
 }: PizzaOrderDropdownProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleToggle = async (pizzaValue: string) => {
+  // Count occurrences of each pizza
+  const getQuantity = (pizzaValue: string): number => {
+    return currentSelection.filter(p => p === pizzaValue).length;
+  };
+
+  const handleIncrement = async (pizzaValue: string) => {
     if (isUpdating || disabled) return;
     
     setIsUpdating(true);
     try {
-      const newSelection = currentSelection.includes(pizzaValue)
-        ? currentSelection.filter(p => p !== pizzaValue)
-        : [...currentSelection, pizzaValue];
-      
+      const newSelection = [...currentSelection, pizzaValue];
       await onSelectionChange(guestIndex, newSelection);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDecrement = async (pizzaValue: string) => {
+    if (isUpdating || disabled) return;
+    
+    setIsUpdating(true);
+    try {
+      const index = currentSelection.indexOf(pizzaValue);
+      if (index > -1) {
+        const newSelection = [...currentSelection];
+        newSelection.splice(index, 1);
+        await onSelectionChange(guestIndex, newSelection);
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -64,6 +81,8 @@ export const PizzaOrderDropdown = ({
     }
   };
 
+  const totalPizzas = currentSelection.length;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -73,43 +92,63 @@ export const PizzaOrderDropdown = ({
           disabled={disabled || isUpdating}
           className="h-8 text-xs"
         >
-          {currentSelection.length === 0 ? (
+          {totalPizzas === 0 ? (
             'Select Pizzas'
           ) : (
             <>
               <Badge variant="secondary" className="mr-1">
-                {currentSelection.length}
+                {totalPizzas}
               </Badge>
-              Pizza{currentSelection.length !== 1 ? 's' : ''} Selected
+              Pizza{totalPizzas !== 1 ? 's' : ''} Selected
             </>
           )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
-        className="w-64 bg-background border-border z-50" 
+        className="w-72 bg-background border-border z-50" 
         align="start"
       >
         <div className="p-2 text-xs font-semibold text-muted-foreground">
           Select Pizzas for Interval
         </div>
         <DropdownMenuSeparator />
-        {PIZZA_OPTIONS.map((pizza) => (
-          <DropdownMenuCheckboxItem
-            key={pizza.value}
-            checked={currentSelection.includes(pizza.value)}
-            onCheckedChange={() => handleToggle(pizza.value)}
-            disabled={isUpdating}
-            className="cursor-pointer"
-          >
-            <span className="flex items-center justify-between w-full">
-              {pizza.label}
-              {currentSelection.includes(pizza.value) && (
-                <Check className="h-4 w-4 ml-2" />
-              )}
-            </span>
-          </DropdownMenuCheckboxItem>
-        ))}
-        {currentSelection.length > 0 && (
+        <div className="max-h-80 overflow-y-auto">
+          {PIZZA_OPTIONS.map((pizza) => {
+            const quantity = getQuantity(pizza.value);
+            return (
+              <div
+                key={pizza.value}
+                className="flex items-center justify-between px-2 py-2 hover:bg-accent"
+              >
+                <span className="text-sm flex-1">{pizza.label}</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDecrement(pizza.value)}
+                    disabled={isUpdating || quantity === 0}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-6 text-center">
+                    {quantity}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleIncrement(pizza.value)}
+                    disabled={isUpdating}
+                    className="h-7 w-7 p-0"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {totalPizzas > 0 && (
           <>
             <DropdownMenuSeparator />
             <div className="p-2">
