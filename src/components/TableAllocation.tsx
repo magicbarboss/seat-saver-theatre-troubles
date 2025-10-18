@@ -2325,15 +2325,20 @@ const TableAllocation = ({
             {/* Show pizza selections */}
             <div className="flex items-start gap-2 mt-2">
               <div className="flex flex-wrap gap-1 flex-1">
-                {section.allocatedGuest?.pizzaSelections && section.allocatedGuest.pizzaSelections.length > 0 ? (
-                  section.allocatedGuest.pizzaSelections.map((p, idx) => (
-                    <Badge key={`${p}-${idx}`} variant="secondary" className="text-xs">
-                      {formatPizzaName(p)}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-xs text-muted-foreground">No pizzas</span>
-                )}
+                {(() => {
+                  const currentPizzas = section.allocatedGuest 
+                    ? pizzaSelections.get(section.allocatedGuest.originalIndex) 
+                    : [];
+                  return currentPizzas && currentPizzas.length > 0 ? (
+                    currentPizzas.map((p, idx) => (
+                      <Badge key={`${p}-${idx}`} variant="secondary" className="text-xs">
+                        {formatPizzaName(p)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No pizzas</span>
+                  );
+                })()}
               </div>
               {onPizzaSelectionChange && section.allocatedGuest && (
                 <Button
