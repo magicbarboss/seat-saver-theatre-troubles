@@ -3000,6 +3000,8 @@ const CheckInSystem = ({
             onAddWalkIn={handleAddWalkIn}
             showTimes={showTimes}
             guestTableAllocations={guestTableAllocations}
+            pizzaSelections={pizzaSelections}
+            onPizzaSelectionChange={handlePizzaSelectionChange}
           />
         </TabsContent>
 

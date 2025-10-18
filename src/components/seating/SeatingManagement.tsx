@@ -31,6 +31,8 @@ interface SeatingManagementProps {
   onAddWalkIn?: (walkInData: { name: string; count: number; showTime: string; notes?: string }) => void;
   showTimes: string[];
   guestTableAllocations?: Map<number, number[]>;
+  pizzaSelections?: Map<number, string[]>;
+  onPizzaSelectionChange?: (guestIndex: number, pizzas: string[]) => void;
 }
 
 export const SeatingManagement: React.FC<SeatingManagementProps> = ({
@@ -41,7 +43,9 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
   friendshipGroups,
   onAddWalkIn,
   showTimes,
-  guestTableAllocations = new Map()
+  guestTableAllocations = new Map(),
+  pizzaSelections = new Map(),
+  onPizzaSelectionChange
 }) => {
   const [tables, setTables] = useState<Table[]>([]);
   const [activeTab, setActiveTab] = useState('seating');
@@ -369,16 +373,18 @@ export const SeatingManagement: React.FC<SeatingManagementProps> = ({
         </div>
 
         <TabsContent value="seating" className="space-y-6">
-          <SeatingChart
-            tables={tablesWithGuests}
-            checkedInGuests={checkedInGuests}
-            onTableAssign={handleTableAssign}
-            onGuestMove={handleGuestMove}
-            onTableClear={handleTableClear}
-            friendshipGroups={friendshipGroups}
-            onAddWalkIn={onAddWalkIn}
-            showTimes={showTimes}
-          />
+              <SeatingChart
+                tables={tablesWithGuests}
+                checkedInGuests={checkedInGuests}
+                onTableAssign={handleTableAssign}
+                onGuestMove={handleGuestMove}
+                onTableClear={handleTableClear}
+                friendshipGroups={friendshipGroups}
+                onAddWalkIn={onAddWalkIn}
+                showTimes={showTimes}
+                pizzaSelections={pizzaSelections}
+                onPizzaSelectionChange={onPizzaSelectionChange}
+              />
         </TabsContent>
 
         <TabsContent value="designer" className="space-y-6">

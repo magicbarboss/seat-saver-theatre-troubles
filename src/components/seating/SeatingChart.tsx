@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckedInGuest } from '../checkin/types';
 import { WalkInGuestForm } from '../checkin/WalkInGuestForm';
-import { formatPizzaName } from '../checkin/PizzaOrderDropdown';
+import { formatPizzaName, PizzaOrderDropdown } from '../checkin/PizzaOrderDropdown';
 import { toast } from '@/hooks/use-toast';
-import { Users, UserMinus, Eye, EyeOff, ChevronDown, Link, UserPlus } from 'lucide-react';
+import { Users, UserMinus, Eye, EyeOff, ChevronDown, Link, UserPlus, Pizza } from 'lucide-react';
 
 interface Table {
   id: string;
@@ -33,6 +33,8 @@ interface SeatingChartProps {
   friendshipGroups: Map<string, number[]>;
   onAddWalkIn?: (walkInData: { name: string; count: number; showTime: string; notes?: string }) => void;
   showTimes: string[];
+  pizzaSelections?: Map<number, string[]>;
+  onPizzaSelectionChange?: (guestIndex: number, pizzas: string[]) => void;
 }
 
 export const SeatingChart: React.FC<SeatingChartProps> = ({
@@ -43,7 +45,9 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   onTableClear,
   friendshipGroups,
   onAddWalkIn,
-  showTimes = []
+  showTimes = [],
+  pizzaSelections = new Map(),
+  onPizzaSelectionChange
 }) => {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -51,6 +55,7 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
   const [isJoinTablesMode, setIsJoinTablesMode] = useState(false);
   const [selectedTablesForJoining, setSelectedTablesForJoining] = useState<string[]>([]);
   const [joinedTableGroups, setJoinedTableGroups] = useState<Map<string, string[]>>(new Map());
+  const [editingPizzaForGuest, setEditingPizzaForGuest] = useState<CheckedInGuest | null>(null);
 
   // Calculate table statistics
   const tableStats = useMemo(() => {
@@ -571,32 +576,45 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
               <div className="space-y-2">
                 <h4 className="font-medium">Assigned Guests:</h4>
                 {selectedTableData.assignedGuests.map(guest => (
-                  <div key={guest.originalIndex} className="flex items-center justify-between p-2 border border-border rounded">
-                    <div className="flex-1">
-                      <div className="font-medium">{guest.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {guest.count} guests • {guest.showTime}
-                      </div>
-                      {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {guest.pizzaSelections.map(pizza => (
-                            <Badge key={pizza} variant="secondary" className="text-xs">
-                              {formatPizzaName(pizza)}
-                            </Badge>
-                          ))}
+                  <div key={guest.originalIndex} className="p-2 border border-border rounded space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium">{guest.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {guest.count} guests • {guest.showTime}
                         </div>
-                      )}
+                        {guest.pizzaSelections && guest.pizzaSelections.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {guest.pizzaSelections.map((pizza, idx) => (
+                              <Badge key={`${pizza}-${idx}`} variant="secondary" className="text-xs">
+                                {formatPizzaName(pizza)}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        {onPizzaSelectionChange && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingPizzaForGuest(guest)}
+                          >
+                            <Pizza className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Move guest back to unassigned
+                            onGuestMove(guest, selectedTableData.id, '');
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Move guest back to unassigned
-                        onGuestMove(guest, selectedTableData.id, '');
-                      }}
-                    >
-                      Remove
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -638,6 +656,41 @@ export const SeatingChart: React.FC<SeatingChartProps> = ({
                   Close
                 </Button>
               </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Pizza Selection Edit Dialog */}
+      {editingPizzaForGuest && onPizzaSelectionChange && (
+        <Dialog open={true} onOpenChange={() => setEditingPizzaForGuest(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Pizza Order - {editingPizzaForGuest.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Select pizzas for this guest's table
+              </div>
+              <PizzaOrderDropdown
+                guestId={editingPizzaForGuest.originalIndex.toString()}
+                guestIndex={editingPizzaForGuest.originalIndex}
+                currentSelection={pizzaSelections.get(editingPizzaForGuest.originalIndex) || []}
+                onSelectionChange={async (guestIndex, pizzas) => {
+                  await onPizzaSelectionChange(guestIndex, pizzas);
+                  toast({
+                    title: "Pizza Order Updated",
+                    description: `Updated pizza selection for ${editingPizzaForGuest.name}`
+                  });
+                }}
+              />
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setEditingPizzaForGuest(null)}
+              >
+                Close
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
