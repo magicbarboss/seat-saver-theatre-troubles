@@ -5,11 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus } from 'lucide-react';
+import { Users, Utensils, CheckCircle, Plus, Minus, ArrowRightLeft, UserPlus, Pizza } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ManualMoveDialog } from './seating/ManualMoveDialog';
 import { supabase } from '@/integrations/supabase/client';
-import { formatPizzaName } from './checkin/PizzaOrderDropdown';
+import { formatPizzaName, PizzaOrderDropdown } from './checkin/PizzaOrderDropdown';
 
 interface CheckedInGuest {
   name: string;
@@ -31,7 +31,9 @@ interface TableAllocationProps {
   onGuestSeated: (sectionInfo: { originalIndex: number; sectionId: string; guestCount: number }) => void;
   onTableAllocated: (guestIndex: number, tableIds: number[]) => void;
   onAddWalkIn?: (walkInGuest: { name: string; count: number; showTime: string; notes?: string }) => void;
-  currentShowTime?: string; // Add current show time context
+  currentShowTime?: string;
+  pizzaSelections?: Map<number, string[]>;
+  onPizzaSelectionChange?: (guestIndex: number, pizzas: string[]) => void;
 }
 
 interface TableSection {
@@ -61,7 +63,9 @@ const TableAllocation = ({
   onGuestSeated,
   onTableAllocated,
   onAddWalkIn,
-  currentShowTime = 'all'
+  currentShowTime = 'all',
+  pizzaSelections = new Map(),
+  onPizzaSelectionChange
 }: TableAllocationProps) => {
   const [tables, setTables] = useState<Table[]>([
     // Row 1 (Front) - T1, T2, T3 - 2 seats each (whole tables)
@@ -202,6 +206,7 @@ const TableAllocation = ({
     showTime: '7pm',
     notes: ''
   });
+  const [editingPizzaForGuest, setEditingPizzaForGuest] = useState<CheckedInGuest | null>(null);
   
   // Table joining states
   const [isJoinTablesMode, setIsJoinTablesMode] = useState(false);
@@ -2318,15 +2323,29 @@ const TableAllocation = ({
               </Badge>
             )}
             {/* Show pizza selections */}
-            {section.allocatedGuest?.pizzaSelections && section.allocatedGuest.pizzaSelections.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {section.allocatedGuest.pizzaSelections.map(p => (
-                  <Badge key={p} variant="secondary" className="text-xs">
-                    {formatPizzaName(p)}
-                  </Badge>
-                ))}
+            <div className="flex items-start gap-2 mt-2">
+              <div className="flex flex-wrap gap-1 flex-1">
+                {section.allocatedGuest?.pizzaSelections && section.allocatedGuest.pizzaSelections.length > 0 ? (
+                  section.allocatedGuest.pizzaSelections.map((p, idx) => (
+                    <Badge key={`${p}-${idx}`} variant="secondary" className="text-xs">
+                      {formatPizzaName(p)}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground">No pizzas</span>
+                )}
               </div>
-            )}
+              {onPizzaSelectionChange && section.allocatedGuest && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingPizzaForGuest(section.allocatedGuest)}
+                  className="h-6 w-6 p-0"
+                >
+                  <Pizza className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -3392,6 +3411,41 @@ const TableAllocation = ({
         onMove={handleManualMove}
         preSelectedGuest={preSelectedGuestForMove}
       />
+
+      {/* Pizza Selection Edit Dialog */}
+      {editingPizzaForGuest && onPizzaSelectionChange && (
+        <Dialog open={true} onOpenChange={() => setEditingPizzaForGuest(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Pizza Order - {editingPizzaForGuest.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                Select pizzas for this guest
+              </div>
+              <PizzaOrderDropdown
+                guestId={editingPizzaForGuest.originalIndex.toString()}
+                guestIndex={editingPizzaForGuest.originalIndex}
+                currentSelection={pizzaSelections.get(editingPizzaForGuest.originalIndex) || []}
+                onSelectionChange={async (guestIndex, pizzas) => {
+                  await onPizzaSelectionChange(guestIndex, pizzas);
+                  toast({
+                    title: "Pizza Order Updated",
+                    description: `Updated pizza selection for ${editingPizzaForGuest.name}`
+                  });
+                }}
+              />
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setEditingPizzaForGuest(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

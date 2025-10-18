@@ -3023,6 +3023,8 @@ const CheckInSystem = ({
               onTableAllocated={handleTableAllocated}
               onAddWalkIn={handleAddWalkIn}
               currentShowTime={showFilter}
+              pizzaSelections={pizzaSelections}
+              onPizzaSelectionChange={handlePizzaSelectionChange}
             />
           </ErrorBoundary>
         </TabsContent>
